@@ -35,19 +35,14 @@ resolution <- 0.01
 #Will be used to generate a blank raster for the output to be built onto, WGS84
 #CRS.  Resolution in deg, bounding box in lat/long.
 
-ghgrp_file <- "US_GHGRP_Landfills_only_all_years.xls"
 LMOP_file <- "lmopdata(Aug_22)_landfill_only.xlsx"
 year <- "2019"
 
+#states in the domain
+state_list=c("NY","NJ","MD","DE","PA")
+
 GHGI_value <- 3943 #Gg CH4/yr
 #total national municipal landfill emissions from the GHGI
-
-# 1 site stopped reporting without a valid reason, as ID'd from an error message
-# in the code - instead using the most recent reported value for that facility
-LMOP_update <- data.frame("Facility"="Kearny 1-D",
-                          "GHGRP.ID"=1011381,
-                          "CH4.Data"=85308,
-                          "latest.year"=2016)
 
 plotting_function <- "G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Code and method/Scripts/Plotting_individual_sectors.R"
 #the location of another script that just creates some functions for consistent,
@@ -55,7 +50,7 @@ plotting_function <- "G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Code
 ################################################################################
 #load packages
 i <- 1
-packagecheck <- c("raster","ncdf4","readxl")
+packagecheck <- c("raster","ncdf4","readxl","httr")
 while(i<=length(packagecheck)){
   if(length(find.package(packagecheck[i],quiet = TRUE))<1){
     install.packages(packagecheck[i],repos="https://repo.miserver.it.umich.edu/cran/")
@@ -79,25 +74,87 @@ d03_rast <- raster(nrows=diff(range(d03_bounding_box[,2]))/resolution,
 
 rm(d03_bounding_box,resolution)
 ################################################################################
-# First load all data and convert as necessary
+#Download the relevant data using the API
+#(https://www.epa.gov/enviro/envirofacts-data-service-api) and combine the
+#facility and emission data appropriately
 
-ghgrp <- read_xls(file.path(Input_directory,ghgrp_file),sheet=year,col_names = T,skip = 5)
-#read the appropriate year.  
+#initialize output
+outfile <- vector()
+ghgrp_facility_info <- data.frame()
+
+for(A in 1:length(state_list)){
+  #create a temp file for the download, use HTTR to download it to that file,
+  #and then read/combine them in an R dataframe
+  outfile <- c(outfile,tempfile(fileext = ".xlsx"))
+  GET(paste0("https://data.epa.gov/efservice/PUB_DIM_FACILITY/STATE/=/",state_list[A],"/EXCEL"),
+      write_disk(outfile[A]))
+  ghgrp_facility_info <- rbind(ghgrp_facility_info,read_excel(outfile[A]))
+}
+#download the relevant landfill-sector data (https://www.epa.gov/enviro/greenhouse-gas-model)
+outfile <- c(outfile,tempfile(fileext = ".xlsx"))
+invisible(GET("https://data.epa.gov/efservice/HH_SUBPART_LEVEL_INFORMATION/EXCEL",
+              write_disk(outfile[A+1])))
+ghgrp_landfill_emissions <- read_excel(outfile[A+1])
+
+#force all names to be lowercase to allow matches even if case sometimes differs
+ghgrp_facility_info$facility_name <- tolower(ghgrp_facility_info$facility_name)
+ghgrp_landfill_emissions$facility_name <- tolower(ghgrp_landfill_emissions$facility_name)
+
+#facility info uses column name year, landfill data uses reporting_year, change
+#to be consistent
+colnames(ghgrp_landfill_emissions) <- gsub("reporting_","",colnames(ghgrp_landfill_emissions))
+
+#combine the datasets by ID, facility name, and year
+ghgrp_all_data <- merge(ghgrp_facility_info,ghgrp_landfill_emissions,
+                        by=c("facility_id","facility_name","year"), all=F)
+
+#keep only data for the year of interest
+ghgrp <- ghgrp_all_data[ghgrp_all_data$year==year,]
+
+#Calculate national total in the GHGRP for the year of interest
+ghgrp_national <- sum(as.numeric(ghgrp_landfill_emissions$ghg_quantity[ghgrp_landfill_emissions$year==year]))/1000   # MT CH4/yr to Gg CH4/yr
+
+
+#identify facilities that stopped reporting without a valid reason, then subset
+#to only landfill facilities
+nonreporting_facilities <- unique(ghgrp_facility_info$facility_id[ghgrp_facility_info$reporting_status=="STOPPED_REPORTING_UNKNOWN_REASON" & ghgrp_facility_info$year<=year])
+nonreporting_landfills <- nonreporting_facilities[which(nonreporting_facilities %in% unique(ghgrp_landfill_emissions$facility_id))]
+
+#find the latest data available for those that stopped reporting
+nonreporting_landfill_data <- ghgrp_all_data[ghgrp_all_data$facility_id %in% nonreporting_landfills,] %>% 
+  group_by(facility_id) %>% 
+  slice_max(order_by = year) %>%
+  as.data.frame()
+
+#add this most recent data to the GHGRP dataset
+ghgrp <- rbind(nonreporting_landfill_data,ghgrp)
+
+#convert the relevant columns to numeric class
+ghgrp[,c("latitude","longitude","ghg_quantity")] <- apply(ghgrp[,c("latitude","longitude","ghg_quantity")],
+                                                          2,FUN = function(x){as.numeric(x)})
+
+#delete all tempfiles and clean up working environment
+unlink(outfile)
+rm(A,ghgrp_all_data,ghgrp_facility_info,ghgrp_landfill_emissions,
+   nonreporting_landfill_data,nonreporting_facilities,nonreporting_landfills,
+   outfile,state_list)
+################################################################################
+#Now convert to spatial and load/convert LMOP.  Assign GHGI_national -
+#GHGRP_national to all LMOP facilities equally.
 
 #convert to a spatial object, crop to d03, convert units
-coordinates(ghgrp) <- ~LONGITUDE + LATITUDE
+coordinates(ghgrp) <- ~longitude + latitude
 proj4string(ghgrp) <- CRS(SRS_string="EPSG:4326")  # WGS84
 ghgrp_crop <- crop(ghgrp, d03_rast)
-ghgrp_crop$emiss <- ghgrp_crop$`GHG QUANTITY (METRIC TONS CO2e)`*1e6/(25*16.043*365*24*60*60)   # MT CO2e/yr to mol/s of CH4
+ghgrp_crop$emiss <- ghgrp_crop$ghg_quantity*1e6/(16.043*365*24*60*60)   # MT CH4/yr to mol/s of CH4
 
 # Now calculate national totals
-ghgrp_national <- sum(ghgrp$`GHG QUANTITY (METRIC TONS CO2e)`)/25000   # MT CO2e/yr to Gg CH4/yr
 EPA_total <- GHGI_value 
 non_ghgrp_total <- EPA_total - ghgrp_national
 
 # Read in LMOP and remove those in GHGRP
 LMOP <- read_xlsx(file.path(Input_directory,LMOP_file),sheet="LMOP Database",col_names = T)
-LMOP_non_ghgrp <- LMOP[!(LMOP$`GHGRP ID` %in% ghgrp$`GHGRP ID`),] 
+LMOP_non_ghgrp <- LMOP[!(LMOP$`GHGRP ID` %in% ghgrp$facility_id),] 
 
 #This has some nans in, remove those
 LMOP_filt <- subset(LMOP_non_ghgrp,!is.na(Latitude))
@@ -109,47 +166,9 @@ LMOP_crop <- crop(LMOP_filt, d03_rast)
 avg_non_ghgrp <- non_ghgrp_total/nrow(LMOP_non_ghgrp)
 # For comparison, calculate avg ghgrp
 avg_ghgrp <- ghgrp_national/nrow(ghgrp)
-################################################################################
-#Check for any potential GHGRP reporters who've stopped reporting to check if
-#they did so without a valid reason
-
-ghgrp_old <- read_xls(file.path(Input_directory,ghgrp_file),sheet="2010",col_names = T,skip = 5)
-for(old_year in as.character(2011:(as.numeric(year)-1))){
-  ghgrp_one_year <- read_xls(file.path(Input_directory,ghgrp_file),sheet=old_year,col_names = T,skip = 5)
-  ghgrp_old <- rbind(ghgrp_one_year,ghgrp_old)
-}
-#load in and combine GHGRP data from 2010 to the year before the year of
-#interest
-
-coordinates(ghgrp_old) <- ~LONGITUDE + LATITUDE
-proj4string(ghgrp_old) <- CRS(SRS_string="EPSG:4326")  # WGS84
-ghgrp_old <- crop(ghgrp_old, d03_rast)
-#same as previous section
-ghgrp_old <- ghgrp_old[!duplicated(ghgrp_old$`GHGRP ID`),]
-ghgrp_old <- ghgrp_old[!(ghgrp_old$`GHGRP ID` %in% ghgrp$`GHGRP ID`),]
-ghgrp_old <- ghgrp_old[!(ghgrp_old$`GHGRP ID` %in% LMOP_update$GHGRP.ID),]
-#keep only 1 row per facility (the most recent comes first, so it's the one that
-#will be kept) and remove any that still report in the year of interest or have
-#already been dealt with in LMOP_update.
-
-if(nrow(ghgrp_old)>0){
-  View(ghgrp_old@data)
-  stop("Line 137 - The table lists the most recent data for all GHGRP facilities that are no longer reporting.  Look into these missing facilities on GHGRP's website to check if they stopped reporting for a valid reason or not.  If not, add them to LMOP_update in the beginning, rerun, then run the remainder of the code.  If all had a valid reason, simply continue.")
-}
-#check these no longer reporting facilities to check if they stopped reporting
-#without a valid reason
-
-#sort them by GHGRP ID so that matches can be made more easily
-LMOP_crop <- LMOP_crop[order(LMOP_crop$`GHGRP ID`),]
-LMOP_update <- LMOP_update[order(LMOP_update$GHGRP.ID),]
-
 # Assign the avg emissions to LMOP landfills
 LMOP_crop$emiss <- avg_non_ghgrp*1e9/(16.043*365*24*60*60)   #Gg CH4/yr to mol/s of CH4
-# and assign the non-reporters who stopped reporting without a valid reason
-LMOP_update$CH4.Data <- LMOP_update$CH4.Data*1e6/(25*16.043*365*24*60*60) #MT CO2e/yr to mol/s of CH4
-LMOP_crop$emiss[LMOP_crop$`GHGRP ID`%in%LMOP_update$GHGRP.ID] <- LMOP_update$CH4.Data
 
-rm(ghgrp_old,ghgrp_one_year)
 ################################################################################
 # Now rasterise and save
 
@@ -166,7 +185,8 @@ write.csv(ghgrp_crop, file.path(Output_directory,'MSW_GHGRP_all.csv'))
 write.csv(LMOP_crop, file.path(Output_directory,"MSW_LMOP_all.csv"))
 
 # Now just the names, coordinates and emissions
-ghgrp_crop_output <- data.frame(ghgrp_crop$`FACILITY NAME`,coordinates(ghgrp_crop),ghgrp_crop$emiss)
+# ghgrp_crop_output <- data.frame(ghgrp_crop$`FACILITY NAME`,coordinates(ghgrp_crop),ghgrp_crop$emiss)
+ghgrp_crop_output <- data.frame(ghgrp_crop$facility_name,coordinates(ghgrp_crop),ghgrp_crop$emiss)
 names(ghgrp_crop_output) <- c('Site_Name','Longitude','Latitude','Emission_mol_per_s')
 write.csv(ghgrp_crop_output,file.path(Output_directory,'MSW_GHGRP.csv'),row.names=FALSE)
 
