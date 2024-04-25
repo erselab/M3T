@@ -50,7 +50,7 @@ plotting_function <- "G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Code
 ################################################################################
 #load packages
 i <- 1
-packagecheck <- c("raster","ncdf4","readxl","httr")
+packagecheck <- c("raster","ncdf4","readxl","httr","dplyr")
 while(i<=length(packagecheck)){
   if(length(find.package(packagecheck[i],quiet = TRUE))<1){
     install.packages(packagecheck[i],repos="https://repo.miserver.it.umich.edu/cran/")
