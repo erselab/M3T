@@ -50,7 +50,7 @@ plotting_function <- "G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Code
 ################################################################################
 #load packages
 i <- 1
-packagecheck <- c("raster","ncdf4","readxl","httr","dplyr")
+packagecheck <- c("raster","ncdf4","readxl","httr","dplyr","jsonlite")
 while(i<=length(packagecheck)){
   if(length(find.package(packagecheck[i],quiet = TRUE))<1){
     install.packages(packagecheck[i],repos="https://repo.miserver.it.umich.edu/cran/")
@@ -78,23 +78,41 @@ rm(d03_bounding_box,resolution)
 #(https://www.epa.gov/enviro/envirofacts-data-service-api) and combine the
 #facility and emission data appropriately
 
-#initialize output
-outfile <- vector()
-ghgrp_facility_info <- data.frame()
+#see https://www.eia.gov/opendata/browser/seds
+SEDS_URL <- paste0("https://api.eia.gov/v2/seds/data/?frequency=annual&data[0]=value&facets[seriesId][]=CLCCB",
+                   "&facets[seriesId][]=CLEIB&facets[seriesId][]=CLICB&facets[seriesId][]=NGCCB&facets[seriesId][]=NGEIB&facets[seriesId][]=NGICB&facets[seriesId][]=PACCB&facets[seriesId][]=PAEIB&facets[seriesId][]=PAICB&facets[seriesId][]=PARCB&facets[seriesId][]=WDRCB&facets[seriesId][]=WWCCB&facets[seriesId][]=WWEIB&facets[seriesId][]=WWICB",
+                   paste0("&facets[stateId][]=",state_list,collapse = ""),
+                   "&start=",SEDS_year,"&end=",SEDS_year,
+                   "&sort[0][column]=seriesId&sort[0][direction]=asc&offset=0&api_key=",API_key)
 
+#download directly into R and keep only the data table
+EIA_raw_data <- fromJSON(SEDS_URL)
+EIA_raw_data <- EIA_raw_data$response$data
+
+#rearrange columns/rows to better mesh with EPA data
+EIA_data=(reshape(EIA_raw_data[,c("seriesId","stateId","value")],idvar="stateId",timevar = "seriesId",direction="wide"))
+
+#rename to be consistent with EPA (matches SEDS webpage)
+colnames(EIA_data) <- c("State",colnames(EPA_data)[c(2,4,3,9,11,10,6,8,7,5,12,13,15,14)])
+EIA_data$State <- gsub("US","US_SEDS",EIA_data$State)
+
+#make numeric rather than text, combine with EPA, and sort by state
+EIA_data[,-1] <- apply(EIA_data[,-1], 2, FUN=function(x){as.numeric(x)/1000})
+stat_comb_data <- rbind(EIA_data,EPA_data)
+stat_comb_data <- stat_comb_data[order(stat_comb_data$State),]
+
+#see https://www.epa.gov/enviro/envirofacts-data-service-api
+data_URLs <- paste0("https://data.epa.gov/efservice/PUB_DIM_FACILITY/STATE/=/",state_list,"/JSON")
+
+#initialize output
+ghgrp_facility_info <- data.frame()
 for(A in 1:length(state_list)){
-  #create a temp file for the download, use HTTR to download it to that file,
-  #and then read/combine them in an R dataframe
-  outfile <- c(outfile,tempfile(fileext = ".xlsx"))
-  GET(paste0("https://data.epa.gov/efservice/PUB_DIM_FACILITY/STATE/=/",state_list[A],"/EXCEL"),
-      write_disk(outfile[A]))
-  ghgrp_facility_info <- rbind(ghgrp_facility_info,read_excel(outfile[A]))
+  #use HTTR to download data and read/combine them in an R dataframe
+  ghgrp_facility_info <- rbind(ghgrp_facility_info,fromJSON(data_URLs[A]))
 }
+
 #download the relevant landfill-sector data (https://www.epa.gov/enviro/greenhouse-gas-model)
-outfile <- c(outfile,tempfile(fileext = ".xlsx"))
-invisible(GET("https://data.epa.gov/efservice/HH_SUBPART_LEVEL_INFORMATION/EXCEL",
-              write_disk(outfile[A+1])))
-ghgrp_landfill_emissions <- read_excel(outfile[A+1])
+ghgrp_landfill_emissions <- fromJSON("https://data.epa.gov/efservice/HH_SUBPART_LEVEL_INFORMATION/JSON")
 
 #force all names to be lowercase to allow matches even if case sometimes differs
 ghgrp_facility_info$facility_name <- tolower(ghgrp_facility_info$facility_name)
@@ -134,7 +152,6 @@ ghgrp[,c("latitude","longitude","ghg_quantity")] <- apply(ghgrp[,c("latitude","l
                                                           2,FUN = function(x){as.numeric(x)})
 
 #delete all tempfiles and clean up working environment
-unlink(outfile)
 rm(A,ghgrp_all_data,ghgrp_facility_info,
    nonreporting_landfill_data,nonreporting_facilities,nonreporting_landfills,
    outfile,state_list)
