@@ -187,6 +187,13 @@ EIA_data[,-1] <- apply(EIA_data[,-1], 2, FUN=function(x){as.numeric(x)/1000})
 stat_comb_data <- rbind(EIA_data,EPA_data)
 stat_comb_data <- stat_comb_data[order(stat_comb_data$State),]
 
+#round so that EPA and SEDS have the same precision (national) and the other
+#sector-states have the same precision as the webpage data
+stat_comb_data[stat_comb_data$State=="US_SEDS",-1] <- 
+  round(stat_comb_data[stat_comb_data$State=="US_SEDS",-1])
+stat_comb_data[,-1] <- 
+  round(stat_comb_data[,-1],1)
+
 rm(EIA_raw_data,EIA_data)
 ################################################################################
 # # #automatically download and combine the data from the EIA SEDS database.  Also
