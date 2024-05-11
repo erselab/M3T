@@ -26,6 +26,11 @@
 
 #Do we need the urban tigerlines, or just the focus city ones?  
 
+#which is better?  Source the function Inventory_based_disaggregation here and
+#within the code save output to an input environment (current setup) or source
+#it in the function it's needed (i.e., stationary_combustion) and have it assign
+#output to the parent directory?  Does it matter?
+
 #some defaults for a Philly centered domain with NAD83 crs
 # CH4_inventory_build <- function(Input_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Raw data/",
 #                                 Output_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Processed/",
@@ -180,7 +185,7 @@
                    xmin=min(domain_bbox[,1]), xmax=max(domain_bbox[,1]),
                    ymin=min(domain_bbox[,2]), ymax=max(domain_bbox[,2]), 
                    crs=domain_crs)
-    rm(domain_bbox,domain_res)
+    rm(domain_bbox,domain_res,domain_crs)
   }
   
   ################################################################################
@@ -271,11 +276,11 @@
 # }
   
   #example quick plots
-  # sf chloropleth
+  ##sf chloropleth
   # plot(all_merge_sf_LCC_state["res_wood_ER"])
-  # terra chloropleth, same colorscale
+  ##terra chloropleth, same colorscale
   # plot(all_merge_LCC_state,"res_wood_ER",col=sf.colors(13),breaks=13)
 
+  
 
-
-
+  
