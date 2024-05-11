@@ -1,12 +1,7 @@
 #Write a function to disaggregate total emissions using ACES/Vulcan or both
 #within sub domain bounds (states, Local Distribution Companies, Counties)
 
-# input_inventory=aces_res
-# totals=res_totals
-# agg_level="state"
-# NEI_input=all_merge_LCC_state
-
-disaggregation <- function(input_inventory,totals,agg_level,NEI_input){
+disaggregation <- function(input_inventory,totals,agg_level,NEI_input,cover_all,out_envir){
   input_name <- deparse(substitute(input_inventory))
   #pull the input name (aces_res/com or vu_res/com) for naming later.  Note -
   #this must be done before input_inventory is edited
@@ -22,14 +17,6 @@ disaggregation <- function(input_inventory,totals,agg_level,NEI_input){
   names(input_inventory_ch4) <- totals
   # Set up lists of rasters for calculating ch4 emissions, with one raster for
   # each subsector
-  
-  assign(x=gsub("res|com|ind|elec","template",input_name),template,envir = .GlobalEnv)
-  #save the template to the global environment, as it may be needed later.
-  
-  
-  
-  
-  
   
   for(i in 1:length(cover_all)){
     cover <- cover_all[[i]]
@@ -59,8 +46,7 @@ disaggregation <- function(input_inventory,totals,agg_level,NEI_input){
     
     cat("\rFinished mapping",input_name,agg_level,"level entry",i,"of",length(cover_all),"        ")
   }#cover loop
-  
-  assign(x=paste0(input_name,"_ch4_by",agg_level),input_inventory_ch4,envir = .GlobalEnv)
+  assign(x=paste0(input_name,"_ch4_by",agg_level),input_inventory_ch4,envir = out_envir)
   #save this output to the global environment, as it'll be needed later.
   #E.g., aces_res_ch4_state or vu_com_ch4_domain
   
