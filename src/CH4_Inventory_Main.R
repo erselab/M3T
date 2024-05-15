@@ -2,7 +2,7 @@
 #to build a CH4 inventory one sector at a time.  Requires the user set a config
 #file to determine which variants for some sectors are run among other things.
 
-#questions
+#questions/work to be done
 
 #what shapefiles do we want to use for both subsetting in some cases, and
 #plotting?  TL or CB (excludes water areas) or other (Joe had a much higher res
@@ -22,7 +22,12 @@
 #Is there a better way to do a config file than a .R file like I did?
 
 #So far the ECHO API doesn't seem to provide similar NEI data, but only facility
-#locations without the emissions data.
+#locations without the emissions data.  Same for wastewater data
+#https://echo.epa.gov/tools/web-services/facility-search-water#/Facility%20Information/get_cwa_rest_services_get_download
+
+#Difficulty using USGS API too.
+#https://data.usgs.gov/datacatalog/api/docs#/Harvest/read_harvested_files_harvest_files_get.
+#PID for USGS NLCD is USGS:649595e9d34ef77fcb01dca3.
 
 #Do we need the urban tigerlines, or just the focus city ones?  
 
@@ -30,6 +35,81 @@
 #within the code save output to an input environment (current setup) or source
 #it in the function it's needed (i.e., stationary_combustion) and have it assign
 #output to the parent directory?  Does it matter?
+
+#I should go through and double check that any potential cropping/masking is
+#done carefully.  Ideally, always include a slight buffer to avoid edge issues.
+#Given the input can be any CRS, this could impact more than it originally did.
+
+#Should change it so that different variants are all possible in any
+#combination.  E.g., like Vulcan or ACES (either or both can be true).  This
+#applies to wastewater (Moore vs GHGI, scaled emissions for septic vs reported
+#septic emissions - which can be varied by state).
+
+#Noticed an issue with WWTP that has an impact on a few pixels.  Pixels that are
+#on the border of 2 states get included in both.  This occurs when masking.  Can
+#easily deal with it by calculating fractional coverage within the state and
+#multiplying by this weighting to put these pixels partially within each state
+#and then adding them in the final domain-scale output.
+
+#currently I have built things to get ~identical output to the original to test
+#for bugs.  Several things can be updated to newer data.  E.g., CWNS 2022, NLCD
+#2021.
+
+#Note the newer CWNS seems to have a rather different layout, though it appears
+#the same information is available.
+
+#I need to carefully go through and set the codes to identify the appropriate
+#year to use for data that are not available annually (e.g., NEI, CWNS).
+#Additionally, I need some error capability to use a previous year if the year
+#chosen is too recent to have data (e.g., GHGRP).
+
+#For wastewater do we want to update the NLCD km2 national coverage of open or
+#low_int landcover?  It wouldn't be hard, and terra runs drastically faster.
+#Still going to take quite some time I'm sure.  We are using an NLCD that is 1
+#or 2 versions ahead of the publication listing the values, and I can easily
+#compare to that version to make sure the calculation is comparable.
+
+#for NLCD_fraction saw that the domain-sum of open
+#(global(open*cellSize(open,unit="km"),sum,na.rm=T) was 5235.635 when projecting
+#a vector outline of the domain and crop/masking.  When projecting the raster to
+#the domain (necessary for other calculations) I get the below:
+#bilinear = 5162.411
+#near = 5175.685
+#cubic = 5174.696
+#cubicspline = 5177.335
+#lanczos = 5195.922
+#We previoously used nearest neighbor and that's what I currently use too.
+
+#need to update landfill to save combustion/waste emissions separately.
+
+# Industrial wastewater facilities sometimes report CH4 to subparts AA
+# (pulp/paper), C (combustion), and TT (industrial landfill), but the GHGRP
+# equivalent is only from industrial wastewater
+
+#downloading GHGRP data is sometimes repetitive (facility location type data in
+#particular is downloaded in full several times).  Talking with EPA about better
+#use of the API may solve this issue, but downloading this data 1 x in the main
+#would improve things as well.  I could save it to the input folder like I do
+#with tigerlines so it only has to be downloaded once.
+
+#do we want to keep septic and wastewater in the same function?  They are pretty
+#much completely independent calculations.  Industrial wastewater too (straight
+#from GHGRP).
+
+#wastewater matched exactly when replacing projection and area functions with
+#terra and making sure input data was the same.  However, the NLCD fractions did
+#differ more significantly given it used to be XESMF.  Both spatial and
+#state/domain totals differed, though the differences weren't huge.
+
+#should double check conversions are exactly what we want (minor, mass is 16.043
+#g/mol or 16 g/mol, year to day = 365 or 365.25).  Should at least make sure
+#they're all consistent.
+
+#by default terra has progress bars for steps that take a long time (e.g., NLCD
+#calculations).  Do we want this behavior?  If so we should add clarification
+#before each discussing WHAT is in progress (confusing otherwise).
+
+#need to go through and properly set verbose if statements for some codes.
 
 #some defaults for a Philly centered domain with NAD83 crs
 # CH4_inventory_build <- function(Input_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Raw data/",
@@ -174,6 +254,8 @@
   #accordingly)
   source(paste0(code_directory,"Landfill_emissions_r1.R"))
   source(paste0(code_directory,"stationary_combustion_r4.R"))
+  source(paste0(code_directory,"NLCD_fractions_by_state.R"))
+  source(paste0(code_directory,"WWTP_emissions_r3.R"))
   
   ################################################################################
   #create the domain and set it to all NaN
@@ -263,7 +345,12 @@
        stationary_combustion_by_state,stationary_combustion_by_domain)
   }
   if(Process_wastewater){
-    
+    NLCD_open_and_low_int()
+    Wastewater()
+    rm(Wastewater_Municipal_file,Wastewater_Municipal_method,
+       Wastewater_State_info,GHGI_national_wastewater_septic,
+       GHGI_national_wastewater_nonseptic,GHGI_septic_EF,
+       Total_national_open_or_low_int_area,National_wastewater_info)
   }
   if(Process_wetlands_and_inland_waters){
     
