@@ -49,7 +49,9 @@
 #on the border of 2 states get included in both.  This occurs when masking.  Can
 #easily deal with it by calculating fractional coverage within the state and
 #multiplying by this weighting to put these pixels partially within each state
-#and then adding them in the final domain-scale output.
+#and then adding them in the final domain-scale output.  Of course this ignores
+#the fact that pre-aggregation more of the landtype of interest could be in 1
+#state than the other, not necessarily evenly distributed...
 
 #currently I have built things to get ~identical output to the original to test
 #for bugs.  Several things can be updated to newer data.  E.g., CWNS 2022, NLCD
@@ -110,6 +112,9 @@
 #before each discussing WHAT is in progress (confusing otherwise).
 
 #need to go through and properly set verbose if statements for some codes.
+
+#we can speed up downloading API resources by filtering to just the data we need
+#as long as we ensure it's not different data (like GHGRP was).
 
 #some defaults for a Philly centered domain with NAD83 crs
 # CH4_inventory_build <- function(Input_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Raw data/",
