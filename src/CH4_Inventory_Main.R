@@ -8,9 +8,29 @@
 #plotting?  TL or CB (excludes water areas) or other (Joe had a much higher res
 #shapefile)?
 
+#need to post simplistic case for terra extract to github still.  exactextractR
+#(adds exact=T for raster::extract) agrees almost perfectly, but for the simple
+#case it gave the expected answer (1/2) whereas terra was always a little off.
+
+#likely need to update/clean up comments throughout several of the functions to
+#more appropriately describe what's happening.
+
+#Need to be careful with any sort of API-based filtering of GHGRP data.  Saw
+#that compressors subset to the states of interest included a few on the W
+#coast...  Possible that some weren't included in the same (erroneous) fashion.
+
+#double check ghgrp downloads - transmission (part W) includes a lot of
+#facilities that report to subpart W, but are not what we're interested in.
+#Additionally, some have different names between subparts - so merging may need
+#to be done differently...
+
 #Is there a better way to install/library packages than either of the 2
 #approaches I provided?  I believe it should look different in a package anyway,
 #so this may not matter.
+
+#stress test main - change domain to a completely different region (and res),
+#change to use an input raster rather than a bbox, change crs to one none of the
+#input uses (e.g., UTM EPSG:3372), change year
 
 #Do we want to keep the option to use XESMF at all, or just always use Terra or
 #GdalUtils?
@@ -113,8 +133,30 @@
 
 #need to go through and properly set verbose if statements for some codes.
 
+#Do we want verbose to dictate saving csv's as well?  What about the input data?
+
+#Need to check for reused data (e.g., ACES/Vulcan, GHGRP facility data, GHGRP
+#combustion data) and consider downloading here rather than in multiple scripts.
+
+#Need to consider saving input data like GHGRP to be loaded instead of
+#re-downloaded each time (like tigerlines) to speed up multiple runs.
+
 #we can speed up downloading API resources by filtering to just the data we need
 #as long as we ensure it's not different data (like GHGRP was).
+
+#for now I have the compressor code flag an error and provide some
+#visuals/tables if there's any GHGRP reporting compressor stations without a
+#matching HIFLD facility within 1 km.  GHGRP values overwrite the national
+#average applied to other HIFLD facilities.  We can instead add any that far
+#away as new facilities or dig into other ideas.  Only about 8 in our domain.
+#Can run nationally to investigate.
+
+#Need to consider the potential of multiples (3 GHGRP facilities match to the
+#same HIFLD one).  I believe the code would just use 1 of them and ignore the
+#others.
+
+#checked and compressors and pipelines ~perfectly matched if using the terra
+#area functions in the old code
 
 #some defaults for a Philly centered domain with NAD83 crs
 # CH4_inventory_build <- function(Input_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Raw data/",
@@ -261,6 +303,7 @@
   source(paste0(code_directory,"stationary_combustion_r4.R"))
   source(paste0(code_directory,"NLCD_fractions_by_state.R"))
   source(paste0(code_directory,"WWTP_emissions_r3.R"))
+  source(paste0(code_directory,"NG_transmission_emissions_r1.R"))
   
   ################################################################################
   #create the domain and set it to all NaN
@@ -342,12 +385,14 @@
     
   }
   if(Process_natural_gas_transmission){
-    
+    Transmission()
+    rm(Process_natural_gas_transmission)
   }
   if(Process_stationary_combustion){
     Stationary_combustion()
     rm(stationary_combustion_GHGI_data,stationary_combustion_emission_factors,
-       stationary_combustion_by_state,stationary_combustion_by_domain)
+       stationary_combustion_by_state,stationary_combustion_by_domain,
+       Process_stationary_combustion)
   }
   if(Process_wastewater){
     NLCD_open_and_low_int()
@@ -355,7 +400,8 @@
     rm(Wastewater_Municipal_file,Wastewater_Municipal_method,
        Wastewater_State_info,GHGI_national_wastewater_septic,
        GHGI_national_wastewater_nonseptic,GHGI_septic_EF,
-       Total_national_open_or_low_int_area,National_wastewater_info)
+       Total_national_open_or_low_int_area,National_wastewater_info,
+       Process_wastewater)
   }
   if(Process_wetlands_and_inland_waters){
     
