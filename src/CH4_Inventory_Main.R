@@ -158,6 +158,54 @@
 #checked and compressors and pipelines ~perfectly matched if using the terra
 #area functions in the old code
 
+#add clear user update(s) for each Sector (e.g., cat("starting sector X\n") ...
+#cat("processing Y for sector X\n"))
+
+#for NG distribution - the EIA does have state level data available by API, but
+#I could not find an api to access the forms that are per company
+
+#for NG distribution - we discussed having a separate script to build the by-LDC
+#shapefiles and just including those in the package?.  Right now it's just
+#loading in the prepared files from what I did for Philly before.  I will need
+#to spend some time recoding this and rebuilding a merged dataset for the entire
+#NEC.  I believe some GHGRP data may be able to replace some of the EIA/PHMSA
+#data (need to investigate) and emailed GHGRP on 6/3/2024 to find out if we can
+#access the GHGRP shapefiles directly.
+
+#the eia API (distribion and stationry combustion) seems to have changed since I
+#ran stationary combustion.  Filtering by year used to work fine if setting
+#start/end year to the desired year for annual data.  Now that returns nothing
+#and I need a +/- 1 year (stranger still, I needed to start 1 yr earlier for 1
+#script, and end 1 year later for the other to get the desired year).
+
+#for NG distribution - the more detailed GHGRP data I have easy access to via
+#Envirofacts now has gas volumes delivered by sector which we were getting from
+#EIA.  We still need customer counts from EIA, but this does provide a means to
+#automatically match those datasets.  Unfortunately, they did not perfectly
+#match, so there is some question as to which we rely on.  Most do match exactly
+#or quite close though.
+
+#for NG distribution - there WAS an API-downloadable table that included a bunch
+#of data I previously webscraped (some of which is also available in PHMSA).
+#However, it only goes to 2015 and I can't find equivalent data in the post 2015
+#data tables.  As such I'm still webscraping for it...
+#https://enviro.epa.gov/envirofacts/metadata/table/ghg/w_local_dist_companies_details
+
+#for NG distribution - the extract function takes a LONG time to run.  Doing it
+#for each state individually is not too bad, but doing it for the domain as a
+#whole is CONSIDERABLY slower.  I should investigate simply summing the state
+#values pixel-by-pixel (should give identical output).
+#aggregate(do.call(rbind.data.frame, cover_all_old),
+#by=list(do.call(rbind.data.frame, cover_all_old)$cell), sum,na.rm=T)
+
+#for NG distribution - need to compare to original version, fixing all
+#reprojections and area calculations to terra.
+
+#for NG distribution and stationary combustion - there is a separate script to
+#convert units, reformat, and reproject the output from these scripts because
+#Joe did this via XESMF.  No need to do this now, and this should be
+#reincorporated into the individual scripts.
+
 #some defaults for a Philly centered domain with NAD83 crs
 # CH4_inventory_build <- function(Input_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Raw data/",
 #                                 Output_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Processed/",
@@ -304,6 +352,7 @@
   source(paste0(code_directory,"NLCD_fractions_by_state.R"))
   source(paste0(code_directory,"WWTP_emissions_r3.R"))
   source(paste0(code_directory,"NG_transmission_emissions_r1.R"))
+  source(paste0(code_directory,"NG_distribution_emissions_r4.R"))
   
   ################################################################################
   #create the domain and set it to all NaN
@@ -382,17 +431,20 @@
     rm(Process_landfills,Municipal_solid_waste,GHGI_landfill_total)
   }
   if(Process_natural_gas_distribution){
-    
+    NG_distribution()
+    rm(Process_natural_gas_distribution,natural_gas_post_meter_emission_factor,
+       NG_distribution_by_domain,NG_distribution_by_LDC,NG_distribution_by_state)
+    #add function name
   }
   if(Process_natural_gas_transmission){
     Transmission()
-    rm(Process_natural_gas_transmission)
+    rm(Process_natural_gas_transmission,Transmission)
   }
   if(Process_stationary_combustion){
     Stationary_combustion()
     rm(stationary_combustion_GHGI_data,stationary_combustion_emission_factors,
        stationary_combustion_by_state,stationary_combustion_by_domain,
-       Process_stationary_combustion)
+       Process_stationary_combustion,Stationary_combustion)
   }
   if(Process_wastewater){
     NLCD_open_and_low_int()
@@ -401,16 +453,19 @@
        Wastewater_State_info,GHGI_national_wastewater_septic,
        GHGI_national_wastewater_nonseptic,GHGI_septic_EF,
        Total_national_open_or_low_int_area,National_wastewater_info,
-       Process_wastewater)
+       Process_wastewater,NLCD_open_and_low_int,Wastewater)
   }
   if(Process_wetlands_and_inland_waters){
     
+    rm(Process_wetlands_and_inland_waters)
   }
   if(Incorporate_remaining_sectors_from_gridded_EPA){
     
   }
-  
-  
+  if(Combine_sectors){
+    
+  }
+
 # }
   
   #example quick plots
