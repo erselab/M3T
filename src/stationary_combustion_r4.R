@@ -37,7 +37,7 @@ Stationary_combustion <- function(){
   SEDS_URL <- paste0("https://api.eia.gov/v2/seds/data/?frequency=annual&data[0]=value&facets[seriesId][]=CLCCB",
                      "&facets[seriesId][]=CLEIB&facets[seriesId][]=CLICB&facets[seriesId][]=NGCCB&facets[seriesId][]=NGEIB&facets[seriesId][]=NGICB&facets[seriesId][]=PACCB&facets[seriesId][]=PAEIB&facets[seriesId][]=PAICB&facets[seriesId][]=PARCB&facets[seriesId][]=WDRCB&facets[seriesId][]=WWCCB&facets[seriesId][]=WWEIB&facets[seriesId][]=WWICB",
                      paste0("&facets[stateId][]=",state_name_list,collapse = ""),
-                     "&start=",inventory_year,"&end=",inventory_year,
+                     "&start=",inventory_year-1,"&end=",inventory_year,
                      "&sort[0][column]=seriesId&sort[0][direction]=asc&offset=0&api_key=",EIA_API_key)
   
   #download directly into R and keep only the data table
