@@ -224,7 +224,9 @@
 #Better organize output.  I think xl files in 1 folder, subsector output in 1,
 #and sector output in a third
 
-#roxygen or similar package from links Israel sent to properly document code.  
+#roxygen or similar package from links Israel sent to properly document code.
+#See here for specifics of doing this for a dataset rather than code
+#(https://roxygen2.r-lib.org/articles/rd-other.html).
 
 #Make all inputs to the functions actual arguments, not pulled from global.
 
@@ -455,7 +457,8 @@
                           domain=domain,state_name_list=state_name_list,
                           output_directory=output_directory,
                           inventory_year=inventory_year,
-                          verbose=verbose)
+                          verbose=verbose,
+                          GHGI_landfill_total=GHGI_landfill_total)
     rm(Process_landfills,Municipal_solid_waste,GHGI_landfill_total)
   }
   if(Process_natural_gas_distribution){
