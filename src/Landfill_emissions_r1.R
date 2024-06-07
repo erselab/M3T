@@ -26,12 +26,8 @@
 # But leave this out here and just use the GEPA industrial landfill emissions
 
 
-Municipal_solid_waste <- function(){
-  
-  ################################################################################
-  #User input
-  
-  LMOP_file <- "lmopdata(Mar_24)_landfill_only.xlsx"
+Municipal_solid_waste <- function(LMOP_file,domain,state_name_list,
+                                  output_directory,inventory_year,verbose){
   
   ################################################################################
   #Download the relevant emissions data using the API
@@ -155,7 +151,7 @@ Municipal_solid_waste <- function(){
   # Read in LMOP and remove those in GHGRP.  Note facilities that used to report
   # to GHGRP and stopped with a valid reason are being considered LMOP facilities
   # in this approach.
-  LMOP <- read_xlsx(file.path(input_directory,LMOP_file),sheet="LMOP Database",col_names = T)
+  LMOP <- read_xlsx(LMOP_file,sheet="LMOP Database",col_names = T)
   LMOP_non_ghgrp <- LMOP[!(LMOP$`GHGRP ID` %in% ghgrp_landfill_emissions$facility_id[ghgrp_landfill_emissions$year==inventory_year]),]
   
   #This has some nans in, remove those
@@ -231,8 +227,7 @@ Municipal_solid_waste <- function(){
              "Municipal Solid Waste -\n (GHGI - GHGRP) distributed using \nLandfill Methane Outreach Program")
     
     dir.create("Summed_Sectors",showWarnings = F)
-    setwd("Summed_Sectors")
-    
+
     Summed_landfill <- ghgrp_flux+LMOP_flux
     log_plot(Summed_landfill,
              "Landfill Sector\nGHGRP + LMOP for municipal")

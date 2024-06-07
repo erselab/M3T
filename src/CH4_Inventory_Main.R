@@ -217,6 +217,17 @@
 #GEPA - do we want visuals of the industrial landfills, non-fossil GEPA sectors,
 #and fossil GEPA sectors?
 
+#for NG dist and stat_comb - towards the end when saving and plotting there's
+#quite a bit of redundant code that's also harder to read than it needs to be.
+#Should clean up.
+
+#Better organize output.  I think xl files in 1 folder, subsector output in 1,
+#and sector output in a third
+
+#roxygen or similar package from links Israel sent to properly document code.  
+
+#Make all inputs to the functions actual arguments, not pulled from global.
+
 #some defaults for a Philly centered domain with NAD83 crs
 # CH4_inventory_build <- function(Input_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Raw data/",
 #                                 Output_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Processed/",
@@ -364,7 +375,7 @@
   source(paste0(code_directory,"WWTP_emissions_r3.R"))
   source(paste0(code_directory,"NG_transmission_emissions_r1.R"))
   source(paste0(code_directory,"NG_distribution_emissions_r4.R"))
-  source(paste0(code_directory,""))
+  source(paste0(code_directory,"Prepare_GEPA.R"))
   
   ################################################################################
   #create the domain and set it to all NaN
@@ -439,7 +450,12 @@
   #Actually run the functions now, based on the config file
   
   if(Process_landfills){
-    Municipal_solid_waste()
+    Municipal_solid_waste(LMOP_file=file.path(input_directory,
+                                              "lmopdata(Mar_24)_landfill_only.xlsx"),
+                          domain=domain,state_name_list=state_name_list,
+                          output_directory=output_directory,
+                          inventory_year=inventory_year,
+                          verbose=verbose)
     rm(Process_landfills,Municipal_solid_waste,GHGI_landfill_total)
   }
   if(Process_natural_gas_distribution){
