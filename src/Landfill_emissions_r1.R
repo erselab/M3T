@@ -1,3 +1,70 @@
+#'@title Create gridded municipal solid waste methane emissions maps
+#'
+#'@description `Municipal_solid_waste` writes 2 netcdf files of gridded methane
+#'  emissions from municipal landfills, as well as optional visuals and more
+#'  easily read excel files
+#'
+#'@details This function calculates and grids methane emissions from municipal
+#'  landfills. It uses the greenhouse gas reporting program (GHGRP) emissions
+#'  when available.  It then calculates the difference between national GHGRP
+#'  emissions and the national greenhouse gas inventory (GHGI) emissions (GHGI
+#'   - GHGRP) and distributes this residual equally to all facilities in the
+#'  landfill methane outreach program (LMOP) that are not already accounted for
+#'  by the GHGRP.
+#'
+#'  The necessary GHGRP data will be automatically downloaded.
+#'
+#'  The GHGRP includes only facilities that emit at least 25,000 metric tons of
+#'  carbon dioxide equivalent while the GHGI is intended to capture all national
+#'  emissions and LMOP is a voluntary program with location and other details,
+#'  but no emissions information.
+#'
+#'  LMOP and GHGRP gridded emissions maps are saved separately.
+#'@param LMOP_file Character providing the full filepath to the landfill methane
+#'  outreach program's landfill-level only data excel file available at
+#'  <https://www.epa.gov/lmop/landfill-technical-data>
+#'@param domain SpatRaster providing the desired output grid, including the
+#'  desired resolution, projection, and coordinate reference system
+#'@param state_name_list Character vector listing all states within the desired
+#'  domain
+#'@param output_directory Character providing the full filepath to save
+#'  processed data
+#'@param inventory_year Character indicating the desired year of GHGRP data to
+#'  use.  The data is available starting in 2010 and generally is about 2 years
+#'  behind present day.
+#'@param verbose Logical indicating whether to save additional output.  This
+#'  includes 4 csv files, 2 providing summarized and 2 providing detailed
+#'  information for all landfills within the domain, separated between LMOP and
+#'  GHGRP.  It also includes 2 plots of the gridded methane emissions on log
+#'  scales, one for LMOP facilities and one for GHGRP facilities.
+#'@param GHGI_landfill_total Numeric.  The total national emissions from
+#'  municipal solid waste from the GHGI for the inventory_year in kilotons per
+#'  year, equivalent to gigagrams per year.  The GHGI is available at
+#'  <https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks>
+#'  and the value can be found in the table titled 'CH4 emissions from Landfills
+#'  (kt)' as row 'MSW net CH4 Emissions'.
+#'@returns Nothing is returned from the function, but the main outputs are 2
+#'  netcdf files of the methane emissions of municipal landfills.
+#'@examples
+#'grid_bbox=cbind(c(-76.65,-73.65),c(38.97,40.97))
+#'grid_res=0.01
+#'grid_crs="epsg:4326"
+#'grid <- rast(nrows=diff(range(grid_bbox[,2]))/grid_res,
+#'             ncols=diff(range(grid_bbox[,1]))/grid_res, xmin=min(grid_bbox[,1]),
+#'             xmax=max(grid_bbox[,1]), ymin=min(grid_bbox[,2]), ymax=max(grid_bbox[,2]),
+#'             crs=grid_crs)
+#'             
+#'Municipal_solid_waste(LMOP_file="~/../Desktop/lmopdata(Mar_24)_landfill_only.xlsx",
+#'                      domain=grid,state_name_list=c("DE","MD","NJ","NY","PA"),
+#'                      output_directory="~/../Desktop/",inventory_year="2018",
+#'                      verbose=TRUE)
+#'@author Joe Pitt, \email{madeup@@wisc.edu}
+#'@author Kris Hajny, \email{blank@@fake.edu}
+#'@author Israel Lopez-Coto, \email{test@@test.edu}
+
+
+
+
 ## Landfill_emissions_r1.R
 ## Developed: 2021-10-22 17:00
 ## Finalized: 2023-02-03
@@ -27,7 +94,8 @@
 
 
 Municipal_solid_waste <- function(LMOP_file,domain,state_name_list,
-                                  output_directory,inventory_year,verbose){
+                                  output_directory,inventory_year,verbose,
+                                  GHGI_landfill_total){
   
   ################################################################################
   #Download the relevant emissions data using the API
@@ -225,12 +293,6 @@ Municipal_solid_waste <- function(LMOP_file,domain,state_name_list,
              "Municipal Solid Waste -\n GHGRP reporters")
     log_plot(LMOP_flux,filename="MSW_LMOP",
              "Municipal Solid Waste -\n (GHGI - GHGRP) distributed using \nLandfill Methane Outreach Program")
-    
-    dir.create("Summed_Sectors",showWarnings = F)
-
-    Summed_landfill <- ghgrp_flux+LMOP_flux
-    log_plot(Summed_landfill,
-             "Landfill Sector\nGHGRP + LMOP for municipal")
   }
   
 }
