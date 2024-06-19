@@ -1,9 +1,6 @@
 #Config file for all Sectors.  Modify any of the below variables as desired.
 #Separated by input type and sector.
 
-EIA_API_key <- "1kLep4UApTZKwdOrDkW6J8qlO0niiw8ej0JPliyc"
-
-
 #Sectors to process
 Process_wetlands_and_inland_waters <- FALSE
 Process_landfills <- FALSE
@@ -12,7 +9,7 @@ Process_natural_gas_transmission <- FALSE
 Process_stationary_combustion <- FALSE
 Process_wastewater <- FALSE
 Incorporate_remaining_sectors_from_gridded_EPA <- FALSE
-
+Combine_sectors <- FALSE #create total CH4 inventory(s) by summing across sectors
 
 
 #Variations on the method
@@ -24,7 +21,7 @@ Incorporate_remaining_sectors_from_gridded_EPA <- FALSE
 		stationary_combustion_by_state <- TRUE
 		stationary_combustion_by_domain <- TRUE
   #Natural Gas Distribution
-		NG_distribution_by_LDC <- TRUE
+		NG_distribution_by_LDC <- F
 		NG_distribution_by_state <- TRUE
 		NG_distribution_by_domain <- TRUE
 	#Wastewater
@@ -55,7 +52,7 @@ Incorporate_remaining_sectors_from_gridded_EPA <- FALSE
 
 
 
-#Emission factors and GHGI values
+#Emission factors, GHGI values, and other sector-specific information
 	#Landfills
 		GHGI_landfill_total <- 3943 #Gg CH4/yr
 		#total national municipal landfill emissions from the GHGI.  In a table titled
@@ -80,6 +77,7 @@ Incorporate_remaining_sectors_from_gridded_EPA <- FALSE
 		#convert from g/yr to mol/s.
 
 	#Stationary Combustion
+    EIA_API_key <- "1kLep4UApTZKwdOrDkW6J8qlO0niiw8ej0JPliyc"
 		stationary_combustion_GHGI_data <- data.frame("State"="US_EPA",
 								"com_coal"=17,
 								"ind_coal"=517,
@@ -140,7 +138,7 @@ Incorporate_remaining_sectors_from_gridded_EPA <- FALSE
 
 		Total_national_open_or_low_int_area <- 352032 #km2
 		#National total of developed open space and developed low intensity land cover
-		#from the national land cover database from
+		#from the national land cover database from Table 7 of 
 		#https://doi.org/10.1016/j.isprsjprs.2020.02.019.
 
 		National_wastewater_info <- data.frame("Year"=c(1990,2021),

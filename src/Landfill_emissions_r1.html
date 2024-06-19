@@ -22,7 +22,7 @@ function processMathHTML() {
 
 <p>'Municipal_solid_waste' writes 2 netcdf files of gridded methane
 emissions from municipal landfills, as well as optional visuals and more
-easily read excel files
+easily read csv files
 </p>
 
 
@@ -35,7 +35,11 @@ easily read excel files
   output_directory,
   inventory_year,
   verbose,
-  GHGI_landfill_total
+  GHGI_landfill_total,
+  plot_directory,
+  County_Tigerlines,
+  State_Tigerlines,
+  focus_city_tigerlines
 )
 </code></pre>
 
@@ -47,12 +51,16 @@ easily read excel files
 <td>
 <p>Character providing the full filepath to the landfill methane
 outreach program's landfill-level only data excel file available at
-&lt;https://www.epa.gov/lmop/landfill-technical-data&gt;</p>
+<a href="https://www.epa.gov/lmop/landfill-technical-data">https://www.epa.gov/lmop/landfill-technical-data</a>.  Only the LMOP_database
+tab is used and only the variables GHGRP_ID, latitude, and longitude are
+used.  Columns represent separate variables and rows represent separate
+landfills.  There is an example file in the package's datasets folder that
+has been successfully used in this code available for reference.</p>
 </td></tr>
 <tr><td><code id="domain">domain</code></td>
 <td>
 <p>SpatRaster providing the desired output grid, including the
-desired resolution, projection, and coordinate reference system</p>
+desired resolution and coordinate reference system</p>
 </td></tr>
 <tr><td><code id="state_name_list">state_name_list</code></td>
 <td>
@@ -66,9 +74,7 @@ processed data</p>
 </td></tr>
 <tr><td><code id="inventory_year">inventory_year</code></td>
 <td>
-<p>Character indicating the desired year of GHGRP data to
-use.  The data is available starting in 2010 and generally is about 2 years
-behind present day.</p>
+<p>Numeric indicating the desired year of data to use.</p>
 </td></tr>
 <tr><td><code id="verbose">verbose</code></td>
 <td>
@@ -80,12 +86,39 @@ scales, one for LMOP facilities and one for GHGRP facilities.</p>
 </td></tr>
 <tr><td><code id="GHGI_landfill_total">GHGI_landfill_total</code></td>
 <td>
-<p>Numeric.  The total national emissions from
-municipal solid waste from the GHGI for the inventory_year in kilotons per
-year, equivalent to gigagrams per year.  The GHGI is available at
-&lt;https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks&gt;
+<p>Numeric.  Pulled from config file.  The total
+national emissions from municipal solid waste from the GHGI for the
+inventory_year in kilotons per year, equivalent to gigagrams per year.  The
+GHGI is available at
+<a href="https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks">https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks</a>
 and the value can be found in the table titled 'CH4 emissions from Landfills
 (kt)' as row 'MSW net CH4 Emissions'.</p>
+</td></tr>
+<tr><td><code id="plot_directory">plot_directory</code></td>
+<td>
+<p>Character providing the full filepath to save figures.
+Only relevant if verbose = TRUE.</p>
+</td></tr>
+<tr><td><code id="County_Tigerlines">County_Tigerlines</code></td>
+<td>
+<p>SpatVector.  United States Census Bureau county
+shapefile.  Available at
+<a href="https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html">https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html</a>.
+Only relevant if verbose=TRUE.</p>
+</td></tr>
+<tr><td><code id="State_Tigerlines">State_Tigerlines</code></td>
+<td>
+<p>SpatVector.  United States Census Bureau county
+shapefile.  Available at
+<a href="https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html">https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html</a>.
+Only relevant if verbose=TRUE.</p>
+</td></tr>
+<tr><td><code id="focus_city_tigerlines">focus_city_tigerlines</code></td>
+<td>
+<p>SpatVector.  United States Census Bureau county
+shapefile.  Available at
+<a href="https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html">https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html</a>.
+Only relevant if a focus city was set in main and verbose=TRUE.</p>
 </td></tr>
 </table>
 
@@ -93,19 +126,29 @@ and the value can be found in the table titled 'CH4 emissions from Landfills
 <h3>Details</h3>
 
 <p>This function calculates and grids methane emissions from municipal
-landfills. It uses the greenhouse gas reporting program (GHGRP) emissions
-when available.  It then calculates the difference between national GHGRP
-emissions and the national greenhouse gas inventory (GHGI) emissions (GHGI
-- GHGRP) and distributes this residual equally to all facilities in the
-landfill methane outreach program (LMOP) that are not already accounted for
-by the GHGRP.
+landfills. It uses the Environmental Protection Agency's (EPA) Greenhouse
+Gas Reporting Program (GHGRP) emissions when available.  It then calculates
+the difference between national GHGRP emissions and the EPA national
+Greenhouse Gas Inventory (GHGI) emissions (GHGI - GHGRP) and distributes
+this residual equally to all facilities in the EPA Landfill Methane Outreach
+Program (LMOP) that are not already accounted for by the GHGRP.
 </p>
 <p>The necessary GHGRP data will be automatically downloaded.
 </p>
 <p>The GHGRP includes only facilities that emit at least 25,000 metric tons of
 carbon dioxide equivalent while the GHGI is intended to capture all national
 emissions and LMOP is a voluntary program with location and other details,
-but no emissions information.
+but no emissions information.  GHGRP data is available starting in 2010 and
+generally is about 2 years behind present day, the GHGI is available
+starting in 1990 and is updated approximately in sync with the GHGRP, and
+the LMOP is updated more frequently, sometimes multiple times per year.  All
+three datasets are annual.  The GHGRP and LMOP are at the facility scale
+while the GHGI is national totals.
+</p>
+<p>The GHGI is available at
+<a href="https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks">https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks</a>
+The GHGRP is available at <a href="https://www.epa.gov/ghgreporting">https://www.epa.gov/ghgreporting</a> LMOP is
+available at <a href="https://www.epa.gov/lmop/landfill-technical-data">https://www.epa.gov/lmop/landfill-technical-data</a>
 </p>
 <p>LMOP and GHGRP gridded emissions maps are saved separately.
 </p>
@@ -114,7 +157,15 @@ but no emissions information.
 <h3>Value</h3>
 
 <p>Nothing is returned from the function, but the main outputs are 2
-netcdf files of the methane emissions of municipal landfills.
+netcdf files of the methane emissions of municipal landfills.  They are
+titled &quot;MSW_GHGRP.nc&quot; and &quot;MSW_LMOP.nc&quot;.
+</p>
+<p>If verbose is set to TRUE, then &quot;MSW_GHGRP.csv&quot;, &quot;MSW_GHGRP_all.csv&quot;,
+&quot;MSW_LMOP.csv&quot;, and &quot;MSW_LMOP_all.csv&quot; are also saved.  The simpler csvs
+include only the name, location, and assigned emissions for landfills within
+the domain that were pulled from the corresponding input file.  The _all
+files include all variables that were in the corresponding input file for
+the same landfills.
 </p>
 
 
@@ -130,18 +181,28 @@ netcdf files of the methane emissions of municipal landfills.
 
 <h3>Examples</h3>
 
-<pre><code class='language-R'>grid_bbox=cbind(c(-76.65,-73.65),c(38.97,40.97))
+<pre><code class='language-R'>library(terra)
+grid_bbox=cbind(c(-76.65,-73.65),c(38.97,40.97))
 grid_res=0.01
 grid_crs="epsg:4326"
 grid &lt;- rast(nrows=diff(range(grid_bbox[,2]))/grid_res,
             ncols=diff(range(grid_bbox[,1]))/grid_res, xmin=min(grid_bbox[,1]),
             xmax=max(grid_bbox[,1]), ymin=min(grid_bbox[,2]), ymax=max(grid_bbox[,2]),
             crs=grid_crs)
-            
+
+Urban_Tigerlines &lt;- vect("~/../Desktop/Urban_Tigerlines/tl_2018_us_uac10.shp")
+focus_city &lt;- terra::subset(Urban_Tigerlines,Urban_Tigerlines$NAME10 %in% "Philadelphia, PA--NJ--DE--MD")
 Municipal_solid_waste(LMOP_file="~/../Desktop/lmopdata(Mar_24)_landfill_only.xlsx",
-                     domain=grid,state_name_list=c("DE","MD","NJ","NY","PA"),
-                     output_directory="~/../Desktop/",inventory_year="2018",
-                     verbose=TRUE)
+                      domain=grid,
+                      state_name_list=c("DE","MD","NJ","NY","PA"),
+                      output_directory="~/../Desktop/",
+                      inventory_year=2018,
+                      verbose=TRUE,
+                      GHGI_landfill_total = 3943,
+                      State_Tigerlines=vect("~/../Desktop/State_Tigerlines/tl_2018_us_state.shp"),
+                      County_Tigerlines=vect("~/../Desktop/County_Tigerlines/tl_2018_us_county.shp"),
+                      focus_city_tigerlines=focus_city,
+                      plot_directory="~/../Desktop/plots/")
 </code></pre>
 
 </main>

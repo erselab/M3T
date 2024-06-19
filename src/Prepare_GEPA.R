@@ -1,8 +1,74 @@
+#'@title Pull gridded methane emissions maps for sectors not built with other
+#'  functions from the Maasakkers gridded EPA inventory
+#'
+#'@description `Prepare_GEPA` writes 3 netcdf files of gridded methane emissions
+#'  - 1 for thermogenic sectors, 1 for industrial landfills, and 1 for
+#'  non-thermogenic sources.
+#'
+#'@details This function downloads the most appropriate year of gridded methane
+#'  data at 0.1 deg by 0.1 deg from Maasakkers et al. and pulls sectors that
+#'  have not been calculated in other scripts.  They are projected to the domain
+#'  grid and combined into thermogenic and non-thermogenic groups, with the
+#'  exception of industrial landfills which are saved separately.  For
+#'  thermogenic this includes
+#' \itemize{
+#'   \item mobile combustion
+#'   \item Coal (abandoned, surface, and underground)
+#'   \item Petroleum Systems (exploration, production, refining, and transport)
+#'   \item Abandoned Oil and Gas
+#'   \item Natural Gas (exploration, processing, and production)
+#'   \item Industry (petrochemical, and ferroalloy)
+#'   }
+#'  And for non-thermogenic this includes
+#'   \itemize{
+#'   \item Composting
+#'   \item Enteric Fermentation
+#'   \item Manure Management
+#'   \item Rice Cultivation
+#'   \item Field Burning
+#'   }
+#'  The data is available at \url{https://doi.org/10.5281/zenodo.8367082}.  The
+#'  file will be saved to input_directory to avoid re-downloading every run.
+#'@param domain SpatRaster providing the desired output grid, including the
+#'  desired resolution and coordinate reference system
+#'@param input_directory Character providing the full filepath to save/load
+#'  input data
+#'@param output_directory Character providing the full filepath to save
+#'  processed data
+#'@param inventory_year Numeric indicating the desired year of data to use.
+#'@returns Nothing is returned from the function, but the main outputs are 3
+#'  netcdf files of the methane emissions from the gridded EPA product.  They
+#'  are titled "GEPA_thermo.nc" for gridded EPA thermogenic,
+#'  "GEPA_non_thermo.nc" for non-thermogenic, "GEPA_ind_landfill.nc" for
+#'  industrial landfills.
+#'@examples
+#'library(terra)
+#'grid_bbox=cbind(c(-76.65,-73.65),c(38.97,40.97))
+#'grid_res=0.01
+#'grid_crs="epsg:4326"
+#'grid <- rast(nrows=diff(range(grid_bbox[,2]))/grid_res,
+#'             ncols=diff(range(grid_bbox[,1]))/grid_res, xmin=min(grid_bbox[,1]),
+#'             xmax=max(grid_bbox[,1]), ymin=min(grid_bbox[,2]), ymax=max(grid_bbox[,2]),
+#'             crs=grid_crs)
+#' Prepare_GEPA(inventory_year=2018,
+#'              input_directory="~/../Desktop/",
+#'              output_directory="~/../Desktop/",
+#'              domain=grid)
+#'@author Joe Pitt, \email{madeup@@wisc.edu}
+#'@author Kris Hajny, \email{blank@@fake.edu}
+#'@author Israel Lopez-Coto, \email{test@@test.edu}
+#'@reference \href{https://doi.org/10.1021/acs.est.3c05138}{Maasakkers et al.}
+#'@export
+
+
 #download the gridded epa inventory if it hasn't already been downloaded, then
 #split into the components that we don't have in our inventory and save them to
 #incorporate into the total easily later.
 
-Prepare_GEPA <- function(){
+Prepare_GEPA <- function(inventory_year,
+                         input_directory,
+                         output_directory,
+                         domain){
   
   #Zenodo API to download the appropriate GEPA v2 file.
   #https://zenodo.org/records/8367082
@@ -28,12 +94,12 @@ Prepare_GEPA <- function(){
   
   GEPA <- project(GEPA,domain)
   
-  GEPA_non_FF_sectors <- c("emi_ch4_5B1_Composting",
+  GEPA_non_thermo_sectors <- c("emi_ch4_5B1_Composting",
                            "emi_ch4_3A_Enteric_Fermentation",
                            "emi_ch4_3B_Manure_Management",
                            "emi_ch4_3C_Rice_Cultivation",
                            "emi_ch4_3F_Field_Burning")
-  GEPA_FF_sectors <- c("emi_ch4_1A_Combustion_Mobile",
+  GEPA_thermo_sectors <- c("emi_ch4_1A_Combustion_Mobile",
                        "emi_ch4_1B1a_Abandoned_Coal",
                        "emi_ch4_1B1a_Surface_Coal",
                        "emi_ch4_1B1a_Underground_Coal",
@@ -54,12 +120,12 @@ Prepare_GEPA <- function(){
   
   #subset to the 3 types of GEPA data we need
   GEPA_landfill <- GEPA$emi_ch4_5A1_Landfills_Industrial
-  GEPA_non_FF <- GEPA[[which(names(GEPA) %in% GEPA_non_FF_sectors)]]
-  GEPA_FF <- GEPA[[which(names(GEPA) %in% GEPA_FF_sectors)]]
+  GEPA_non_thermo <- GEPA[[which(names(GEPA) %in% GEPA_non_thermo_sectors)]]
+  GEPA_thermo <- GEPA[[which(names(GEPA) %in% GEPA_thermo_sectors)]]
   
   #sum across layers for those that are multiple individual sectors
-  GEPA_non_FF <- sum(GEPA_non_FF)
-  GEPA_FF <- sum(GEPA_FF)
+  GEPA_non_thermo <- sum(GEPA_non_thermo)
+  GEPA_thermo <- sum(GEPA_thermo)
   
   ################################################################################
   #Save the output
@@ -72,16 +138,16 @@ Prepare_GEPA <- function(){
            longname=paste0(gsub("_"," ",gsub(".nc","",GEPA_filename))," industrial landfills"),
            missval=-9999,
            overwrite=TRUE)
-  writeCDF(GEPA_non_FF,
-           file.path(output_directory,'GEPA_non_FF.nc'),
+  writeCDF(GEPA_non_thermo,
+           file.path(output_directory,'GEPA_non_thermo.nc'),
            force_v4=TRUE,
            varname='methane_emissions',
            unit='nmol/m2/s',
            longname=paste0(gsub("_"," ",gsub(".nc","",GEPA_filename))," enteric fermentation, manure management, rice cultivation, field burning, and composting"),
            missval=-9999,
            overwrite=TRUE)
-  writeCDF(GEPA_FF,
-           file.path(output_directory,'GEPA_FF.nc'),
+  writeCDF(GEPA_thermo,
+           file.path(output_directory,'GEPA_thermo.nc'),
            force_v4=TRUE,
            varname='methane_emissions',
            unit='nmol/m2/s',

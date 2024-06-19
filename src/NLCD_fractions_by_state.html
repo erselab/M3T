@@ -1,0 +1,139 @@
+<!DOCTYPE html><html><head><title>R: Process the National Land Cover Database for 'Wastewater'...</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.15.3/dist/katex.min.css">
+<script type="text/javascript">
+const macros = { "\\R": "\\textsf{R}", "\\code": "\\texttt"};
+function processMathHTML() {
+    var l = document.getElementsByClassName('reqn');
+    for (let e of l) { katex.render(e.textContent, e, { throwOnError: false, macros }); }
+    return;
+}</script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.15.3/dist/katex.min.js"
+    onload="processMathHTML();"></script>
+<link rel="stylesheet" type="text/css" href="R.css" />
+</head><body><div class="container"><main>
+
+<table style="width: 100%;"><tr><td>NLCD_open_and_low_int</td><td style="text-align: right;">R Documentation</td></tr></table>
+
+<h2>Process the National Land Cover Database for 'Wastewater' function</h2>
+
+<h3>Description</h3>
+
+<p>'NLCD_open_and_low_int' writes 2 netcdf files per state within
+the domain as well as a csv.  These netcdf files have the 30 m National Land
+Cover Database Developed, Open Space and Developed, Low Intensity land cover
+types for each state.  The csv provides the total area covered by these two
+land cover types for each state separately.  This information is used in
+'Wastewater' to map septic emissions.
+</p>
+
+
+<h3>Usage</h3>
+
+<pre><code class='language-R'>NLCD_open_and_low_int(
+  nlcd_file,
+  domain,
+  State_Tigerlines,
+  state_name_list,
+  output_directory
+)
+</code></pre>
+
+
+<h3>Arguments</h3>
+
+<table>
+<tr><td><code id="nlcd_file">nlcd_file</code></td>
+<td>
+<p>Character providing the full filepath to the National Land
+Cover Database.  This data is available at <a href="https://www.mrlc.gov/data">https://www.mrlc.gov/data</a>. This
+is a geotif of 30 m land cover data for the Continental United States where
+different values represent the different land cover classifications.  There
+is an example file in the package's datasets folder that has been
+successfully used in this code available for reference.</p>
+</td></tr>
+<tr><td><code id="domain">domain</code></td>
+<td>
+<p>SpatRaster providing the desired output grid, including the
+desired resolution and coordinate reference system</p>
+</td></tr>
+<tr><td><code id="State_Tigerlines">State_Tigerlines</code></td>
+<td>
+<p>SpatVector.  United States Census Bureau county
+shapefile.  Available at
+<a href="https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html">https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html</a>.</p>
+</td></tr>
+<tr><td><code id="state_name_list">state_name_list</code></td>
+<td>
+<p>Character vector listing all states within the desired
+domain</p>
+</td></tr>
+<tr><td><code id="output_directory">output_directory</code></td>
+<td>
+<p>Character providing the full filepath to save
+processed data</p>
+</td></tr>
+</table>
+
+
+<h3>Details</h3>
+
+<p>This function first crops the 30 m National Land Cover Database to
+the states within the domain.  Then the data is subset to create one
+SpatRaster that is 1 for Developed, Open Space and 0 for all other land
+cover types, and another equivalent SpatRaster focused on Developed, Low
+Intensity land cover instead.  These are then split into separate
+SpatRasters for each state and the total area of these two land cover types
+for each state is calculated.  The data is then aggregated using the mean to
+a similar resolution as the domain and reprojected to the domain's
+projection using a nearest neighbor approach. Finally these SpatRasters are
+saved for use in the 'Wastewater' function. The total area of the two land
+cover types for each state is saved as a csv.
+</p>
+
+
+<h3>Value</h3>
+
+<p>Nothing is returned from the function, but the main outputs are 2
+netcdf files per state in the domain and a csv.  The netcdf files are titled
+as &quot;X_NLCD_Y_regridded.nc&quot; where X is the state abbreviation (e.g., MD, DE)
+and Y is the land cover type (either open or low_int for low intensity).
+Each file contains a SpatRaster with the fractional coverage of the land
+cover type for the state on the same grid as the input domain. The csv is
+titled &quot;nlcd_state_total_areas.csv&quot; and provides the total area of each land
+cover type in each state.
+</p>
+
+
+<h3>Author(s)</h3>
+
+<p>Joe Pitt, <a href="mailto:madeup@wisc.edu">madeup@wisc.edu</a>
+</p>
+<p>Kris Hajny, <a href="mailto:blank@fake.edu">blank@fake.edu</a>
+</p>
+<p>Israel Lopez-Coto, <a href="mailto:test@test.edu">test@test.edu</a>
+</p>
+
+
+<h3>Examples</h3>
+
+<pre><code class='language-R'>library(terra)
+grid_bbox=cbind(c(-76.65,-73.65),c(38.97,40.97))
+grid_res=0.01
+grid_crs="epsg:4326"
+grid &lt;- rast(nrows=diff(range(grid_bbox[,2]))/grid_res,
+             ncols=diff(range(grid_bbox[,1]))/grid_res, xmin=min(grid_bbox[,1]),
+             xmax=max(grid_bbox[,1]), ymin=min(grid_bbox[,2]), ymax=max(grid_bbox[,2]),
+             crs=grid_crs)
+NLCD_open_and_low_int &lt;- function(nlcd_file="~/../Desktop/nlcd_2019_land_cover_l48_20210604/nlcd_2019_land_cover_l48_20210604.img",
+                                  State_Tigerlines=vect("~/../Desktop/State_Tigerlines/tl_2018_us_state.shp"),
+                                  state_name_list=c("DE","MD","NJ","NY","PA"),
+                                  output_directory="~/../Desktop/")
+</code></pre>
+
+</main>
+
+</div>
+</body></html>
+

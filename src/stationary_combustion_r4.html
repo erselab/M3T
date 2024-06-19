@@ -1,0 +1,372 @@
+<!DOCTYPE html><html><head><title>R: Create gridded stationary combustion methane emissions maps</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.15.3/dist/katex.min.css">
+<script type="text/javascript">
+const macros = { "\\R": "\\textsf{R}", "\\code": "\\texttt"};
+function processMathHTML() {
+    var l = document.getElementsByClassName('reqn');
+    for (let e of l) { katex.render(e.textContent, e, { throwOnError: false, macros }); }
+    return;
+}</script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.15.3/dist/katex.min.js"
+    onload="processMathHTML();"></script>
+<link rel="stylesheet" type="text/css" href="R.css" />
+</head><body><div class="container"><main>
+
+<table style="width: 100%;"><tr><td>Stationary_combustion</td><td style="text-align: right;">R Documentation</td></tr></table>
+
+<h2>Create gridded stationary combustion methane emissions maps</h2>
+
+<h3>Description</h3>
+
+<p>'Stationary_combustion' writes up to 56 netcdf files of gridded
+methane emissions from stationary combustion sources, as well as optional
+visuals
+</p>
+
+
+<h3>Usage</h3>
+
+<pre><code class='language-R'>Stationary_combustion(
+  NEI_file,
+  domain,
+  state_name_list,
+  output_directory,
+  inventory_year,
+  verbose,
+  County_Tigerlines,
+  Use_ACES,
+  Use_Vulcan,
+  ACES_directory,
+  vulcan_directory,
+  ACES_year,
+  vulcan_band,
+  stationary_combustion_by_state,
+  stationary_combustion_by_domain,
+  stationary_combustion_GHGI_data,
+  stationary_combustion_emission_factors,
+  EIA_API_key,
+  plot_directory,
+  State_Tigerlines,
+  focus_city_tigerlines
+)
+</code></pre>
+
+
+<h3>Arguments</h3>
+
+<table>
+<tr><td><code id="NEI_file">NEI_file</code></td>
+<td>
+<p>Character providing the full filepath to the NEI county level
+CO data for the states within the domain. This data is available at
+<a href="https://www.epa.gov/air-emissions-inventories/2017-national-emissions-inventory-nei-data">https://www.epa.gov/air-emissions-inventories/2017-national-emissions-inventory-nei-data</a>.
+At the bottom of the page there is a data query - to download the desired
+file the national/state/county value should be set to county, the geographic
+aggregation should be set to the states of interest (hold control and click
+to select multiple), and the CAP should be set to carbon monoxide.  The
+resulting excel file has columns for different variables and rows for
+different sector - county - fuel combinations.  The variables are State,
+State FIPS, County, Sector, County FIPS, Pollutant, Pollutant Type,
+Emissions, and Unit of Measure, though the county, pollutant, pollutant
+type, and unit of measure are unused.  There is an example file in the
+package's datasets folder that has been successfully used in this code
+available for reference.</p>
+</td></tr>
+<tr><td><code id="domain">domain</code></td>
+<td>
+<p>SpatRaster providing the desired output grid, including the
+desired resolution and coordinate reference system</p>
+</td></tr>
+<tr><td><code id="state_name_list">state_name_list</code></td>
+<td>
+<p>Character vector listing all states within the desired
+domain</p>
+</td></tr>
+<tr><td><code id="output_directory">output_directory</code></td>
+<td>
+<p>Character providing the full filepath to save
+processed data</p>
+</td></tr>
+<tr><td><code id="inventory_year">inventory_year</code></td>
+<td>
+<p>Character indicating the desired year of data to use.</p>
+</td></tr>
+<tr><td><code id="verbose">verbose</code></td>
+<td>
+<p>Logical indicating whether to save additional output.  This
+includes plots of the gridded methane emissions for each
+fuel-sector-inventory-variation combination as well as 2 summed plots for
+each inventory-variation combination - one for wood and one for all other
+sectors.</p>
+</td></tr>
+<tr><td><code id="County_Tigerlines">County_Tigerlines</code></td>
+<td>
+<p>SpatVector.  United States Census Bureau county
+shapefile downloaded in Main.</p>
+</td></tr>
+<tr><td><code id="Use_ACES">Use_ACES</code></td>
+<td>
+<p>Logical indicating whether or not to use ACES to disaggregate
+from county-level to pixel level emissions.  Either ACES or Vulcan must be
+used, though both can be.</p>
+</td></tr>
+<tr><td><code id="Use_Vulcan">Use_Vulcan</code></td>
+<td>
+<p>Logical indicating whether or not to use Vulcan to
+disaggregate from county-level to pixel level emissions.  Either ACES or
+Vulcan must be used, though both can be.</p>
+</td></tr>
+<tr><td><code id="ACES_directory">ACES_directory</code></td>
+<td>
+<p>Character providing the full path to a folder containing
+the ACES sectoral CO2 inventories.  Must include the residential,
+commercial, electric (elec), and industrial sectors.  ACES v2.0 is available
+at <a href="https://doi.org/10.3334/ORNLDAAC/1943">https://doi.org/10.3334/ORNLDAAC/1943</a>, though the hourly file should be
+averaged across hours to create an annually averaged inventory.  Code to do
+this on a linux-based HPC system is available as the script
+&quot;Annualize_ACES_seawulf.R&quot; and the accompanying batch script
+&quot;Annualize_ACES.sh&quot;.  The year closest to &quot;inventory_year&quot; is used, but
+those further from that year are considered if the closest is unavailable.</p>
+</td></tr>
+<tr><td><code id="vulcan_directory">vulcan_directory</code></td>
+<td>
+<p>Character providing the full path to a folder
+containing the Vulcan sectoral CO2 inventories.  Must include the
+residential, commercial, electric (elec_prod), and industrial sectors.
+Vulcan v3.0 is available at <a href="https://doi.org/10.3334/ORNLDAAC/1741">https://doi.org/10.3334/ORNLDAAC/1741</a>, and the
+annual mean files should be used.  The year closest to &quot;inventory_year&quot; is
+used.  As all years are contained in the same file, it does not search for
+other years.</p>
+</td></tr>
+<tr><td><code id="ACES_year">ACES_year</code></td>
+<td>
+<p>Numeric providing the year of ACES data to use</p>
+</td></tr>
+<tr><td><code id="vulcan_band">vulcan_band</code></td>
+<td>
+<p>Numeric providing the band of Vulcan data to use (1-6 =
+2010 - 2015)</p>
+</td></tr>
+<tr><td><code id="stationary_combustion_by_state">stationary_combustion_by_state</code></td>
+<td>
+<p>Logical. Pulled from config file.
+indicating whether state-toal emissions should be distributed to the county
+scale as is.  Either bystate or bydomain must be used, though both can be.</p>
+</td></tr>
+<tr><td><code id="stationary_combustion_by_domain">stationary_combustion_by_domain</code></td>
+<td>
+<p>Logical. Pulled from config file.
+indicating whether state-toal emissions should be aggregated to the domain
+and then distributed to the county scale.  Either bystate or bydomain must
+be used, though both can be.</p>
+</td></tr>
+<tr><td><code id="stationary_combustion_GHGI_data">stationary_combustion_GHGI_data</code></td>
+<td>
+<p>Data frame.  Pulled from config file. 1
+by 15 data frame with consumption for each sector-fuel combination from the
+GHGI. Although the data is national, there is a state entry set to US_EPA.
+Consumption is in thousands of British Thermal Units (BTU).  The GHGI is
+available at
+<a href="https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks">https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks</a>
+and the values can be found in the Annexes in a table titled &quot;Fuel
+Consumption by Stationary Combustion for Calculating CH4 and N2O Emissions
+(TBtu)&quot;.  Includes every combination of residential (res), commercial (com),
+electric (elec), and residential (res) sectors with coal, petroleum (petr),
+natural gas (gas), and wood fuels with names using the abbreviations in
+parentheses (e.g., com_coal, elec_petr).  Excludes res_coal and res_gas as
+residential coal does not exist in the U.S. anymore and residential gas is
+accounted for elsewhere.</p>
+</td></tr>
+<tr><td><code id="stationary_combustion_emission_factors">stationary_combustion_emission_factors</code></td>
+<td>
+<p>Data frame.  Pulled from config
+file.  1 by 14 data frame with emission factors for each sector-fuel
+combination from the IPCC.  Built equivalently to the GHGI_data, but without
+an entry for the state.  Emission factors are in g/GJ, equivalent to kg/TJ.
+Default emission factors are available in IPCC 2006 volume 2: Energy, tables
+2.2 through 2.5 <a href="https://www.ipcc-nggip.iges.or.jp/public/2006gl/vol2.html">https://www.ipcc-nggip.iges.or.jp/public/2006gl/vol2.html</a>.
+The natural gas electric sector emission factor is instead pulled from Hajny
+et al., 2019 <a href="https://doi.org/10.1021/acs.est.9b01875">https://doi.org/10.1021/acs.est.9b01875</a>.  This is 5.7 kg/TJ,
+within uncertainties of the GHGI value of 4.1 kg/TJ, both of which are
+larger than the IPCC default of 1 kg/TJ.</p>
+</td></tr>
+<tr><td><code id="EIA_API_key">EIA_API_key</code></td>
+<td>
+<p>Character.  Pulled from config file.  API key to access
+SEDS data API.  The API is described at <a href="https://www.eia.gov/opendata/">https://www.eia.gov/opendata/</a> and
+one can register for a key with a link on the right hand side of this page.</p>
+</td></tr>
+<tr><td><code id="plot_directory">plot_directory</code></td>
+<td>
+<p>Character providing the full filepath to save figures.
+Only relevant if verbose = TRUE.</p>
+</td></tr>
+<tr><td><code id="State_Tigerlines">State_Tigerlines</code></td>
+<td>
+<p>SpatVector.  United States Census Bureau county
+shapefile.  Available at
+<a href="https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html">https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html</a>.
+Only relevant if verbose=TRUE.</p>
+</td></tr>
+<tr><td><code id="focus_city_tigerlines">focus_city_tigerlines</code></td>
+<td>
+<p>SpatVector.  United States Census Bureau county
+shapefile.  Available at
+<a href="https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html">https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html</a>.
+Only relevant if a focus city was set in main and verbose=TRUE.</p>
+</td></tr>
+</table>
+
+
+<h3>Details</h3>
+
+<p>This function calculates and grids methane emissions from stationary
+combustion. It uses the Energy Information Administration's (EIA) State
+Energy Data System (SEDS), Environmental Protection Agency's (EPA)
+Greenhouse Gas Inventory (GHGI), EPA National Emissions Inventory (NEI) and
+either the Vulcan or Anthropogenic Carbon Emission System (ACES) CO2
+inventory.  First, the ratio of SEDS national consumption by fuel-sector
+combination to the equivalent GHGI data is applied to SEDS state data so
+that they are approximately consistent with the GHGI.  The state total
+consumption is then converted to emissions using emission factors.  There
+are two variations at this step.
+</p>
+<p>bystate: The state level emissions are then distributed to the county level
+using NEI CO concentrations to calculate weighting values for each county
+(i.e., county CO / state total CO).
+</p>
+<p>bydomain: The state level emissions are summed to get a total for all states
+in the domain.  This is distributed to the county level using NEI CO
+concentrations to calculate weighting values for each county (i.e., county
+CO / domain total CO).
+</p>
+<p>Lastly, county total emissions are distributed using the ACES or Vulcan CO2
+inventory.
+</p>
+<p>This entire process is done separately for each fuel and sector using the
+GHGI, SEDS, and NEI data that are broken down by sector and fuel and CO2
+inventories that are broken down by sector.  Sectors considered are
+residential, commercial, industrial, and electric and the fuels considered
+are coal, natural gas, petroleum, and wood.  Residential coal is ignored as
+it does not exist in the U.S. anymore and residential gas is ignored as it
+is accounted for elsewhere.
+</p>
+<p>The necessary SEDS data will be automatically downloaded.
+</p>
+<p>The GHGI is intended to capture all national emissions.  The SEDS
+consumption data provides state-level consumption broken down by fuel (coal,
+natural gas, petroleum, wood, geothermal, solar, and electricity) and sector
+(residential, commercial, industrial, electric, transportation).  The NEI
+data being used provides CO emissions at the county level.  The GHGI is
+available starting in 1990 and is generally about 2 yearrs behind present
+day.  SEDS data is available starting in 1960 and generally is about 2 years
+behind present day.  NEI data is available beginning in at least 1990, is
+released every three years, and generally takes three years to complete
+(i.e., 2023 NEI is released in 2026).  All data is annual.  The SEDS data is
+at the state scale, NEI data is at the county scale, and GHGI data is at the
+national scale.
+</p>
+<p>The GHGI is available at
+<a href="https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks">https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks</a>
+The SEDS is available at
+<a href="https://www.eia.gov/state/seds/seds-data-complete.php?sid=US">https://www.eia.gov/state/seds/seds-data-complete.php?sid=US</a> The NEI is
+available at
+<a href="https://www.epa.gov/air-emissions-inventories/national-emissions-inventory-nei">https://www.epa.gov/air-emissions-inventories/national-emissions-inventory-nei</a>
+</p>
+<p>Each fuel-sector-inventory-variation combination is saved separately.
+</p>
+
+
+<h3>Value</h3>
+
+<p>Nothing is returned from the function, but the main outputs are up to
+56 netcdf files of the methane emissions from stationary combustion.  They
+are titled as &quot;stat_comb_sector_fuel_variation_inventory.nc&quot; where sector is
+abbreviated as com (commercial), res (residential), elec (electric), and ind
+(industrial); fuel is abbreviated as wood, petr (petroleum), gas (natural
+gas), and coal; and variation is bystate or bydomain.
+</p>
+
+
+<h3>Author(s)</h3>
+
+<p>Joe Pitt, <a href="mailto:madeup@wisc.edu">madeup@wisc.edu</a>
+</p>
+<p>Kris Hajny, <a href="mailto:blank@fake.edu">blank@fake.edu</a>
+</p>
+<p>Israel Lopez-Coto, <a href="mailto:test@test.edu">test@test.edu</a>
+</p>
+
+
+<h3>Examples</h3>
+
+<pre><code class='language-R'>library(terra)
+user_key = "__user_EIA_API_key__"
+grid_bbox=cbind(c(-76.65,-73.65),c(38.97,40.97))
+grid_res=0.01
+grid_crs="epsg:4326"
+grid &lt;- rast(nrows=diff(range(grid_bbox[,2]))/grid_res,
+             ncols=diff(range(grid_bbox[,1]))/grid_res, xmin=min(grid_bbox[,1]),
+             xmax=max(grid_bbox[,1]), ymin=min(grid_bbox[,2]), ymax=max(grid_bbox[,2]),
+             crs=grid_crs)
+Urban_Tigerlines &lt;- vect("~/../Desktop/Urban_Tigerlines/tl_2018_us_uac10.shp")
+focus_city &lt;- terra::subset(Urban_Tigerlines,Urban_Tigerlines$NAME10 %in% "Philadelphia, PA--NJ--DE--MD")
+Stationary_combustion(NEI_file="~/../Desktop/NEI_2017.xlsx",
+                      domain=grid,
+                      state_name_list=c("DE","MD","NJ","NY","PA"),
+                      output_directory="~/../Desktop/",
+                      inventory_year=2018,
+                      verbose=TRUE,
+                      Use_ACES=TRUE,
+                      Use_Vulcan=TRUE,
+                      ACES_directory="~/../Desktop/Inventories/ACES_v2.0",
+                      vulcan_directory="~/../Desktop/Inventories/Vulcan_v3.0",
+                      ACES_year=2017,
+                      vulcan_band=6,
+                      stationary_combustion_by_state=TRUE,
+                      stationary_combustion_by_domain=TRUE,
+                      stationary_combustion_GHGI_data=data.frame(
+                        "State"="US_EPA",
+                        "com_coal"=17,
+                        "ind_coal"=517,
+                        "elec_coal"=10554,
+                        "res_petr"=975,
+                        "com_petr"=801,
+                        "ind_petr"=2062,
+                        "elec_petr"=42,
+                        "com_gas"=3647,
+                        "ind_gas"=9484,
+                        "elec_gas"=11553,
+                        "res_wood"=544,
+                        "com_wood"=84,
+                        "ind_wood"=1407,
+                        "elec_wood"=68),
+                      stationary_combustion_emission_factors=data.frame(
+                        "com_coal"=10,
+                        "ind_coal"=10,
+                        "elec_coal"=1,
+                        "res_petr"=10,
+                        "com_petr"=10,
+                        "ind_petr"=3,
+                        "elec_petr"=3,
+                        "com_gas"=5,
+                        "ind_gas"=1,
+                        "elec_gas"=5.4/(1.0550559*0.9), #g/mmbtu to g/GJ and low to high heating value (0.9)
+                        "res_wood"=300,
+                        "com_wood"=300,
+                        "ind_wood"=30,
+                        "elec_wood"=30),
+                      EIA_API_key=user_key,
+                      State_Tigerlines=vect("~/../Desktop/State_Tigerlines/tl_2018_us_state.shp"),
+                      County_Tigerlines=vect("~/../Desktop/County_Tigerlines/tl_2018_us_county.shp"),
+                      focus_city_tigerlines=focus_city,
+                      plot_directory="~/../Desktop/plots/")
+</code></pre>
+
+</main>
+
+</div>
+</body></html>
+

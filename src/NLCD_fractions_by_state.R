@@ -1,13 +1,75 @@
+#'@title Process the National Land Cover Database for `Wastewater` function
+#'
+#'@description `NLCD_open_and_low_int` writes 2 netcdf files per state within
+#'  the domain as well as a csv.  These netcdf files have the 30 m National Land
+#'  Cover Database Developed, Open Space and Developed, Low Intensity land cover
+#'  types for each state.  The csv provides the total area covered by these two
+#'  land cover types for each state separately.  This information is used in
+#'  `Wastewater` to map septic emissions.
+#'
+#'@details This function first crops the 30 m National Land Cover Database to
+#'  the states within the domain.  Then the data is subset to create one
+#'  SpatRaster that is 1 for Developed, Open Space and 0 for all other land
+#'  cover types, and another equivalent SpatRaster focused on Developed, Low
+#'  Intensity land cover instead.  These are then split into separate
+#'  SpatRasters for each state and the total area of these two land cover types
+#'  for each state is calculated.  The data is then aggregated using the mean to
+#'  a similar resolution as the domain and reprojected to the domain's
+#'  projection using a nearest neighbor approach. Finally these SpatRasters are
+#'  saved for use in the `Wastewater` function. The total area of the two land
+#'  cover types for each state is saved as a csv.
+#'
+#'@param nlcd_file Character providing the full filepath to the National Land
+#'  Cover Database.  This data is available at \url{https://www.mrlc.gov/data}. This
+#'  is a geotif of 30 m land cover data for the Continental United States where
+#'  different values represent the different land cover classifications.  There
+#'  is an example file in the package's datasets folder that has been
+#'  successfully used in this code available for reference.
+#'@param domain SpatRaster providing the desired output grid, including the
+#'  desired resolution and coordinate reference system
+#'@param state_name_list Character vector listing all states within the desired
+#'  domain
+#'@param output_directory Character providing the full filepath to save
+#'  processed data
+#'@param State_Tigerlines SpatVector.  United States Census Bureau county
+#'  shapefile.  Available at
+#'  \url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.
+#'@returns Nothing is returned from the function, but the main outputs are 2
+#'  netcdf files per state in the domain and a csv.  The netcdf files are titled
+#'  as "X_NLCD_Y_regridded.nc" where X is the state abbreviation (e.g., MD, DE)
+#'  and Y is the land cover type (either open or low_int for low intensity).
+#'  Each file contains a SpatRaster with the fractional coverage of the land
+#'  cover type for the state on the same grid as the input domain. The csv is
+#'  titled "nlcd_state_total_areas.csv" and provides the total area of each land
+#'  cover type in each state.
+#'@examples
+#'library(terra)
+#' grid_bbox=cbind(c(-76.65,-73.65),c(38.97,40.97))
+#' grid_res=0.01
+#' grid_crs="epsg:4326"
+#' grid <- rast(nrows=diff(range(grid_bbox[,2]))/grid_res,
+#'              ncols=diff(range(grid_bbox[,1]))/grid_res, xmin=min(grid_bbox[,1]),
+#'              xmax=max(grid_bbox[,1]), ymin=min(grid_bbox[,2]), ymax=max(grid_bbox[,2]),
+#'              crs=grid_crs)
+#' NLCD_open_and_low_int <- function(nlcd_file="~/../Desktop/nlcd_2019_land_cover_l48_20210604/nlcd_2019_land_cover_l48_20210604.img",
+#'                                   State_Tigerlines=vect("~/../Desktop/State_Tigerlines/tl_2018_us_state.shp"),
+#'                                   state_name_list=c("DE","MD","NJ","NY","PA"),
+#'                                   output_directory="~/../Desktop/")
+#'@author Joe Pitt, \email{madeup@@wisc.edu}
+#'@author Kris Hajny, \email{blank@@fake.edu}
+#'@author Israel Lopez-Coto, \email{test@@test.edu}
+#'@export
+
+
 # Calculate NLCD fractions for the states in the d03 domain
 ## Finalized: 2023-02-03
 
-NLCD_open_and_low_int <- function(){
-  
-  ################################################################################
-  #Manually defined variables
-  nlcd_file <- file.path("G:/My Drive/Shepson Group Drive/General Inventories and Shapefiles/Shapefiles",
-                         "nlcd_2019_land_cover_l48_20210604/nlcd_2019_land_cover_l48_20210604.img")
-  
+NLCD_open_and_low_int <- function(nlcd_file,
+                                  domain,
+                                  State_Tigerlines,
+                                  state_name_list,
+                                  output_directory){
+  XESMF=F
   ################################################################################
   #subset NLCD to the appropriate states
   
