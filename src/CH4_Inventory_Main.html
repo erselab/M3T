@@ -14,7 +14,7 @@ function processMathHTML() {
 <link rel="stylesheet" type="text/css" href="R.css" />
 </head><body><div class="container"><main>
 
-<table style="width: 100%;"><tr><td>code_directory</td><td style="text-align: right;">R Documentation</td></tr></table>
+<table style="width: 100%;"><tr><td>CH4_inventory_build</td><td style="text-align: right;">R Documentation</td></tr></table>
 
 <h2>Main function to calculate gridded methane emissions.  Runs sector by
 sector according to the config file.</h2>
@@ -29,13 +29,46 @@ the config file and inputs.
 
 <h3>Usage</h3>
 
-<pre><code class='language-R'>code_directory
+<pre><code class='language-R'>CH4_inventory_build(
+  input_directory =
+    "G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Raw_data_rewrite/",
+  output_directory =
+    "G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Processed_rewrite/",
+  code_directory = "~/../../Kristian/Desktop/methane_inventory/src/",
+  plot_directory =
+    "G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Figures_rewrite/",
+  focus_city = "Philadelphia, PA--NJ--DE--MD",
+  inventory_year = 2019,
+  domain = as.data.frame(cbind(c(-76.65, -73.65), c(38.97, 40.97))),
+  domain_res = 0.01,
+  domain_crs = "epsg:4326",
+  ACES_directory =
+    "G:/My Drive/Shepson Group Drive/General Inventories and Shapefiles/Inventories/ACES_v2.0",
+  vulcan_directory =
+    "G:/My Drive/Shepson Group Drive/General Inventories and Shapefiles/Inventories/Vulcan_v3.0",
+  verbose = TRUE
+)
 </code></pre>
 
 
 <h3>Arguments</h3>
 
 <table>
+<tr><td><code id="input_directory">input_directory</code></td>
+<td>
+<p>Character providing the full filepath to load/save
+input data</p>
+</td></tr>
+<tr><td><code id="code_directory">code_directory</code></td>
+<td>
+<p>Character providing the full filepath to source all
+other functions and the config.</p>
+</td></tr>
+<tr><td><code id="plot_directory">plot_directory</code></td>
+<td>
+<p>Character providing the full filepath to save figures.
+Only relevant if verbose = TRUE.</p>
+</td></tr>
 <tr><td><code id="focus_city">focus_city</code></td>
 <td>
 <p>Character or numeric or a vector of characters or numerics.
@@ -51,6 +84,10 @@ detailed in the above documents.
 </p>
 <p>This will be used to subset the urban area census outlines and used in any
 visualizations.</p>
+</td></tr>
+<tr><td><code id="inventory_year">inventory_year</code></td>
+<td>
+<p>Numeric indicating the desired year of data to use.</p>
 </td></tr>
 <tr><td><code id="domain">domain</code></td>
 <td>
@@ -69,21 +106,6 @@ length 1 or 2 (x,y).</p>
 <td>
 <p>Character providing the projection of the domain</p>
 </td></tr>
-<tr><td><code id="input_directory">input_directory</code></td>
-<td>
-<p>Character providing the full filepath to load/save
-input data</p>
-</td></tr>
-<tr><td><code id="plot_directory">plot_directory</code></td>
-<td>
-<p>Character providing the full filepath to save figures.
-Only relevant if verbose = TRUE.</p>
-</td></tr>
-<tr><td><code id="code_directory">code_directory</code></td>
-<td>
-<p>Character providing the full filepath to source all
-other functions and the config.</p>
-</td></tr>
 <tr><td><code id="ACES_directory">ACES_directory</code></td>
 <td>
 <p>Character providing the full filepath to a folder with
@@ -97,10 +119,6 @@ have been averaged into annual files.  ACES is available at
 annual, sectoral Vulcan inventory files.  Vulcan v3.0 is available at
 <a href="https://doi.org/10.3334/ORNLDAAC/1741">https://doi.org/10.3334/ORNLDAAC/1741</a>.</p>
 </td></tr>
-<tr><td><code id="inventory_year">inventory_year</code></td>
-<td>
-<p>Numeric indicating the desired year of data to use.</p>
-</td></tr>
 <tr><td><code id="verbose">verbose</code></td>
 <td>
 <p>Logical indicating whether to save additional output.  This
@@ -108,12 +126,6 @@ includes easier to read csv files of the data that has been gridded for
 multiple sectors as well as sector and subsector visuals.</p>
 </td></tr>
 </table>
-
-
-<h3>Format</h3>
-
-<p>An object of class <code>character</code> of length 1.
-</p>
 
 
 <h3>Details</h3>

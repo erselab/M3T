@@ -4,7 +4,7 @@
 #'  similar user-edited input data as well as options for which sectors to run
 #'  and, when applicable, which variations to run.
 #'
-#'@details This fuunction is intended to be the location for all user edited
+#'@details This function is intended to be the location for all user edited
 #'  variables other than inputs to the main `CH4_inventory_build` function.
 #'@returns Nothing is returned from the function.  It is run in
 #'  `CH4_inventory_build` so that all user-edited settings are utilized

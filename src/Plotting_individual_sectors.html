@@ -1,0 +1,294 @@
+<!DOCTYPE html><html><head><title>R: Create a log10 visual</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.15.3/dist/katex.min.css">
+<script type="text/javascript">
+const macros = { "\\R": "\\textsf{R}", "\\code": "\\texttt"};
+function processMathHTML() {
+    var l = document.getElementsByClassName('reqn');
+    for (let e of l) { katex.render(e.textContent, e, { throwOnError: false, macros }); }
+    return;
+}</script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.15.3/dist/katex.min.js"
+    onload="processMathHTML();"></script>
+<link rel="stylesheet" type="text/css" href="R.css" />
+</head><body><div class="container"><main>
+
+<table style="width: 100%;"><tr><td>log_plot</td><td style="text-align: right;">R Documentation</td></tr></table>
+
+<h2>Create a log10 visual</h2>
+
+<h3>Description</h3>
+
+<p>This is a simple helper function for ease of use.  It runs
+prep_plot_data and builds useful map visuals of the input data.
+</p>
+
+
+<h3>Usage</h3>
+
+<pre><code class='language-R'>log_plot(input, title, zlim_min = NULL, zlim_max = NULL, filename)
+</code></pre>
+
+
+<h3>Arguments</h3>
+
+<table>
+<tr><td><code id="input">input</code></td>
+<td>
+<p>SpatRaster.  Intended to be a SpatRaster of gridded methane
+emissions.</p>
+</td></tr>
+<tr><td><code id="title">title</code></td>
+<td>
+<p><strong>Optional</strong> character providing the main title for the
+plot.  The plot will have no main title if not provided.</p>
+</td></tr>
+<tr><td><code id="zlim_min">zlim_min</code></td>
+<td>
+<p><strong>Optional</strong> numeric providing the minimum value for the
+colorscale of the plot, representing the log-scale gridded methane in
+nmol/m2/s.  Will default to the minimum of the data if not provided.</p>
+</td></tr>
+<tr><td><code id="zlim_max">zlim_max</code></td>
+<td>
+<p><strong>Optional</strong> numeric equivalent to zlim_min, but for the
+maximum value.</p>
+</td></tr>
+<tr><td><code id="filename">filename</code></td>
+<td>
+<p><strong>Optional</strong> character providing the output filename for
+the plot.  Will default to a png with the name of the input if not provided,
+unless the plot is for an entire sector, rather than subsector.  This will
+use the same default filename, but place it in a separate subfolder.</p>
+</td></tr>
+</table>
+
+
+<h3>Details</h3>
+
+<p>This function is intended to be used when verbose = TRUE for
+CH4_inventory_build.  It allows for reasonable default scales/titles or set
+ones, e.g., if wanting to hold the colorscale constant across multiple
+similar sectors/subsectors.
+</p>
+
+
+<h3>Value</h3>
+
+<p>This function returns nothing, but does produce a plot with the
+gridded methane data colored on a log scale with NA values set to black. All
+axes are clearly labeled and state, county, and, if relevant, focus city
+boundaries are overlaid in greys and white.
+</p>
+
+
+<h3>Author(s)</h3>
+
+<p>Joe Pitt, <a href="mailto:madeup@wisc.edu">madeup@wisc.edu</a>
+</p>
+<p>Kris Hajny, <a href="mailto:blank@fake.edu">blank@fake.edu</a>
+</p>
+<p>Israel Lopez-Coto, <a href="mailto:test@test.edu">test@test.edu</a>
+</p>
+
+
+<h3>Examples</h3>
+
+<pre><code class='language-R'>log_plot(central_flux,filename="Wastewater_dom_central",
+title="Domestic Wastewater -\n EPA total distributed using \nClean Watersheds Needs Survey")
+</code></pre>
+
+</main>
+
+</div>
+</body></html>
+
+<!DOCTYPE html><html><head><title>R: Create a visual</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.15.3/dist/katex.min.css">
+<script type="text/javascript">
+const macros = { "\\R": "\\textsf{R}", "\\code": "\\texttt"};
+function processMathHTML() {
+    var l = document.getElementsByClassName('reqn');
+    for (let e of l) { katex.render(e.textContent, e, { throwOnError: false, macros }); }
+    return;
+}</script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.15.3/dist/katex.min.js"
+    onload="processMathHTML();"></script>
+<link rel="stylesheet" type="text/css" href="R.css" />
+</head><body><div class="container"><main>
+
+<table style="width: 100%;"><tr><td>not_log_plot</td><td style="text-align: right;">R Documentation</td></tr></table>
+
+<h2>Create a visual</h2>
+
+<h3>Description</h3>
+
+<p>This is a simple helper function for ease of use.  It builds
+useful map visuals of the input data.
+</p>
+
+
+<h3>Usage</h3>
+
+<pre><code class='language-R'>not_log_plot(input, title, zlim_min = NULL, zlim_max = NULL, filename)
+</code></pre>
+
+
+<h3>Arguments</h3>
+
+<table>
+<tr><td><code id="input">input</code></td>
+<td>
+<p>SpatRaster.  Intended to be a SpatRaster of gridded methane
+emissions.</p>
+</td></tr>
+<tr><td><code id="title">title</code></td>
+<td>
+<p><strong>Optional</strong> character providing the main title for the
+plot.  The plot will have no main title if not provided.</p>
+</td></tr>
+<tr><td><code id="zlim_min">zlim_min</code></td>
+<td>
+<p><strong>Optional</strong> numeric providing the minimum value for the
+colorscale of the plot, representing the gridded methane in nmol/m2/s.  Will
+default to the minimum of the data if not provided.</p>
+</td></tr>
+<tr><td><code id="zlim_max">zlim_max</code></td>
+<td>
+<p><strong>Optional</strong> numeric equivalent to zlim_min, but for the
+maximum value.</p>
+</td></tr>
+<tr><td><code id="filename">filename</code></td>
+<td>
+<p><strong>Optional</strong> character providing the output filename for
+the plot.  Will default to a png with the name of the input if not provided,
+unless the plot is for an entire sector, rather than subsector.  This will
+use the same default filename, but place it in a separate subfolder.</p>
+</td></tr>
+</table>
+
+
+<h3>Details</h3>
+
+<p>This function is intended to be used when verbose = TRUE for
+CH4_inventory_build.  It allows for reasonable default scales/titles or set
+ones, e.g., if wanting to hold the colorscale constant across multiple
+similar sectors/subsectors.
+</p>
+
+
+<h3>Value</h3>
+
+<p>This function returns nothing, but does produce a plot with the
+gridded methane data colored with NA values set to black. All axes are
+clearly labeled and state, county, and, if relevant, focus city boundaries
+are overlaid in greys and white.
+</p>
+
+
+<h3>Author(s)</h3>
+
+<p>Joe Pitt, <a href="mailto:madeup@wisc.edu">madeup@wisc.edu</a>
+</p>
+<p>Kris Hajny, <a href="mailto:blank@fake.edu">blank@fake.edu</a>
+</p>
+<p>Israel Lopez-Coto, <a href="mailto:test@test.edu">test@test.edu</a>
+</p>
+
+
+<h3>Examples</h3>
+
+<pre><code class='language-R'>not_log_plot(septic_flux,filename="Wastewater_dom_septic_national",
+             "Domestic Wastewater - Septic\n national EPA septic distributed using \ndeveloped open space/low intensity land cover",
+             global(min(septic_flux,septic_flux2),min),
+             global(max(septic_flux,septic_flux2),max))
+</code></pre>
+
+</main>
+
+</div>
+</body></html>
+
+<!DOCTYPE html><html><head><title>R: Prepare input data for a logarithmic plot</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.15.3/dist/katex.min.css">
+<script type="text/javascript">
+const macros = { "\\R": "\\textsf{R}", "\\code": "\\texttt"};
+function processMathHTML() {
+    var l = document.getElementsByClassName('reqn');
+    for (let e of l) { katex.render(e.textContent, e, { throwOnError: false, macros }); }
+    return;
+}</script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.15.3/dist/katex.min.js"
+    onload="processMathHTML();"></script>
+<link rel="stylesheet" type="text/css" href="R.css" />
+</head><body><div class="container"><main>
+
+<table style="width: 100%;"><tr><td>prep_plot_data</td><td style="text-align: right;">R Documentation</td></tr></table>
+
+<h2>Prepare input data for a logarithmic plot</h2>
+
+<h3>Description</h3>
+
+<p>This is a simple helper function for ease of use.  It just takes
+the log10 of the data and sets infinite values to NA.
+</p>
+
+
+<h3>Usage</h3>
+
+<pre><code class='language-R'>prep_plot_data(input)
+</code></pre>
+
+
+<h3>Arguments</h3>
+
+<table>
+<tr><td><code id="input">input</code></td>
+<td>
+<p>SpatRaster.  Intended to be a SpatRaster of gridded methane
+emissions.</p>
+</td></tr>
+</table>
+
+
+<h3>Details</h3>
+
+<p>This function is intended to be used when verbose = TRUE for
+CH4_inventory_build.  It is called by log_plot to help build plots for each
+individual sector/subsector.  Some of these, particular those for point
+sources, are more useful on a log scale.
+</p>
+
+
+<h3>Value</h3>
+
+<p>The log-scaled input data is returned, after removing infinite
+values.
+</p>
+
+
+<h3>Author(s)</h3>
+
+<p>Joe Pitt, <a href="mailto:madeup@wisc.edu">madeup@wisc.edu</a>
+</p>
+<p>Kris Hajny, <a href="mailto:blank@fake.edu">blank@fake.edu</a>
+</p>
+<p>Israel Lopez-Coto, <a href="mailto:test@test.edu">test@test.edu</a>
+</p>
+
+
+<h3>Examples</h3>
+
+<pre><code class='language-R'>prep_plot_data(central_flux)
+</code></pre>
+
+</main>
+
+</div>
+</body></html>
+

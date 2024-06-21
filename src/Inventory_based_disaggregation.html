@@ -1,0 +1,145 @@
+<!DOCTYPE html><html><head><title>R: Disaggregate emissions to the pixel scale using ACES or...</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.15.3/dist/katex.min.css">
+<script type="text/javascript">
+const macros = { "\\R": "\\textsf{R}", "\\code": "\\texttt"};
+function processMathHTML() {
+    var l = document.getElementsByClassName('reqn');
+    for (let e of l) { katex.render(e.textContent, e, { throwOnError: false, macros }); }
+    return;
+}</script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.15.3/dist/katex.min.js"
+    onload="processMathHTML();"></script>
+<link rel="stylesheet" type="text/css" href="R.css" />
+</head><body><div class="container"><main>
+
+<table style="width: 100%;"><tr><td>disaggregation</td><td style="text-align: right;">R Documentation</td></tr></table>
+
+<h2>Disaggregate emissions to the pixel scale using ACES or Vulcan CO2
+inventories</h2>
+
+<h3>Description</h3>
+
+<p>This is a function utilized by 'stationary_combustion' and
+'NG_distribution'.  It distributes emissions from a larger scale (state or
+county) to the pixel scale using gridded CO2 emissions.
+</p>
+
+
+<h3>Usage</h3>
+
+<pre><code class='language-R'>disaggregation(
+  input_inventory,
+  totals,
+  agg_level,
+  NEI_input,
+  cover_all,
+  out_envir
+)
+</code></pre>
+
+
+<h3>Arguments</h3>
+
+<table>
+<tr><td><code id="input_inventory">input_inventory</code></td>
+<td>
+<p>SpatRaster.  Either a Vulcan or ACES sectoral
+inventory.  ACES is available at <a href="https://doi.org/10.3334/ORNLDAAC/1943">https://doi.org/10.3334/ORNLDAAC/1943</a>
+and Vulcan is available at <a href="https://doi.org/10.3334/ORNLDAAC/1741">https://doi.org/10.3334/ORNLDAAC/1741</a>.
+Annual mean files should be used for Vulcan.  The hourly ACES file should be
+averaged across hours to create an annually averaged inventory. Code to do
+this on a linux-based HPC system is available as the script
+&quot;Annualize_ACES_seawulf.R&quot; and the accompanying batch script
+&quot;Annualize_ACES.sh&quot;.</p>
+</td></tr>
+<tr><td><code id="totals">totals</code></td>
+<td>
+<p>Character vector.  Various subsectors to run through the
+disaggregation process.</p>
+</td></tr>
+<tr><td><code id="agg_level">agg_level</code></td>
+<td>
+<p>Character.  The scale of the data before disaggregation,
+solely used for naming.</p>
+</td></tr>
+<tr><td><code id="NEI_input">NEI_input</code></td>
+<td>
+<p>SpatVector.  Includes attributes for each spatial feature
+that detail the emissions at the current agg_level separated by totals.</p>
+</td></tr>
+<tr><td><code id="cover_all">cover_all</code></td>
+<td>
+<p>List of matrices.  Each entry in the list is a separate
+state/county and the matrices are the output of the function
+terra::extract(weights=T,exact=T,cells=T).  These provide the fraction of
+each pixel contained within the state/county.  This allows for better
+accounting for pixels that are on the borders of states/counties.</p>
+</td></tr>
+<tr><td><code id="out_envir">out_envir</code></td>
+<td>
+<p>Environment.  Where to assign output data.</p>
+</td></tr>
+</table>
+
+
+<h3>Details</h3>
+
+<p>This function is intended to be used by 'stationary_combustion' and
+'NG_distribution'.  For each pixel it calculates the ratio of CO2 from that
+pixel to the state/county it is in.  This is combined with the state/county
+total CH4 emissions to disaggregate the emissions to the pixel-scale.  If
+there are no emissions for the state/county then the entire area is assigned
+an equal fraction of emissions.  This is done using sectoral (residential,
+commercial, industrial, electric) CO2 inventories.
+</p>
+<p>ACES is available at <a href="https://doi.org/10.3334/ORNLDAAC/1943">https://doi.org/10.3334/ORNLDAAC/1943</a> and Vulcan
+is available at <a href="https://doi.org/10.3334/ORNLDAAC/1741">https://doi.org/10.3334/ORNLDAAC/1741</a>.
+</p>
+<p>See references <a href="https://doi.org/10.1029/2020JD032974">Vulcan</a> and,
+<a href="https://doi.org/10.1002/2017JD027359">ACES</a>
+</p>
+
+
+<h3>Value</h3>
+
+<p>Nothing is returned.  The disaggregated methane data is assigned to
+the specified out_envir.  This will be a SpatRaster list with one for each
+of the totals.
+</p>
+
+
+<h3>Author(s)</h3>
+
+<p>Joe Pitt, <a href="mailto:madeup@wisc.edu">madeup@wisc.edu</a>
+</p>
+<p>Kris Hajny, <a href="mailto:blank@fake.edu">blank@fake.edu</a>
+</p>
+<p>Israel Lopez-Coto, <a href="mailto:test@test.edu">test@test.edu</a>
+</p>
+
+
+<h3>Examples</h3>
+
+<pre><code class='language-R'>aces_res &lt;- rast(paste0(ACES_directory,"/Sectoral/",ACES_year,'_Annual_ACES_Residential.nc'))
+res_totals &lt;- c('mains_ER_total_res',
+                'serv_ER_total_res',
+                'MnR_ER_total_res',
+                'meter_ER_total_res',
+                'upset_ER_total_res',
+                'post_meter_ER_total_res')
+cover_all &lt;- list(extract(aces_res,all_merge_LCC_domain,weights=T,exact=T,cells=T))
+disaggregation(aces_res,
+               res_totals,
+               agg_level="state",
+               NEI_input=all_merge_LCC_state,
+               cover_all,
+               out_envir=environment())
+</code></pre>
+
+</main>
+
+</div>
+</body></html>
+

@@ -9,9 +9,36 @@ Description:
 
 Usage:
 
-     code_directory
+     CH4_inventory_build(
+       input_directory =
+         "G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Raw_data_rewrite/",
+       output_directory =
+         "G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Processed_rewrite/",
+       code_directory = "~/../../Kristian/Desktop/methane_inventory/src/",
+       plot_directory =
+         "G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Figures_rewrite/",
+       focus_city = "Philadelphia, PA--NJ--DE--MD",
+       inventory_year = 2019,
+       domain = as.data.frame(cbind(c(-76.65, -73.65), c(38.97, 40.97))),
+       domain_res = 0.01,
+       domain_crs = "epsg:4326",
+       ACES_directory =
+         "G:/My Drive/Shepson Group Drive/General Inventories and Shapefiles/Inventories/ACES_v2.0",
+       vulcan_directory =
+         "G:/My Drive/Shepson Group Drive/General Inventories and Shapefiles/Inventories/Vulcan_v3.0",
+       verbose = TRUE
+     )
      
 Arguments:
+
+input_directory: Character providing the full filepath to load/save
+          input data
+
+code_directory: Character providing the full filepath to source all
+          other functions and the config.
+
+plot_directory: Character providing the full filepath to save figures.
+          Only relevant if verbose = TRUE.
 
 focus_city: Character or numeric or a vector of characters or numerics.
           Each character must exactly match the Census name, which can
@@ -29,6 +56,8 @@ focus_city: Character or numeric or a vector of characters or numerics.
           This will be used to subset the urban area census outlines
           and used in any visualizations.
 
+inventory_year: Numeric indicating the desired year of data to use.
+
   domain: SpatRaster providing the desired output grid, including the
           desired resolution and coordinate reference system or a 2x2
           data frame.  For the data frame, the first column would be x
@@ -41,15 +70,6 @@ domain_res: Numeric providing the resolution for the domain.  Can be
 
 domain_crs: Character providing the projection of the domain
 
-input_directory: Character providing the full filepath to load/save
-          input data
-
-plot_directory: Character providing the full filepath to save figures.
-          Only relevant if verbose = TRUE.
-
-code_directory: Character providing the full filepath to source all
-          other functions and the config.
-
 ACES_directory: Character providing the full filepath to a folder with
           sectoral Anthropogenic Carbon Emission System (ACES)
           inventory files that have been averaged into annual files.
@@ -59,16 +79,10 @@ vulcan_directory: Character providing the full filepath to a folder
           with annual, sectoral Vulcan inventory files.  Vulcan v3.0 is
           available at <https://doi.org/10.3334/ORNLDAAC/1741>.
 
-inventory_year: Numeric indicating the desired year of data to use.
-
  verbose: Logical indicating whether to save additional output.  This
           includes easier to read csv files of the data that has been
           gridded for multiple sectors as well as sector and subsector
           visuals.
-
-Format:
-
-     An object of class ‘character’ of length 1.
 
 Details:
 

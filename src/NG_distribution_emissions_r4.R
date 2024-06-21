@@ -141,8 +141,11 @@
 #'  \url{https://doi.org/10.3334/ORNLDAAC/1943} and Vulcan is available at
 #'  \url{https://doi.org/10.3334/ORNLDAAC/1741}.
 #'
-#'  See references \href{https://doi.org/10.1021/acs.est.0c00437}{Weller et al.}
-#'  and \href{https://doi.org/10.1021/acs.est.8b03217}{Fischer et al.}
+#'  See references \href{https://doi.org/10.1021/acs.est.0c00437}{Weller et
+#'  al.}, \href{https://doi.org/10.1021/acs.est.8b03217}{Fischer et al.},
+#'  \href{https://doi.org/10.1029/2020JD032974}{Vulcan} and,
+#'  \href{https://doi.org/10.1002/2017JD027359}{ACES}
+#'  
 #'@param domain SpatRaster providing the desired output grid, including the
 #'  desired resolution and coordinate reference system
 #'@param state_name_list Character vector listing all states within the desired
@@ -321,6 +324,9 @@
 #'@author Israel Lopez-Coto, \email{test@@test.edu}
 #'@reference \href{https://doi.org/10.1021/acs.est.0c00437}{Weller et al.}
 #'@reference \href{https://doi.org/10.1021/acs.est.8b03217}{Fischer et al.}
+#'@reference \href{https://doi.org/10.1029/2020JD032974}{Vulcan}
+#'@reference \href{https://doi.org/10.1002/2017JD027359}{ACES}
+
 #'@export
 
 

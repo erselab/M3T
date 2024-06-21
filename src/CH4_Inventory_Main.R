@@ -73,8 +73,6 @@
 #'@author Joe Pitt, \email{madeup@@wisc.edu}
 #'@author Kris Hajny, \email{blank@@fake.edu}
 #'@author Israel Lopez-Coto, \email{test@@test.edu}
-#'@reference \href{https://doi.org/10.1016/j.isprsjprs.2020.02.019}{Vulcan}
-#'@reference \href{https://doi.org/10.1021/acs.est.2c05373}{ACES}
 #'@export
 
 
@@ -330,7 +328,6 @@ CH4_inventory_build <- function(input_directory="G:/My Drive/Shepson Group Drive
                           County_Tigerlines=County_Tigerlines,
                           State_Tigerlines=State_Tigerlines,
                           focus_city_tigerlines=focus_city_tigerlines)
-    rm(Process_landfills,Municipal_solid_waste,GHGI_landfill_total)
   }
   if(Process_natural_gas_distribution){
     # rm(list=setdiff(ls(),c("input_directory","domain","output_directory",
@@ -402,9 +399,6 @@ CH4_inventory_build <- function(input_directory="G:/My Drive/Shepson Group Drive
                       County_Tigerlines=County_Tigerlines,
                       focus_city_tigerlines=focus_city_tigerlines)
     }
-    rm(Process_natural_gas_distribution,natural_gas_post_meter_emission_factor,
-       NG_distribution_by_domain,NG_distribution_by_LDC,NG_distribution_by_state,
-       NG_distribution,)
     # filter_vulcan
   }
   if(Process_natural_gas_transmission){
@@ -430,7 +424,6 @@ CH4_inventory_build <- function(input_directory="G:/My Drive/Shepson Group Drive
                  County_Tigerlines=County_Tigerlines,
                  State_Tigerlines=State_Tigerlines,
                  focus_city_tigerlines=focus_city_tigerlines)
-    rm(Process_natural_gas_transmission,Transmission)
   }
   if(Process_stationary_combustion){
     # rm(list=setdiff(ls(),c("input_directory","domain","output_directory",
@@ -467,9 +460,6 @@ CH4_inventory_build <- function(input_directory="G:/My Drive/Shepson Group Drive
                           plot_directory=plot_directory,
                           State_Tigerlines=State_Tigerlines,
                           focus_city_tigerlines=focus_city_tigerlines)
-    rm(stationary_combustion_GHGI_data,stationary_combustion_emission_factors,
-       stationary_combustion_by_state,stationary_combustion_by_domain,
-       Process_stationary_combustion,Stationary_combustion)
   }
   if(Process_wastewater){
     # rm(list=setdiff(ls(),c("domain","output_directory",
@@ -516,15 +506,9 @@ CH4_inventory_build <- function(input_directory="G:/My Drive/Shepson Group Drive
                focus_city_tigerlines=focus_city_tigerlines,
                verbose=verbose,
                plot_directory=plot_directory)
-    rm(Wastewater_Municipal_file,Wastewater_Municipal_method,
-       Wastewater_State_info,GHGI_national_wastewater_septic,
-       GHGI_national_wastewater_nonseptic,GHGI_septic_EF,
-       Total_national_open_or_low_int_area,National_wastewater_info,
-       Process_wastewater,NLCD_open_and_low_int,Wastewater)
   }
   if(Process_wetlands_and_inland_waters){
     
-    rm(Process_wetlands_and_inland_waters)
   }
   if(Incorporate_remaining_sectors_from_gridded_EPA){
     # rm(list=setdiff(ls(),c("input_directory","domain","output_directory",
@@ -535,20 +519,18 @@ CH4_inventory_build <- function(input_directory="G:/My Drive/Shepson Group Drive
                  input_directory=input_directory,
                  output_directory=output_directory,
                  domain=domain)
-    rm(Incorporate_remaining_sectors_from_gridded_EPA,Prepare_GEPA)
   }
   if(Combine_sectors){
     
   }
   
 }
-  
-  #example quick plots
-  ##sf chloropleth
-  # plot(all_merge_sf_LCC_state["res_wood_ER"])
-  ##terra chloropleth, same colorscale
-  # plot(all_merge_LCC_state,"res_wood_ER",col=sf.colors(13),breaks=13)
-  
-  
-  
-  
+
+#example quick plots
+##sf chloropleth
+# plot(all_merge_sf_LCC_state["res_wood_ER"])
+##terra chloropleth, same colorscale
+# plot(all_merge_LCC_state,"res_wood_ER",col=sf.colors(13),breaks=13)
+
+
+

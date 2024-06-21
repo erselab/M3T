@@ -1,0 +1,98 @@
+Disaggregate emissions to the pixel scale using ACES or Vulcan CO2
+inventories
+
+Description:
+
+     This is a function utilized by `stationary_combustion` and
+     `NG_distribution`.  It distributes emissions from a larger scale
+     (state or county) to the pixel scale using gridded CO2 emissions.
+
+Usage:
+
+     disaggregation(
+       input_inventory,
+       totals,
+       agg_level,
+       NEI_input,
+       cover_all,
+       out_envir
+     )
+     
+Arguments:
+
+input_inventory: SpatRaster.  Either a Vulcan or ACES sectoral
+          inventory.  ACES is available at
+          <https://doi.org/10.3334/ORNLDAAC/1943> and Vulcan is
+          available at <https://doi.org/10.3334/ORNLDAAC/1741>. Annual
+          mean files should be used for Vulcan.  The hourly ACES file
+          should be averaged across hours to create an annually
+          averaged inventory. Code to do this on a linux-based HPC
+          system is available as the script "Annualize_ACES_seawulf.R"
+          and the accompanying batch script "Annualize_ACES.sh".
+
+  totals: Character vector.  Various subsectors to run through the
+          disaggregation process.
+
+agg_level: Character.  The scale of the data before disaggregation,
+          solely used for naming.
+
+NEI_input: SpatVector.  Includes attributes for each spatial feature
+          that detail the emissions at the current agg_level separated
+          by totals.
+
+cover_all: List of matrices.  Each entry in the list is a separate
+          state/county and the matrices are the output of the function
+          terra::extract(weights=T,exact=T,cells=T).  These provide the
+          fraction of each pixel contained within the state/county.
+          This allows for better accounting for pixels that are on the
+          borders of states/counties.
+
+out_envir: Environment.  Where to assign output data.
+
+Details:
+
+     This function is intended to be used by `stationary_combustion`
+     and `NG_distribution`.  For each pixel it calculates the ratio of
+     CO2 from that pixel to the state/county it is in.  This is
+     combined with the state/county total CH4 emissions to disaggregate
+     the emissions to the pixel-scale.  If there are no emissions for
+     the state/county then the entire area is assigned an equal
+     fraction of emissions.  This is done using sectoral (residential,
+     commercial, industrial, electric) CO2 inventories.
+
+     ACES is available at <https://doi.org/10.3334/ORNLDAAC/1943> and
+     Vulcan is available at <https://doi.org/10.3334/ORNLDAAC/1741>.
+
+     See references Vulcan and, ACES
+
+Value:
+
+     Nothing is returned.  The disaggregated methane data is assigned
+     to the specified out_envir.  This will be a SpatRaster list with
+     one for each of the totals.
+
+Author(s):
+
+     Joe Pitt, <mailto:madeup@wisc.edu>
+
+     Kris Hajny, <mailto:blank@fake.edu>
+
+     Israel Lopez-Coto, <mailto:test@test.edu>
+
+Examples:
+
+     aces_res <- rast(paste0(ACES_directory,"/Sectoral/",ACES_year,'_Annual_ACES_Residential.nc'))
+     res_totals <- c('mains_ER_total_res',
+                     'serv_ER_total_res',
+                     'MnR_ER_total_res',
+                     'meter_ER_total_res',
+                     'upset_ER_total_res',
+                     'post_meter_ER_total_res')
+     cover_all <- list(extract(aces_res,all_merge_LCC_domain,weights=T,exact=T,cells=T))
+     disaggregation(aces_res,
+                    res_totals,
+                    agg_level="state",
+                    NEI_input=all_merge_LCC_state,
+                    cover_all,
+                    out_envir=environment())
+     
