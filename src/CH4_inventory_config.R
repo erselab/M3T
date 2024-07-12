@@ -49,11 +49,16 @@ main_config <- function(){
     NG_distribution_by_domain <- TRUE
     
     #Wastewater
-    Wastewater_Municipal_file <- "DMR"
+    # Wastewater_Municipal_file <- "DMR"
+    Wastewater_use_CWNS <- TRUE
+    Wastewater_use_DMR <- TRUE
     #either CWNS for 2012 clean watershed needs survey discharge flow or DMR which is
     #provided continuously. The 2 datasets do not seem to be consistent and are missing
     #data from certain facilities.
-    Wastewater_Municipal_method <- "Moore_linear"
+    Wastewater_Municipal_Method_Moore_linear <- TRUE
+    Wastewater_Municipal_Method_Moore_EF <- FALSE
+    Wastewater_Municipal_Method_GHGI <- TRUE
+    # Wastewater_Municipal_method <- "Moore_linear"
     #GHGI, Moore_EF, or Moore_linear.  Moore et al.,
     #(https://doi.org/10.1021/acs.est.2c05373) estimated a direct empirical
     #relationship between flow and emission rates using a linear fit on a log-log
@@ -61,12 +66,56 @@ main_config <- function(){
     #Their estimate was ~2x that of the GHGI.  The GHGI method takes GHGI totals and
     #distributes it to all facilities using flow as a direct proxy for emission magnitude.
     #The emission factor approach is not fully implemented yet and should not be used.
+    Wastewater_national_septic <- TRUE
+    Wastewater_state_septic <- TRUE
     Wastewater_State_info <- data.frame("State"=c("DE", "MD", "NJ", "NY", "PA"),
                                         "Population"=c(1018396,6164660,9261699,19677151,12972008),
                                         "Septic_Fraction"=c(0.257,0.181,0.116,0.159,0.245),
                                         "Method"=c("scaled","scaled","scaled","reported","scaled"))
-    #Pulled from census data.  method is either scaled - i.e., from an old census
-    #report, or reported, i.e., use as is from a relatively recent census report
+    #Pulled from census data.  method is either scaled - i.e., from an old
+    #census report, or reported, i.e., use as is from a relatively recent census
+    #report.  Only used if state_septic=TRUE
+    
+    #Wetlands
+    Use_SOCCR1 <- TRUE
+    Use_SOCCR2 <- TRUE
+    Use_Wetcharts <- TRUE
+    #Methodology for Wetland and freshwater methane emissions.  State Of the
+    #Carbon Cycle Report emission factors combined with national wetland
+    #inventory data, or downscaled wetcharts with SOCCR freshwater added.
+    Use_NLCD <- TRUE
+    Use_NALCMS <- TRUE
+    #landcover data that will be used to downscale wetcharts from 0.5 deg to 0.1 deg.  Only relevant if use_wetcharts is true
+    
+    # Wetcharts models are defined with digit 1 = global scale factor (1=124.5
+    # Tg/yr, 2=166 Tg/yr, 3=207.5 Tg/yr), digit 2 = heterotrophic respiration
+    # model (1-8=MsTMIP models, 9=CARDAMOM), 3 = temperature dependence (CH4:C
+    # q10 value of 1 - 3), and 4 = extent parameterization (1=SWAMPS+GLWD,
+    # 2=SWAMPS+GLOBCOVER, 3=PREC+GLWD, 4=PREC+GLOBCOVER) as described in the
+    # user guide
+    # https://daac.ornl.gov/CMS/guides/MonthlyWetland_CH4_WetCHARTs.html
+    
+    #Users can provide a single list (the models to be used, top example) or
+    #several (run multiple variations with different model subsets, bottom
+    #example).  Ma et al. https://doi.org/10.1029/2021AV000408 ranked model
+    #performance as compared to a GOSAT-based inversion and some subsequent
+    #works subset to the 9 highest performing models, though Nesser et al.
+    #https://doi.org/10.5194/acp-24-5069-2024 further subset these to only 7 as
+    #2 showed overestimation in North America compared to GOSAT in Lu et al.
+    #https://doi.org/10.5194/acp-22-395-2022
+    
+    #1 wetcharts output
+    Wetcharts_model_subset <- list(c(1913,1914,1923,1924,1933,1934,2913,2914,2923,
+                                     2924,2933,2934,3913,3914,3923,3924,3933,3934)) #all models
+    #2 wetcharts outputs
+    # Wetcharts_model_subset <- list(c(1913,1914,1923,1924,1933,1934,2913,2914,2924), #Ma subset
+    #                                c(1913,1914,1924,1933,1934,2914,2924)) #Nesser subset
+    
+    Use_SOCCR1_freshwater <- TRUE
+    Use_SOCCR2_freshwater <- TRUE
+    #SOCCR data to use for freshwater component of wetcharts emissions.  Only
+    #relevant if Use_wetcharts is true.
+    
   }
   
   
