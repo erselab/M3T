@@ -29,6 +29,8 @@
 #'   }
 #'  The data is available at \url{https://doi.org/10.5281/zenodo.8367082}.  The
 #'  file will be saved to input_directory to avoid re-downloading every run.
+#'  
+#'  See reference \href{https://doi.org/10.1021/acs.est.3c05138}{Maasakkers et al.}
 #'@param domain SpatRaster providing the desired output grid, including the
 #'  desired resolution and coordinate reference system
 #'@param input_directory Character providing the full filepath to save/load
