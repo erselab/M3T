@@ -363,7 +363,7 @@ Disaggregate_Wetcharts <- function(
   ################################################################################
   #Visuals
   
-  if(verbose==T){
+  if(verbose){
     zlim_min <- -3
     zlim_max <- log10(max(unlist(sapply(NLCD_Downscaled_Averaged_wetcharts,FUN=function(x){global(x,max,na.rm=T)})),
                           unlist(sapply(NALCMS_Downscaled_Averaged_wetcharts,FUN=function(x){global(x,max,na.rm=T)})),
@@ -372,18 +372,24 @@ Disaggregate_Wetcharts <- function(
     #the max is the max across wetcharts pre and post downscaling.
     
     for(B in 1:length(Downscaled_Averaged_wetcharts)){
+      model_list_string <- paste(Wetcharts_model_subset[[B]],collapse = ",")
+      if(nchar(model_list_string)>50){
+        model_list_string <- paste0(substr(model_list_string,0,50),"\n",
+                                    substr(model_list_string,51,999))
+      }
+
       for(A in 1:12){
         if(Use_NLCD){
           log_plot(input = NLCD_Downscaled_Averaged_wetcharts[[B]][[A]],zlim_min = zlim_min,
                    zlim_max = zlim_max,filename = paste0('Wetcharts_NLCD_Downscaled_subset_',B,"_month_",A),
                    title = paste0(month.abb[A]," NLCD downscaled Wetcharts CH4\nlog10(nmol/m2s), Saturated colorscale low end\nmodels ",
-                                  paste(Wetcharts_model_subset[[B]],collapse = ",")))
+                                  model_list_string))
         }
         if(Use_NALCMS){
           log_plot(input = NALCMS_Downscaled_Averaged_wetcharts[[B]][[A]],zlim_min = zlim_min,
                    zlim_max = zlim_max,filename = paste0('Wetcharts_NALCMS_Downscaled_subset_',B,"_month_",A),
                    title = paste0(month.abb[A]," NALCMS downscaled Wetcharts CH4\nlog10(nmol/m2s), Saturated colorscale low end\nmodels ",
-                                  paste(Wetcharts_model_subset[[B]],collapse = ",")))
+                                  model_list_string))
         }
       }
     }

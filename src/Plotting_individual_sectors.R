@@ -83,6 +83,13 @@ log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
   
   input <- prep_plot_data(input)
   
+  if(!is.null(zlim_min)){
+    input[input<zlim_min] <- zlim_min
+  }
+  if(!is.null(zlim_max)){
+    input[input>zlim_max] <- zlim_max
+  }
+  
   png(paste0(outputname,".png"),width = 480*2,height=480*2)
   plot(input,mar=c(3.1, 3.1, 2.1, 7.1)+c(0,0,0,1),
        # col=timPalette(),
