@@ -7,16 +7,16 @@
 #'
 #'@details This function is intended to be used by `stationary_combustion` and
 #'  `NG_distribution`.  For each pixel it calculates the ratio of CO2 from that
-#'  pixel to the state/county it is in.  This is combined with the state/county
-#'  total CH4 emissions to disaggregate the emissions to the pixel-scale.  If
-#'  there are no emissions for the state/county then the entire area is assigned
-#'  an equal fraction of emissions.  This is done using sectoral (residential,
-#'  commercial, industrial, electric) CO2 inventories.
+#'  pixel to the total CO2 for the state/county it is in.  This is combined with
+#'  the state/county total CH4 emissions to disaggregate the emissions to the
+#'  pixel-scale.  If there are no emissions for the state/county then the entire
+#'  area is assigned an equal fraction of emissions.  This is done using
+#'  sectoral (residential, commercial, industrial, electric) CO2 inventories.
 #'
 #'  ACES is available at \url{https://doi.org/10.3334/ORNLDAAC/1943} and Vulcan
 #'  is available at \url{https://doi.org/10.3334/ORNLDAAC/1741}.
 #'
-#'  See references \href{https://doi.org/10.1029/2020JD032974}{Vulcan} and,
+#'  See references \href{https://doi.org/10.1029/2020JD032974}{Vulcan} and
 #'  \href{https://doi.org/10.1002/2017JD027359}{ACES}
 #'@param input_inventory SpatRaster.  Either a Vulcan or ACES sectoral
 #'  inventory.  ACES is available at \url{https://doi.org/10.3334/ORNLDAAC/1943}
