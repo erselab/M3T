@@ -20,6 +20,16 @@ main_config <- function(){
   #Config file for all Sectors.  Modify any of the below variables as desired.
   #Separated by input type and sector.
   
+  #Set how some gridded data is saved. Integer (INT, whole number) values or
+  #float (FLT, decimal numbers) are allowed and signed (S) or unsigned (U)
+  #values too (i.e., positive vs negative). Lastly a number is related to the
+  #precision, and thus size of the output in memory.  Highly recommend FLT8S if
+  #memory is available or FLT4S otherwise.
+
+  #Options are: "INT1U", "INT1S", "INT2U", "INT2S", "INT4U", "INT4S", "INT8U",
+  #"INT8S", "FLT4S", "FLT8S".
+  terraOptions(datatype="FLT8S")
+  
   #Sectors to process
   {
     Process_wetlands_and_inland_waters <- FALSE
@@ -33,8 +43,8 @@ main_config <- function(){
   }
   
   #Variations on the method
-  #Several sectors
   {
+    #Several sectors
     Use_ACES <- TRUE
     Use_Vulcan <- TRUE
     #use ACES and/or Vulcan to distribute certain sectors
@@ -85,7 +95,8 @@ main_config <- function(){
     #inventory data, or downscaled wetcharts with SOCCR freshwater added.
     Use_NLCD <- TRUE
     Use_NALCMS <- TRUE
-    #landcover data that will be used to downscale wetcharts from 0.5 deg to 0.1 deg.  Only relevant if use_wetcharts is true
+    #landcover data that will be used to downscale wetcharts from 0.5 deg to 0.1
+    #deg.  Only relevant if use_wetcharts is true
     
     # Wetcharts models are defined with digit 1 = global scale factor (1=124.5
     # Tg/yr, 2=166 Tg/yr, 3=207.5 Tg/yr), digit 2 = heterotrophic respiration
@@ -214,7 +225,9 @@ main_config <- function(){
     #fraction in the year of interest and the year that the scaled states reported a
     #septic fraction (typically 1990)
   }
-  #assign to the parent environment
+  
+  #assign all to the parent environment as this should only be called by
+  #CH4_inventory_main.R
   for(object in ls(envir = environment())){
     assign(x=object,
            value = get(object,envir = environment()),

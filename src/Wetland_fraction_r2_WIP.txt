@@ -1,0 +1,93 @@
+Create gridded wetland coverage maps using National Wetlands Inventory
+data
+
+Description:
+
+     `NWI_Wetland_fraction` writes multiple tiff files of the
+     fractional wetland cover in each pixel.  There is one file for
+     each state - wetland type combination.
+
+Usage:
+
+     NWI_Wetland_fraction(
+       input_directory,
+       output_directory,
+       domain,
+       state_name_list
+     )
+     
+Arguments:
+
+input_directory: Character providing the full filepath to save/load
+          input data
+
+output_directory: Character providing the full filepath to save
+          processed data
+
+  domain: SpatRaster providing the desired output grid, including the
+          desired resolution and coordinate reference system
+
+state_name_list: Character vector listing all states within the desired
+          domain
+
+Details:
+
+     This function downloads National Wetlands Inventory (NWI) data and
+     calculates the fraction of each gridcell in the domain that is
+     covered by the NWI polygons.  This is done separately for each
+     state as the data is available by state or watershed.  It also
+     processes each type of wetland separately.
+
+     The wetland types are pulled from the NWI system, subsystem, and
+     class as defined here
+     <https://www.fws.gov/media/national-wetland-inventory-wetlands-and-deepwater-map-code-diagram>
+     and discussed in detail here
+     <https://www.fws.gov/media/classification-wetlands-and-deepwater-habitats-united-states>.
+     They are M1 (marine, subtidal), M2 (marine, intertidal), E1
+     (estuarine, subtidal), E2 (estuarine, intertidal), R1 (riverine,
+     tidal), R2 (riverine, lower perrennial), R3 (riverine, upper
+     perennial), R4 (riverine, intermittent), L1 (lacustrine,
+     limnetic), L2 (lacustrine, littoral), PFO (palustrine, forested),
+     and PNF (palustrine, all non-forested classes).
+
+     The NWI data for each state will be automatically downloaded.
+     This can be up to several GB per state.
+
+     The NWI is a biannually updated dataset including the extent and
+     type of wetlands across the United States.  It is available at
+     <https://www.fws.gov/program/national-wetlands-inventory/wetlands-data.>
+
+     A separate TIFF file is saved for each state - wetland type
+     combination.  These are used in further processing.
+
+Value:
+
+     Nothing is returned from the function, but the main outputs are
+     TIFF files of the fractional wetland coverage per pixel for each
+     wetland type and state.  They are titled "state abbreviation _
+     wetland type abbreviation.tiff".
+
+Author(s):
+
+     Joe Pitt, <mailto:madeup@wisc.edu>
+
+     Kris Hajny, <mailto:blank@fake.edu>
+
+     Israel Lopez-Coto, <mailto:test@test.edu>
+
+Examples:
+
+     library(terra)
+     grid_bbox=cbind(c(-76.65,-73.65),c(38.97,40.97))
+     grid_res=0.01
+     grid_crs="epsg:4326"
+     grid <- rast(nrows=diff(range(grid_bbox[,2]))/grid_res,
+                 ncols=diff(range(grid_bbox[,1]))/grid_res, xmin=min(grid_bbox[,1]),
+                 xmax=max(grid_bbox[,1]), ymin=min(grid_bbox[,2]), ymax=max(grid_bbox[,2]),
+                 crs=grid_crs)
+     
+     NWI_Wetland_fraction(input_directory="~/../Desktop/input/",
+                          output_directory="~/../Desktop/",
+                          domain=grid,
+                          state_name_list=c("DE","MD","NJ","NY","PA"))
+     

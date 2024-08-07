@@ -225,6 +225,8 @@ source(paste0(code_directory,"NG_transmission_emissions_r1.R"))
 source(paste0(code_directory,"NG_distribution_emissions_r4.R"))
 source(paste0(code_directory,"Prepare_GEPA.R"))
 source(paste0(code_directory,"WETCHARTS_downscaling.R"))
+source(paste0(code_directory,"Wetland_fraction_r2_WIP.R"))
+# source(paste0(code_directory,"Wetland_emissions_r2.R"))
 
 #run the config and pull all user-set variables from it
 main_config()
@@ -535,7 +537,23 @@ if(Process_wetlands_and_inland_waters){
                            NALCMS_file=file.path("G:/My Drive/Shepson Group Drive/General Inventories and Shapefiles/Shapefiles/NALCMS_2020_land_cover/NA_NALCMS_landcover_2020_30m/data/NA_NALCMS_landcover_2020_30m.tif"),
                            Wetcharts_model_subset)
   }
-  #Wetland emissions
+  # rm(list=setdiff(ls(),c("input_directory","domain","output_directory",
+  #                        "state_name_list","code_directory")))
+  # source(paste0(code_directory,"CH4_inventory_config.R"))
+  # source(paste0(code_directory,"Wetland_fraction_r2_WIP.R"))
+  # main_config()
+  # rm(code_directory)
+  NWI_Wetland_fraction(input_directory=input_directory,
+                       output_directory=output_directory,
+                       domain=domain,
+                       state_name_list=state_name_list)
+  # rm(list=setdiff(ls(),c("input_directory","domain","output_directory",
+  #                        "state_name_list")))
+  # source(paste0(code_directory,"CH4_inventory_config.R"))
+  # source(paste0(code_directory,"Wetland_emissions_r2.R"))
+  # source(paste0(code_directory,"Plotting_individual_sectors.R"))
+  # main_config()
+  # rm(code_directory)
 }
 if(Incorporate_remaining_sectors_from_gridded_EPA){
   # rm(list=setdiff(ls(),c("input_directory","domain","output_directory",
