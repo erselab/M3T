@@ -105,26 +105,42 @@ NWI_Wetland_fraction <- function(input_directory,
       #if already processed, stop the function without error
       return(NULL)
     }
-    #identify any invalid polygons (generally, extremely small)
+    #identify any invalid polygons (errors such as too few vertices or
+    #self-intersection).  Has to be done in multiple steps or it doesn't seem to
+    #work.
     invalid_polygons <- !is.valid(input)
-    #make valid
     if(sum(invalid_polygons)>1){
-      input[invalid_polygons] <- makeValid(input[invalid_polygons])
+      valid_polygons <- input[!invalid_polygons]
+      invalid_polygons <- input[invalid_polygons]
+      invalid_polygons <- makeValid(invalid_polygons)
+      if(all(is.valid(invalid_polygons))){
+        #if successful, just recombine
+        validated_input <- vect(c(valid_polygons,invalid_polygons))
+      }else{
+        stop('failed to fix some polygons')
+      }
+    }else{
+      validated_input <- input
     }
     
+    # #Aggregate to dissolve polygons that are inside others and convert to 1
+    # #overall polygon instead.  Avoids excessive rounding error when combining
+    # #extract results from many polygons.
+    # validated_input <- aggregate(validated_input)
+
     #below is less than 7E-18 delta compared to for loop equivalent.  But it takes
     #~10 seconds compared to 2.6 minutes (for WV R4, 14,853 geometries)
     
     #calculate fractional coverage and save these weights to a raster.  Sum across
     #all polygons for a given raster cell (they all represent the same wetland
     #type after all)
-    cover <- extract(state_template,input,weights=T,exact=T,cells=T)
+    cover <- extract(state_template,validated_input,weights=T,exact=T,cells=T)
     cover <- aggregate(cover$weight,by=list(cover$cell),FUN=sum)
     colnames(cover) <- c("cell","weight")
     output_rast=state_template
     output_rast[cover[,'cell']] <- cover[,'weight']
     output_rast[is.na(output_rast)] <- 0
-    
+
     #extend to the domain + some buffer, crop out any other excess and save
     output_rast <- extend(output_rast,ext(domain)+res(domain)*5,fill=0)
     output_rast <- crop(output_rast,ext(domain)+res(domain)*5)
