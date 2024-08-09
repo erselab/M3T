@@ -1,0 +1,209 @@
+<!DOCTYPE html><html><head><title>R: Create SOCCR based wetland methane maps</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.15.3/dist/katex.min.css">
+<script type="text/javascript">
+const macros = { "\\R": "\\textsf{R}", "\\code": "\\texttt"};
+function processMathHTML() {
+    var l = document.getElementsByClassName('reqn');
+    for (let e of l) { katex.render(e.textContent, e, { throwOnError: false, macros }); }
+    return;
+}</script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.15.3/dist/katex.min.js"
+    onload="processMathHTML();"></script>
+<link rel="stylesheet" type="text/css" href="R.css" />
+</head><body><div class="container"><main>
+
+<table style="width: 100%;"><tr><td>SOCCR_Wetlands</td><td style="text-align: right;">R Documentation</td></tr></table>
+
+<h2>Create SOCCR based wetland methane maps</h2>
+
+<h3>Description</h3>
+
+<p>'SOCCR_Wetlands' writes 2 netcdf files of gridded wetland methane
+emissions, 1 for SOCCR1 and 1 for SOCCR2.  May include freshwater wetland
+emissions using Rosentretet et al. too.  Includes optional visuals as well.
+</p>
+
+
+<h3>Usage</h3>
+
+<pre><code class='language-R'>SOCCR_Wetlands(
+  output_directory,
+  plot_directory,
+  domain,
+  Use_SOCCR1,
+  Use_SOCCR2,
+  Include_freshwater,
+  Wetland_EFs,
+  verbose,
+  County_Tigerlines,
+  State_Tigerlines,
+  focus_city_tigerlines
+)
+</code></pre>
+
+
+<h3>Arguments</h3>
+
+<table>
+<tr><td><code id="output_directory">output_directory</code></td>
+<td>
+<p>Character providing the full filepath to save
+processed data</p>
+</td></tr>
+<tr><td><code id="plot_directory">plot_directory</code></td>
+<td>
+<p>Character providing the full filepath to save figures.
+Only relevant if verbose = TRUE.</p>
+</td></tr>
+<tr><td><code id="domain">domain</code></td>
+<td>
+<p>SpatRaster providing the desired output grid, including the
+desired resolution and coordinate reference system</p>
+</td></tr>
+<tr><td><code id="Use_SOCCR1">Use_SOCCR1</code></td>
+<td>
+<p>Logical.  Pulled from config file.  Indicating whether or
+not to calculate emissions using SOCCR1.</p>
+</td></tr>
+<tr><td><code id="Use_SOCCR2">Use_SOCCR2</code></td>
+<td>
+<p>Logical.  Pulled from config file.  Indicating whether or
+not to calculate emissions using SOCCR2.</p>
+</td></tr>
+<tr><td><code id="Include_freshwater">Include_freshwater</code></td>
+<td>
+<p>Logical.  Pulled from config file.  Indicating
+whether or not to calculate emissions for freshwater wetlands using
+Rosentreter et al.</p>
+</td></tr>
+<tr><td><code id="Wetland_EFs">Wetland_EFs</code></td>
+<td>
+<p>Data frame.  Pulled from config file. Emission factors to
+use for all wetlands - including SOCCR1, SOCCR2, and Rosentreter et al.</p>
+</td></tr>
+<tr><td><code id="verbose">verbose</code></td>
+<td>
+<p>Logical indicating whether to save additional output.  This
+includes monthly plots of the gridded methane emissions on log scales, saved
+separately for each model subset and each land cover dataset used.</p>
+</td></tr>
+<tr><td><code id="County_Tigerlines">County_Tigerlines</code></td>
+<td>
+<p>SpatVector.  United States Census Bureau county
+shapefile.  Available at
+<a href="https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html">https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html</a>.
+Only relevant if verbose=TRUE.</p>
+</td></tr>
+<tr><td><code id="State_Tigerlines">State_Tigerlines</code></td>
+<td>
+<p>SpatVector.  United States Census Bureau county
+shapefile.  Available at
+<a href="https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html">https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html</a>.
+Only relevant if verbose=TRUE.</p>
+</td></tr>
+<tr><td><code id="focus_city_tigerlines">focus_city_tigerlines</code></td>
+<td>
+<p>SpatVector.  United States Census Bureau county
+shapefile.  Available at
+<a href="https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html">https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html</a>.
+Only relevant if a focus city was set in main and verbose=TRUE.</p>
+</td></tr>
+</table>
+
+
+<h3>Details</h3>
+
+<p>This function takes the output of 'NWI_Wetland_fraction', which is
+per pixel fractional coverage of wetlands separated by wetland type, and
+applies emission factors to convert coverage to methane emissions.  It is
+simply applying SOCCR1 or SOCCR2 average emissions from wetlands to the NWI
+activity data.  Additionally, freshwater emissions are calculated using
+emissions from Rosentreter et al.
+</p>
+<p>SOCCR1 values are based on the arithmetic averages of Table F5, SOCC2 values
+are based on the arithmetic averages of Tables 13B.8 to 13B.11 for PFO and
+PNF and Table 15A.2 for M2 and E2, and Lakes and Rivers (L1, L2, and R1 -
+R4) are from Rosentreter et al. using the median flux from rivers and the
+largest lake class (&gt;1 km).  This lake flux was chosen as McDonald et al.
+show that large lakes (&gt;1 km2) constitute 71% of the total lake area in
+CONUS (rising to 90% if including the Great Lakes).
+</p>
+<p>SOCCR1 is available at
+<a href="https://www.carboncyclescience.us/state-carbon-cycle-report-soccr">https://www.carboncyclescience.us/state-carbon-cycle-report-soccr</a> and
+SOCCR2 is available at <a href="https://carbon2018.globalchange.gov/">https://carbon2018.globalchange.gov/</a>.
+</p>
+<p>See references <a href="https://doi.org/10.4319/lo.2012.57.2.0597">McDonald et
+al.</a> and <a href="https://doi.org/10.1038/s41561-021-00715-2">Rosentreter et al.</a>
+</p>
+
+
+<h3>Value</h3>
+
+<p>Nothing is returned from the function, but the main outputs are 2
+netcdcf files of the methane emissions from wetlands with 1 file for SOCCR1
+and 1 file for SOCCR2 based emissions.  Lakes and rivers from Rosentreter et
+al. emissions can also be included.  They are titled &quot;SOCCR1.nc&quot; and
+&quot;SOCCR2.nc&quot;.
+</p>
+<p>If verbose is set to TRUE, then multiple figures are also saved.  Log scale
+plots with consistent axes are saved for the 2 SOCCR emissions.  They are
+saved as &quot;SOCCR1.png&quot; and &quot;SOCCR2.png&quot;.
+</p>
+
+
+<h3>Author(s)</h3>
+
+<p>Joe Pitt, <a href="mailto:madeup@wisc.edu">madeup@wisc.edu</a>
+</p>
+<p>Kris Hajny, <a href="mailto:blank@fake.edu">blank@fake.edu</a>
+</p>
+<p>Israel Lopez-Coto, <a href="mailto:test@test.edu">test@test.edu</a>
+</p>
+
+
+<h3>Examples</h3>
+
+<pre><code class='language-R'>library(terra)
+grid_bbox=cbind(c(-76.65,-73.65),c(38.97,40.97))
+grid_res=0.01
+grid_crs="epsg:4326"
+grid &lt;- rast(nrows=diff(range(grid_bbox[,2]))/grid_res,
+            ncols=diff(range(grid_bbox[,1]))/grid_res, xmin=min(grid_bbox[,1]),
+            xmax=max(grid_bbox[,1]), ymin=min(grid_bbox[,2]), ymax=max(grid_bbox[,2]),
+            crs=grid_crs)
+EFs &lt;- data.frame("E2"=c(10.3,15.29*16.043/12.011),
+                          "M2"=c(10.3,15.29*16.043/12.011),
+                          "PFO"=c(36,18.52*16.043/12.011),
+                          "PNF"=c(36,24.92*16.043/12.011),
+                          "L1"=5,
+                          "L2"=5,
+                          "R1"=7.88,
+                          "R2"=7.88,
+                          "R3"=7.88,
+                          "R4"=7.88)
+rownames(EFs) &lt;- c("SOCCR1","SOCCR2")
+
+# convert from g CH4 per m2 per yr to nmol/m2/s
+EFs=EFs*1E9/(16.043*365.25*24*60*60)
+
+SOCCR_Wetlands(output_directory="~/../Desktop/",
+               plot_directory="~/../Desktop/plots/",
+               domain=grid,
+               Use_SOCCR1=TRUE,
+               Use_SOCCR2=TRUE,
+               Include_freshwater=TRUE,
+               Wetland_EFs=EFs,
+               verbose=TRUE,
+               County_Tigerlines=vect("~/../Desktop/County_Tigerlines/tl_2018_us_county.shp"),
+               State_Tigerlines=vect("~/../Desktop/State_Tigerlines/tl_2018_us_state.shp"),
+               focus_city_tigerlines=focus_city)
+
+</code></pre>
+
+</main>
+
+</div>
+</body></html>
+

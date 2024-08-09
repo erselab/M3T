@@ -1,358 +1,247 @@
-## Wetland_emissions_r2.R
-## In use: 2021-11-02 20:00
-#
-# Load in the various state wetland fraction rasters
-# These overlap somewhat, so crop each to the squares within each state
-# Then add together and assign fluxes to each class
-################################################################################
-#Manually defined variables
+#'@title Create SOCCR based wetland methane maps
+#'
+#'@description `SOCCR_Wetlands` writes 2 netcdf files of gridded wetland methane
+#'  emissions, 1 for SOCCR1 and 1 for SOCCR2.  May include freshwater wetland
+#'  emissions using Rosentretet et al. too.  Includes optional visuals as well.
+#'
+#'@details This function takes the output of `NWI_Wetland_fraction`, which is
+#'  per pixel fractional coverage of wetlands separated by wetland type, and
+#'  applies emission factors to convert coverage to methane emissions.  It is
+#'  simply applying SOCCR1 or SOCCR2 average emissions from wetlands to the NWI
+#'  activity data.  Additionally, freshwater emissions are calculated using
+#'  emissions from Rosentreter et al.
+#'
+#'  SOCCR1 values are based on the arithmetic averages of Table F5, SOCC2 values
+#'  are based on the arithmetic averages of Tables 13B.8 to 13B.11 for PFO and
+#'  PNF and Table 15A.2 for M2 and E2, and Lakes and Rivers (L1, L2, and R1 -
+#'  R4) are from Rosentreter et al. using the median flux from rivers and the
+#'  largest lake class (>1 km).  This lake flux was chosen as McDonald et al.
+#'  show that large lakes (>1 km2) constitute 71\% of the total lake area in
+#'  CONUS (rising to 90\% if including the Great Lakes).
+#'
+#'  SOCCR1 is available at
+#'  \url{https://www.carboncyclescience.us/state-carbon-cycle-report-soccr} and
+#'  SOCCR2 is available at \url{https://carbon2018.globalchange.gov/}.
+#'
+#'  See references \href{https://doi.org/10.4319/lo.2012.57.2.0597}{McDonald et
+#'  al.} and \href{https://doi.org/10.1038/s41561-021-00715-2}{Rosentreter et al.}
+#'@param output_directory Character providing the full filepath to save
+#'  processed data
+#'@param verbose Logical indicating whether to save additional output.  This
+#'  includes monthly plots of the gridded methane emissions on log scales, saved
+#'  separately for each model subset and each land cover dataset used.
+#'@param domain SpatRaster providing the desired output grid, including the
+#'  desired resolution and coordinate reference system
+#'@param Use_SOCCR1 Logical.  Pulled from config file.  Indicating whether or
+#'  not to calculate emissions using SOCCR1.
+#'@param Use_SOCCR2 Logical.  Pulled from config file.  Indicating whether or
+#'  not to calculate emissions using SOCCR2.
+#'@param Include_freshwater Logical.  Pulled from config file.  Indicating
+#'  whether or not to calculate emissions for freshwater wetlands using
+#'  Rosentreter et al.
+#'@param Wetland_EFs Data frame.  Pulled from config file. Emission factors to
+#'  use for all wetlands - including SOCCR1, SOCCR2, and Rosentreter et al.
+#'@param plot_directory Character providing the full filepath to save figures.
+#'  Only relevant if verbose = TRUE.
+#'@param County_Tigerlines SpatVector.  United States Census Bureau county
+#'  shapefile.  Available at
+#'  \url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.
+#'  Only relevant if verbose=TRUE.
+#'@param State_Tigerlines SpatVector.  United States Census Bureau county
+#'  shapefile.  Available at
+#'  \url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.
+#'  Only relevant if verbose=TRUE.
+#'@param focus_city_tigerlines SpatVector.  United States Census Bureau county
+#'  shapefile.  Available at
+#'  \url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.
+#'  Only relevant if a focus city was set in main and verbose=TRUE.
+#'@returns Nothing is returned from the function, but the main outputs are 2
+#'  netcdcf files of the methane emissions from wetlands with 1 file for SOCCR1
+#'  and 1 file for SOCCR2 based emissions.  Lakes and rivers from Rosentreter et
+#'  al. emissions can also be included.  They are titled "SOCCR1.nc" and
+#'  "SOCCR2.nc".
+#'
+#'  If verbose is set to TRUE, then multiple figures are also saved.  Log scale
+#'  plots with consistent axes are saved for the 2 SOCCR emissions.  They are
+#'  saved as "SOCCR1.png" and "SOCCR2.png".
+#'@examples
+#' library(terra)
+#' grid_bbox=cbind(c(-76.65,-73.65),c(38.97,40.97))
+#' grid_res=0.01
+#' grid_crs="epsg:4326"
+#' grid <- rast(nrows=diff(range(grid_bbox[,2]))/grid_res,
+#'             ncols=diff(range(grid_bbox[,1]))/grid_res, xmin=min(grid_bbox[,1]),
+#'             xmax=max(grid_bbox[,1]), ymin=min(grid_bbox[,2]), ymax=max(grid_bbox[,2]),
+#'             crs=grid_crs)
+#' EFs <- data.frame("E2"=c(10.3,15.29*16.043/12.011),
+#'                           "M2"=c(10.3,15.29*16.043/12.011),
+#'                           "PFO"=c(36,18.52*16.043/12.011),
+#'                           "PNF"=c(36,24.92*16.043/12.011),
+#'                           "L1"=5,
+#'                           "L2"=5,
+#'                           "R1"=7.88,
+#'                           "R2"=7.88,
+#'                           "R3"=7.88,
+#'                           "R4"=7.88)
+#' rownames(EFs) <- c("SOCCR1","SOCCR2")
+#'
+#' # convert from g CH4 per m2 per yr to nmol/m2/s
+#' EFs=EFs*1E9/(16.043*365.25*24*60*60)
+#'
+#' SOCCR_Wetlands(output_directory="~/../Desktop/",
+#'                plot_directory="~/../Desktop/plots/",
+#'                domain=grid,
+#'                Use_SOCCR1=TRUE,
+#'                Use_SOCCR2=TRUE,
+#'                Include_freshwater=TRUE,
+#'                Wetland_EFs=EFs,
+#'                verbose=TRUE,
+#'                County_Tigerlines=vect("~/../Desktop/County_Tigerlines/tl_2018_us_county.shp"),
+#'                State_Tigerlines=vect("~/../Desktop/State_Tigerlines/tl_2018_us_state.shp"),
+#'                focus_city_tigerlines=focus_city)
+#'
+#'@author Joe Pitt, \email{madeup@@wisc.edu}
+#'@author Kris Hajny, \email{blank@@fake.edu}
+#'@author Israel Lopez-Coto, \email{test@@test.edu}
+#'@reference \href{https://doi.org/10.4319/lo.2012.57.2.0597}{McDonald et al.}
+#'@reference \href{https://doi.org/10.1038/s41561-021-00715-2}{Rosentreter et
+#'  al.}
+#'@export
 
-Input_directory <- "G:/My Drive/Shepson Group Drive/Kris/Indy Inversion/Inventories/Hi-res_CH4_inventory_development/Raw_data_files/"
-Output_directory <- "G:/My Drive/Shepson Group Drive/Kris/Indy Inversion/Inventories/Hi-res_CH4_inventory_development/Processed_output/Wetlands/"
 
-# wetcharts_0.1_deg_file <- file.path(Output_directory,"XESMF_wetcharts_downscaling","2022-10-04_cold_NALCMS_XESMF_Wetcharts_2015.gri")
-wetcharts_0.1_deg_file <- file.path(Output_directory,"XESMF_wetcharts_downscaling","2022-10-04_warm_NALCMS_XESMF_Wetcharts_2015.gri")
-# wetcharts_0.1_deg_file <- file.path(Output_directory,"XESMF_wetcharts_downscaling","2022-09-15_NALCMS_XESMF_Wetcharts_2015.gri")
-#higher res wetcharts that was disaggregated using NALCMS or NLCD.  Using
-#projectraster or XESMF.
-
-# built to loop code to calculate d01 and d03 emission maps each time
-state_shapefile <- 'G:/My Drive/Shepson Group Drive/Kris/Old_outdated_or_complete/NYC SF work/tl_2019_us_state/tl_2019_us_state.shp'
-wetland_fraction_dir <- Output_directory
-domain <- c('d03',
-            'd01')
-output_dir <- c(Output_directory,
-                Output_directory)
-state_list <- list(c("IN"),
-                   c("MI","WI","MN","IA","MO","IL","IN","OH","PA","NY","WV","VA","NC","TN","KY","AR","MD"))
-nrows <- c(160, 92)
-ncols <- c(230, 154)
-xmn <- c(-87.3, -93.8)
-xmx <- c((0.01*230)+-87.3, (0.1*154)+-93.8)
-ymn <- c(39, 35.2)
-ymx <- c(39+(0.01*160), 35.2+(0.1*92))
-
-# lon.res<-0.1 # resolution in degrees longitude
-# lat.res<-0.1  # resolution in degrees latitude
-# numpix.x<-154  # number of pixels in x directions in grid
-# numpix.y<-92  #number of pixels in y directions in grid
-# lon.ll<--93.8
-# lat.ll<-35.2
-#Indy D01
-
-# lon.res<- 0.01 # resolution in degrees longitude
-# lat.res<- 0.01 # resolution in degrees latitude
-# numpix.x <- 230 # number of pixels in x directions in grid
-# numpix.y <- 160 #number of pixels in y directions in grid
-# lon.ll<- -87.3
-# lat.ll<- 39
-# Indy D03
-################################################################################
-#load packages
-packagecheck <- c("raster","rgdal","ncdf4","maps")
-for(i in length(packagecheck)){
-  if(length(find.package(packagecheck[i],quiet = TRUE))<1){
-    install.packages(packagecheck[i])
-  }
-}
-
-invisible(suppressPackageStartupMessages(lapply(packagecheck, library, character.only=TRUE)))
-rm(packagecheck,i)
-
-#raster + rgdal = raster filetype functionalities
-#ncdf4 = .nc filetype functionalities
-################################################################################
-#load in and process the Wetland_fraction_r1 output to convert from wetland
-#coverage to wetland emissions
-
-states <- readOGR(state_shapefile)
-states_wgs84 <- spTransform(states,CRS(SRS_string="EPSG:4326"))  # Transform to WGS84
-
-for(j in 1:length(domain)){
-  # Initialise rasters that will hold the total fluxes (all states)
-  target_raster <- raster(nrows=nrows[j], ncols=ncols[j], xmn=xmn[j], xmx=xmx[j], ymn=ymn[j], ymx=ymx[j], crs=4326)  # WGS84
-  target_raster[] <- 0
-  E2_frac <- target_raster
-  M2_frac <- target_raster
-  R1_frac <- target_raster
-  R2_frac <- target_raster
-  R3_frac <- target_raster
-  R4_frac <- target_raster
-  L1_frac <- target_raster
-  L2_frac <- target_raster
-  PFO_frac <- target_raster
-  PNF_frac <- target_raster
+SOCCR_Wetlands <- function(output_directory,
+                           plot_directory,
+                           domain,
+                           Use_SOCCR1,
+                           Use_SOCCR2,
+                           Include_freshwater,
+                           Wetland_EFs,
+                           verbose,
+                           County_Tigerlines,
+                           State_Tigerlines,
+                           focus_city_tigerlines){
   
-  # Load in state by state, and in each case retain only the fluxes for cells within that state
-  # Combine all the fluxes in the _frac rasters as we go
-  for(i in 1:length(state_list[[j]])){
-    state_border <- subset(states_wgs84, STUSPS==state_list[[j]][i])
-    if(file.exists(paste0(wetland_fraction_dir,state_list[[j]][i],'_E2_',domain[j],'.grd'))){
-      E2_frac <- E2_frac + mask(raster(paste0(wetland_fraction_dir,state_list[[j]][i],'_E2_',domain[j],'.grd')),state_border,updatevalue=0)
-    }
-    if(file.exists(paste0(wetland_fraction_dir,state_list[[j]][i],'_M2_',domain[j],'.grd'))){
-      M2_frac <- M2_frac + mask(raster(paste0(wetland_fraction_dir,state_list[[j]][i],'_M2_',domain[j],'.grd')),state_border,updatevalue=0)
-    }
-    if(file.exists(paste0(wetland_fraction_dir,state_list[[j]][i],'_R1_',domain[j],'.grd'))){
-      R1_frac <- R1_frac + mask(raster(paste0(wetland_fraction_dir,state_list[[j]][i],'_R1_',domain[j],'.grd')),state_border,updatevalue=0)
-    }
-    if(file.exists(paste0(wetland_fraction_dir,state_list[[j]][i],'_R2_',domain[j],'.grd'))){
-      R2_frac <- R2_frac + mask(raster(paste0(wetland_fraction_dir,state_list[[j]][i],'_R2_',domain[j],'.grd')),state_border,updatevalue=0)
-    }
-    if(file.exists(paste0(wetland_fraction_dir,state_list[[j]][i],'_R3_',domain[j],'.grd'))){
-      R3_frac <- R3_frac + mask(raster(paste0(wetland_fraction_dir,state_list[[j]][i],'_R3_',domain[j],'.grd')),state_border,updatevalue=0)
-    }
-    if(file.exists(paste0(wetland_fraction_dir,state_list[[j]][i],'_R4_',domain[j],'.grd'))){
-      R4_frac <- R4_frac + mask(raster(paste0(wetland_fraction_dir,state_list[[j]][i],'_R4_',domain[j],'.grd')),state_border,updatevalue=0)
-    }
-    if(file.exists(paste0(wetland_fraction_dir,state_list[[j]][i],'_L1_',domain[j],'.grd'))){
-      L1_frac <- L1_frac + mask(raster(paste0(wetland_fraction_dir,state_list[[j]][i],'_L1_',domain[j],'.grd')),state_border,updatevalue=0)
-    }
-    if(file.exists(paste0(wetland_fraction_dir,state_list[[j]][i],'_L2_',domain[j],'.grd'))){
-      L2_frac <- L2_frac + mask(raster(paste0(wetland_fraction_dir,state_list[[j]][i],'_L2_',domain[j],'.grd')),state_border,updatevalue=0)
-    }
-    if(file.exists(paste0(wetland_fraction_dir,state_list[[j]][i],'_PFO_',domain[j],'.grd'))){
-      PFO_frac <- PFO_frac + mask(raster(paste0(wetland_fraction_dir,state_list[[j]][i],'_PFO_',domain[j],'.grd')),state_border,updatevalue=0)
-    }
-    if(file.exists(paste0(wetland_fraction_dir,state_list[[j]][i],'_PNF_',domain[j],'.grd'))){
-      PNF_frac <- PNF_frac + mask(raster(paste0(wetland_fraction_dir,state_list[[j]][i],'_PNF_',domain[j],'.grd')),state_border,updatevalue=0)
+  ## Wetland_emissions_r2.R
+  ## In use: 2021-11-02 20:00
+  #
+  # Load in the various state wetland fraction rasters
+  # These overlap somewhat, so crop each to the squares within each state
+  # Then add together and assign fluxes to each class
+  
+  
+  ################################################################################
+  #load in and process the Wetland_fraction_r1 output to convert from wetland
+  #coverage to wetland emissions
+  
+  NWI_files <- list.files(paste0(output_directory,"/NWI/"),".tiff",full.names = T)
+  
+  
+  Wetland_types <- vector()
+  if(Use_SOCCR1 | Use_SOCCR2){
+    Wetland_types <- c(Wetland_types,"M2","E2","PFO","PNF")
+  }
+  if(Include_freshwater){
+    Wetland_types <- c(Wetland_types,"R1","R2","R3","R4","L1","L2")
+  }
+  
+  
+  #process separately for each type (different EFs)
+  for(i in 1:length(Wetland_types)){
+    subset_files <- NWI_files[grep(Wetland_types[i],NWI_files)]
+    subset_data <- rast(subset_files)
+    #given NWI extends somewhat beyond state bounds, there is overlap.  So max
+    #should combine them akin to sum, but without double counting.
+    subset_data <- max(subset_data)
+    names(subset_data) <- Wetland_types[i]
+    
+    if(i==1){
+      if(Use_SOCCR1 | Include_freshwater){
+        SOCCR1_flux <- subset_data*Wetland_EFs["SOCCR1",Wetland_types[i]]
+      }
+      if(Use_SOCCR2){
+        SOCCR2_flux <- subset_data*Wetland_EFs["SOCCR2",Wetland_types[i]]
+      }
+      #for a later sanity check
+      all_frac <- subset_data
+    }else{
+      if(Use_SOCCR1 | Include_freshwater){
+        SOCCR1_flux <- c(SOCCR1_flux,subset_data*Wetland_EFs["SOCCR1",Wetland_types[i]])
+      }
+      if(Use_SOCCR2){
+        SOCCR2_flux <- c(SOCCR2_flux,subset_data*Wetland_EFs["SOCCR2",Wetland_types[i]])
+      }
+      all_frac <- all_frac+subset_data
     }
   }
   
   # Check that the fractions are always between 0 and 1
-  all_frac <- E2_frac + M2_frac + R1_frac + R2_frac + R3_frac + R4_frac + L1_frac + L2_frac + PFO_frac + PNF_frac
-  max_frac <- cellStats(all_frac,max)
-  min_frac <- cellStats(all_frac,min)
-  cat("total wetland area ranges from",min_frac,"to",max_frac,"for",domain[j],"\n")
+  max_frac <- unlist(global(all_frac,max))*100
+  min_frac <- unlist(global(all_frac,min))*100
+  if((Use_SOCCR1 | Use_SOCCR2) & Include_freshwater){
+    cat("total SOCCR-relevant + freshwater wetland area per pixel ranges from",min_frac,"to",max_frac,"%\n")
+  }else if(Use_SOCCR1 | Use_SOCCR2){
+    cat("total SOCCR-relevant wetland area per pixel ranges from",min_frac,"to",max_frac,"%\n")
+  }else if(Include_freshwater){
+    cat("total freshwater wetland area per pixel ranges from",min_frac,"to",max_frac,"%\n")
+  }
   
-  # Take avg fluxes from SOCCR1 report (as in McKain et al) - these are in gCH4 per m2 per yr
-  # In McKain et al there are no fluxes from open water
-  E2_flux_SOCCR1 <- E2_frac*1.3*1e9/(16.043*365*24*60*60)  # convert to nmol/m2/s
-  M2_flux_SOCCR1 <- M2_frac*1.3*1e9/(16.043*365*24*60*60)  # convert to nmol/m2/s
-  PFO_flux_SOCCR1 <- PFO_frac*7.6*1e9/(16.043*365*24*60*60)  # convert to nmol/m2/s
-  PNF_flux_SOCCR1 <- PNF_frac*7.6*1e9/(16.043*365*24*60*60)  # convert to nmol/m2/s
+  ################################################################################
+  #save the output
   
-  # Now take avg wetland fluxes from SOCCR2 report - recalculated from the SOCCR2 lit review tables
-  # in my spreadsheet "SOCCR1_vs_SOCCR2.xlsx"
-  E2_flux_SOCCR2 <- E2_frac*20.44*1e9/(16.043*365*24*60*60)  # convert to nmol/m2/s
-  M2_flux_SOCCR2 <- M2_frac*20.44*1e9/(16.043*365*24*60*60)  # convert to nmol/m2/s
-  PFO_flux_SOCCR2 <- PFO_frac*18.52*1e9/(16.043*365*24*60*60)  # convert to nmol/m2/s
-  PNF_flux_SOCCR2 <- PNF_frac*19.71*1e9/(16.043*365*24*60*60)  # convert to nmol/m2/s
+  if(Use_SOCCR1 | Include_freshwater){
+    SOCCR1_flux <- crop(SOCCR1_flux,ext(domain))
+    writeCDF(SOCCR1_flux,
+             file.path(output_directory,'SOCCR1.nc'),
+             force_v4=TRUE,
+             varname='methane_emissions',
+             unit='nmol/m2/s',
+             longname='Methane emissions from National Wetland Inventory separated by classes, using fluxes from the SOCCR1 report and the median flux from Rosentreter et al. (2021) for lakes and rivers',
+             missval=-9999,
+             overwrite=TRUE)
+  }
+  if(Use_SOCCR2){
+    SOCCR2_flux <- crop(SOCCR2_flux,ext(domain))
+    writeCDF(SOCCR2_flux,
+             file.path(output_directory,'SOCCR2.nc'),
+             force_v4=TRUE,
+             varname='methane_emissions',
+             unit='nmol/m2/s',
+             longname='Methane emissions from National Wetland Inventory separated by classes, using fluxes from the SOCCR2 report and the median flux from Rosentreter et al. (2021) for lakes and rivers',
+             missval=-9999,
+             overwrite=TRUE)
+  }
+  ################################################################################
+  #visuals
   
-  # Inland water CH4 fluxes are not included in either SOCCR1 or SOCCR2
-  # For lakes, McDonald et al. (10.4319/lo.2012.57.2.0597) show that large lakes > 1 km2 constitute 71% of the total
-  # lake area in the contiguous US (rising to 90% if the Great Lakes are included)
-  # So use the median flux from the largest lakes class (>1 km) from Rosentreter et al. (10.1038/s41561-021-00715-2)
-  L1_flux <- L1_frac*5.00*1e9/(16.043*365*24*60*60)
-  L2_flux <- L2_frac*5.00*1e9/(16.043*365*24*60*60)
-  
-  # Also use the median river flux from Rosentreter et al. Both this and the lake flux come from extended data table 1
-  R1_flux <- R1_frac*7.88*1e9/(16.043*365*24*60*60)
-  R2_flux <- R2_frac*7.88*1e9/(16.043*365*24*60*60)
-  R3_flux <- R3_frac*7.88*1e9/(16.043*365*24*60*60)
-  R4_flux <- R4_frac*7.88*1e9/(16.043*365*24*60*60)
-  
-  # writeRaster(E2_flux_SOCCR1,
-  #             paste0(output_dir[j],'E2_flux_SOCCR1_',domain[j],'.nc'),
-  #             force_v4=TRUE,
-  #             varname='methane_emissions',
-  #             varunit='nmol/m2/s',
-  #             longname='Methane emissions from National Wetland Inventory classes beginning E2, based on fluxes from the SOCCR1 report',
-  #             NAflag=-9999,
-  #             overwrite=TRUE)
-  # 
-  # writeRaster(M2_flux_SOCCR1,
-  #             paste0(output_dir[j],'M2_flux_SOCCR1_',domain[j],'.nc'),
-  #             force_v4=TRUE,
-  #             varname='methane_emissions',
-  #             varunit='nmol/m2/s',
-  #             longname='Methane emissions from National Wetland Inventory classes beginning M2, based on fluxes from the SOCCR1 report',
-  #             NAflag=-9999,
-  #             overwrite=TRUE)
-  # 
-  # writeRaster(PFO_flux_SOCCR1,
-  #             paste0(output_dir[j],'PFO_flux_SOCCR1_',domain[j],'.nc'),
-  #             force_v4=TRUE,
-  #             varname='methane_emissions',
-  #             varunit='nmol/m2/s',
-  #             longname='Methane emissions from National Wetland Inventory classes beginning PFO, based on fluxes from the SOCCR1 report',
-  #             NAflag=-9999,
-  #             overwrite=TRUE)
-  # 
-  # writeRaster(PNF_flux_SOCCR1,
-  #             paste0(output_dir[j],'PNF_flux_SOCCR1_',domain[j],'.nc'),
-  #             force_v4=TRUE,
-  #             varname='methane_emissions',
-  #             varunit='nmol/m2/s',
-  #             longname='Methane emissions from National Wetland Inventory classes beginning P, except those beginning PFO, based on fluxes from the SOCCR1 report',
-  #             NAflag=-9999,
-  #             overwrite=TRUE)
-  # 
-  # writeRaster(E2_flux_SOCCR2,
-  #             paste0(output_dir[j],'E2_flux_SOCCR2_',domain[j],'.nc'),
-  #             force_v4=TRUE,
-  #             varname='methane_emissions',
-  #             varunit='nmol/m2/s',
-  #             longname='Methane emissions from National Wetland Inventory classes beginning E2, based on fluxes from the SOCCR2 report',
-  #             NAflag=-9999,
-  #             overwrite=TRUE)
-  # 
-  # writeRaster(M2_flux_SOCCR2,
-  #             paste0(output_dir[j],'M2_flux_SOCCR2_',domain[j],'.nc'),
-  #             force_v4=TRUE,
-  #             varname='methane_emissions',
-  #             varunit='nmol/m2/s',
-  #             longname='Methane emissions from National Wetland Inventory classes beginning M2, based on fluxes from the SOCCR2 report',
-  #             NAflag=-9999,
-  #             overwrite=TRUE)
-  # 
-  # writeRaster(PFO_flux_SOCCR2,
-  #             paste0(output_dir[j],'PFO_flux_SOCCR2_',domain[j],'.nc'),
-  #             force_v4=TRUE,
-  #             varname='methane_emissions',
-  #             varunit='nmol/m2/s',
-  #             longname='Methane emissions from National Wetland Inventory classes beginning PFO, based on fluxes from the SOCCR2 report',
-  #             NAflag=-9999,
-  #             overwrite=TRUE)
-  # 
-  # writeRaster(PNF_flux_SOCCR2,
-  #             paste0(output_dir[j],'PNF_flux_SOCCR2_',domain[j],'.nc'),
-  #             force_v4=TRUE,
-  #             varname='methane_emissions',
-  #             varunit='nmol/m2/s',
-  #             longname='Methane emissions from National Wetland Inventory classes beginning P, except those beginning PFO, based on fluxes from the SOCCR2 report',
-  #             NAflag=-9999,
-  #             overwrite=TRUE)
-  # 
-  # writeRaster(L1_flux,
-  #             paste0(output_dir[j],'L1_flux_',domain[j],'.nc'),
-  #             force_v4=TRUE,
-  #             varname='methane_emissions',
-  #             varunit='nmol/m2/s',
-  #             longname='Methane emissions from National Wetland Inventory classes beginning beginning L1, based on the median flux from the largest lakes class (>1 km) from Rosentreter et al. (2021)',
-  #             NAflag=-9999,
-  #             overwrite=TRUE)
-  # 
-  # writeRaster(L2_flux,
-  #             paste0(output_dir[j],'L2_flux_',domain[j],'.nc'),
-  #             force_v4=TRUE,
-  #             varname='methane_emissions',
-  #             varunit='nmol/m2/s',
-  #             longname='Methane emissions from National Wetland Inventory classes beginning beginning L2, based on the median flux from the largest lakes class (>1 km) from Rosentreter et al. (2021)',
-  #             NAflag=-9999,
-  #             overwrite=TRUE)
-  # 
-  # writeRaster(R1_flux,
-  #             paste0(output_dir[j],'R1_flux_',domain[j],'.nc'),
-  #             force_v4=TRUE,
-  #             varname='methane_emissions',
-  #             varunit='nmol/m2/s',
-  #             longname='Methane emissions from National Wetland Inventory classes beginning beginning R1, based on the median flux from Rosentreter et al. (2021)',
-  #             NAflag=-9999,
-  #             overwrite=TRUE)
-  # 
-  # writeRaster(R2_flux,
-  #             paste0(output_dir[j],'R2_flux_',domain[j],'.nc'),
-  #             force_v4=TRUE,
-  #             varname='methane_emissions',
-  #             varunit='nmol/m2/s',
-  #             longname='Methane emissions from National Wetland Inventory classes beginning beginning R2, based on the median flux from Rosentreter et al. (2021)',
-  #             NAflag=-9999,
-  #             overwrite=TRUE)
-  # 
-  # writeRaster(R3_flux,
-  #             paste0(output_dir[j],'R3_flux_',domain[j],'.nc'),
-  #             force_v4=TRUE,
-  #             varname='methane_emissions',
-  #             varunit='nmol/m2/s',
-  #             longname='Methane emissions from National Wetland Inventory classes beginning beginning R3, based on the median flux from Rosentreter et al. (2021)',
-  #             NAflag=-9999,
-  #             overwrite=TRUE)
-  # 
-  # writeRaster(R4_flux,
-  #             paste0(output_dir[j],'R4_flux_',domain[j],'.nc'),
-  #             force_v4=TRUE,
-  #             varname='methane_emissions',
-  #             varunit='nmol/m2/s',
-  #             longname='Methane emissions from National Wetland Inventory classes beginning beginning R4, based on the median flux from Rosentreter et al. (2021)',
-  #             NAflag=-9999,
-  #             overwrite=TRUE)
+  if(verbose){
+    #the minimum is a ~arbitrary value given the log scale can go quite negative.
+    zlim_min <- -3
+    if(Use_SOCCR1 & Use_SOCCR2){
+      SOCCR1_flux <- sum(subset(SOCCR1_flux,c("M2","E2","PFO","PNF")))
+      SOCCR2_flux <- sum(subset(SOCCR2_flux,c("M2","E2","PFO","PNF")))
+      zlim_max <- log10(max(global(SOCCR1_flux,max),global(SOCCR2_flux,max)))
+      log_plot(input = SOCCR1_flux,
+               zlim_min = zlim_min, zlim_max = zlim_max,
+               filename = 'SOCCR1',
+               title = paste0("SOCCR1 CH4\nlog10(nmol/m2s), Saturated colorscale low end"))
+      log_plot(input = SOCCR2_flux,
+               zlim_min = zlim_min, zlim_max = zlim_max,
+               filename = 'SOCCR2',
+               title = paste0("SOCCR2 CH4\nlog10(nmol/m2s), Saturated colorscale low end"))
+    }else if(Use_SOCCR1){
+      SOCCR1_flux <- sum(subset(SOCCR1_flux,c("M2","E2","PFO","PNF")))
+      zlim_max <- log10(global(SOCCR1_flux,max))
+      log_plot(input = SOCCR1_flux,
+               zlim_min = zlim_min, zlim_max = zlim_max,
+               filename = 'SOCCR1',
+               title = paste0("SOCCR1 CH4\nlog10(nmol/m2s), Saturated colorscale low end"))
+    }else if(Use_SOCCR2){
+      SOCCR2_flux <- sum(subset(SOCCR2_flux,c("M2","E2","PFO","PNF")))
+      zlim_max <- log10(global(SOCCR2_flux,max))
+      log_plot(input = SOCCR2_flux,
+               zlim_min = zlim_min, zlim_max = zlim_max,
+               filename = 'SOCCR2',
+               title = paste0("SOCCR2 CH4\nlog10(nmol/m2s), Saturated colorscale low end"))
+    }
+  }
 }
-
-################################################################################
-# Finally load Israel's WetCHARTs-based maps and separate the d01 map into US and Canadian components
-wetcharts_d01 <- raster(wetcharts_0.1_deg_file)
-wetcharts_d01 <- wetcharts_d01*1e9/(1000*16.043*24*3600)
-
-wetcharts_d03 <- raster(wetcharts_0.1_deg_file)
-wetcharts_d03 <- wetcharts_d03*1e9/(1000*16.043*24*3600)
-#My version was NOT in the proper units.  Converting from mg/m2day to nmol/m2s
-
-target_raster <- raster(nrows=nrows[which(domain=="d03")],
-                        ncols=ncols[which(domain=="d03")], 
-                        xmn=xmn[which(domain=="d03")], 
-                        xmx=xmx[which(domain=="d03")], 
-                        ymn=ymn[which(domain=="d03")], 
-                        ymx=ymx[which(domain=="d03")], crs="+init=epsg:4326")  #d03
-
-wetcharts_d03 <- crop(wetcharts_d03,target_raster)
-
-# Note that we only need to use mask here, because any cells with the centre in Canada are
-# excluded from the NWI raster when we created it (also using mask)
-wetcharts_canada <- mask(wetcharts_d01, states_wgs84, inverse=T, updatevalue=0)
-wetcharts_US <- mask(wetcharts_d01, states_wgs84, inverse=F, updatevalue=0)
-
-
-# writeRaster(wetcharts_d03,
-#             file.path(Output_directory,'cold_wetcharts_d03.nc'),
-#             force_v4=TRUE,
-#             varname='methane_emissions',
-#             varunit='nmol/m2/s',
-#             longname='Methane emissions based on WetCHARTs',
-#             NAflag=-9999,
-#             overwrite=TRUE)
-# 
-# writeRaster(wetcharts_canada,
-#             file.path(Output_directory,'cold_wetcharts_canada_d01.nc'),
-#             force_v4=TRUE,
-#             varname='methane_emissions',
-#             varunit='nmol/m2/s',
-#             longname='Methane emissions in Canada based on WetCHARTs',
-#             NAflag=-9999,
-#             overwrite=TRUE)
-# 
-# writeRaster(wetcharts_US,
-#             file.path(Output_directory,'cold_wetcharts_US_d01.nc'),
-#             force_v4=TRUE,
-#             varname='methane_emissions',
-#             varunit='nmol/m2/s',
-#             longname='Methane emissions in the US based on WetCHARTs',
-#             NAflag=-9999,
-#             overwrite=TRUE)
-# 
-writeRaster(wetcharts_d03,
-            file.path(Output_directory,'warm_wetcharts_d03.nc'),
-            force_v4=TRUE,
-            varname='methane_emissions',
-            varunit='nmol/m2/s',
-            longname='Methane emissions based on WetCHARTs',
-            NAflag=-9999,
-            overwrite=TRUE)
-
-writeRaster(wetcharts_canada,
-            file.path(Output_directory,'warm_wetcharts_canada_d01.nc'),
-            force_v4=TRUE,
-            varname='methane_emissions',
-            varunit='nmol/m2/s',
-            longname='Methane emissions in Canada based on WetCHARTs',
-            NAflag=-9999,
-            overwrite=TRUE)
-
-writeRaster(wetcharts_US,
-            file.path(Output_directory,'warm_wetcharts_US_d01.nc'),
-            force_v4=TRUE,
-            varname='methane_emissions',
-            varunit='nmol/m2/s',
-            longname='Methane emissions in the US based on WetCHARTs',
-            NAflag=-9999,
-            overwrite=TRUE)

@@ -226,7 +226,7 @@ source(paste0(code_directory,"NG_distribution_emissions_r4.R"))
 source(paste0(code_directory,"Prepare_GEPA.R"))
 source(paste0(code_directory,"WETCHARTS_downscaling.R"))
 source(paste0(code_directory,"Wetland_fraction_r2_WIP.R"))
-# source(paste0(code_directory,"Wetland_emissions_r2.R"))
+source(paste0(code_directory,"Wetland_emissions_r2.R"))
 
 #run the config and pull all user-set variables from it
 main_config()
@@ -547,13 +547,25 @@ if(Process_wetlands_and_inland_waters){
                        output_directory=output_directory,
                        domain=domain,
                        state_name_list=state_name_list)
-  # rm(list=setdiff(ls(),c("input_directory","domain","output_directory",
-  #                        "state_name_list")))
+  # rm(list=setdiff(ls(),c("plot_directory","domain","output_directory",
+  #                        "code_directory","verbose","County_Tigerlines",
+  #                        "State_Tigerlines","focus_city_tigerlines")))
   # source(paste0(code_directory,"CH4_inventory_config.R"))
   # source(paste0(code_directory,"Wetland_emissions_r2.R"))
   # source(paste0(code_directory,"Plotting_individual_sectors.R"))
   # main_config()
   # rm(code_directory)
+  SOCCR_Wetlands(output_directory=output_directory,
+                 plot_directory=plot_directory,
+                 domain=domain,
+                 Use_SOCCR1=Use_SOCCR1,
+                 Use_SOCCR2=Use_SOCCR2,
+                 Include_freshwater=Include_freshwater,
+                 Wetland_EFs=Wetland_EFs,
+                 verbose=verbose,
+                 County_Tigerlines=County_Tigerlines,
+                 State_Tigerlines=State_Tigerlines,
+                 focus_city_tigerlines=focus_city_tigerlines)
 }
 if(Incorporate_remaining_sectors_from_gridded_EPA){
   # rm(list=setdiff(ls(),c("input_directory","domain","output_directory",

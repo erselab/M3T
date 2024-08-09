@@ -25,7 +25,7 @@ main_config <- function(){
   #values too (i.e., positive vs negative). Lastly a number is related to the
   #precision, and thus size of the output in memory.  Highly recommend FLT8S if
   #memory is available or FLT4S otherwise.
-
+  
   #Options are: "INT1U", "INT1S", "INT2U", "INT2S", "INT4U", "INT4S", "INT8U",
   #"INT8S", "FLT4S", "FLT8S".
   terraOptions(datatype="FLT8S")
@@ -86,17 +86,24 @@ main_config <- function(){
     #census report, or reported, i.e., use as is from a relatively recent census
     #report.  Only used if state_septic=TRUE
     
+    
+    
     #Wetlands
+    #Methodology for Wetland and freshwater methane emissions.  State Of the
+    #Carbon Cycle Report emission factors combined with national wetland
+    #inventory data, or downscaled wetcharts.
     Use_SOCCR1 <- TRUE
     Use_SOCCR2 <- TRUE
     Use_Wetcharts <- TRUE
-    #Methodology for Wetland and freshwater methane emissions.  State Of the
-    #Carbon Cycle Report emission factors combined with national wetland
-    #inventory data, or downscaled wetcharts with SOCCR freshwater added.
-    Use_NLCD <- TRUE
-    Use_NALCMS <- TRUE
+    
+    #Use national wetlands inventory and Rosentreter et al data to estimate
+    #freshwater wetland emissions.
+    Include_freshwater <- TRUE
+    
     #landcover data that will be used to downscale wetcharts from 0.5 deg to 0.1
     #deg.  Only relevant if use_wetcharts is true
+    Use_NLCD <- TRUE
+    Use_NALCMS <- TRUE
     
     # Wetcharts models are defined with digit 1 = global scale factor (1=124.5
     # Tg/yr, 2=166 Tg/yr, 3=207.5 Tg/yr), digit 2 = heterotrophic respiration
@@ -121,12 +128,6 @@ main_config <- function(){
     #2 wetcharts outputs
     # Wetcharts_model_subset <- list(c(1913,1914,1923,1924,1933,1934,2913,2914,2924), #Ma subset
     #                                c(1913,1914,1924,1933,1934,2914,2924)) #Nesser subset
-    
-    Use_SOCCR1_freshwater <- TRUE
-    Use_SOCCR2_freshwater <- TRUE
-    #SOCCR data to use for freshwater component of wetcharts emissions.  Only
-    #relevant if Use_wetcharts is true.
-    
   }
   
   
@@ -180,6 +181,15 @@ main_config <- function(){
     #pulled from SEDS.  Res coal doesn't exist in US and res gas is dealt with
     #separately, so not included here.  The desired inventory year (or closest available)
     #should be used.
+    
+    #All emission factors are in g/GJ.  Emission factors are IPCC defaults except
+    #for electric natural gas.  They can be viewed in IPCC 2006 volume 2: Energy tables
+    #2.2 through 2.5 (https://www.ipcc-nggip.iges.or.jp/public/2006gl/vol2.html).
+    #The natural gas electric sector emission factor is from Hajny et al., 2019
+    #(https://doi.org/10.1021/acs.est.9b01875).  It is 5.4 g/MMBTU and within its
+    #uncertainties of the GHGI value of 3.9 g/MMBTU.  Note this value is only for
+    #Combined Cycle NG power plants, however they make up the vast majority of NG
+    #use for electricity in the US.
     stationary_combustion_emission_factors <- data.frame(
       "com_coal"=10,
       "ind_coal"=10,
@@ -194,16 +204,62 @@ main_config <- function(){
       "res_wood"=300,
       "com_wood"=300,
       "ind_wood"=30,
-      "elec_wood"=30
-    )
-    #All emission factors are in g/GJ.  Emission factors are IPCC defaults except
-    #for electric natural gas.  They can be viewed in IPCC 2006 volume 2: Energy tables
-    #2.2 through 2.5 (https://www.ipcc-nggip.iges.or.jp/public/2006gl/vol2.html).
-    #The natural gas electric sector emission factor is from Hajny et al., 2019
-    #(https://doi.org/10.1021/acs.est.9b01875).  It is 5.4 g/MMBTU and within its
-    #uncertainties of the GHGI value of 3.9 g/MMBTU.  Note this value is only for
-    #Combined Cycle NG power plants, however they make up the vast majority of NG
-    #use for electricity in the US.
+      "elec_wood"=30)
+    
+    
+    
+    #wetlands
+    #SOCCR-based wetlands emission factors.  SOCCR1 values comes from
+    #the arithmetic averages of Table F5
+    #(https://www.carboncyclescience.us/state-carbon-cycle-report-soccr), SOCCR2
+    #values come from the arithmetic averages of Tables 13B.8 to 13B.11 for PFO
+    #and PNF and Table 15A.2 for M2 and E2.
+    #(https://carbon2018.globalchange.gov/).  SOCCR2 values are in g C of
+    #CH4/m2/yr, so are converted to g CH4/m2/yr to be consistent with SOCCR1
+    #first.
+    
+    # Inland water CH4 fluxes are not included in either SOCCR1 or SOCCR2 For
+    # lakes, McDonald et al. (10.4319/lo.2012.57.2.0597) show that large lakes
+    # > 1 km2 constitute 71% of the total lake area in the contiguous US
+    # (rising to 90% if the Great Lakes are included) So use the median flux
+    # from the largest lakes class (>1 km) from Rosentreter et al.
+    # (10.1038/s41561-021-00715-2) Also use the median river flux from
+    # Rosentreter et al. Both this and the lake flux come from extended data
+    # table 1
+    
+    #As per the National Wetlands Inventory, defined here
+    #https://www.fws.gov/media/national-wetland-inventory-wetlands-and-deepwater-map-code-diagram
+    #and discussed in detail here
+    #https://www.fws.gov/media/classification-wetlands-and-deepwater-habitats-united-states
+    # M2 = marine, intertidal
+    # E2 = estuarine, intertidal
+    # R1 = riverine, tidal
+    # R2 = riverine, lower perrennial
+    # R3 = riverine, upper perennial
+    # R4 = riverine, intermittent
+    # L1 = lacustrine, limnetic
+    # L2 = lacustrine, littoral 
+    # PFO = palustrine, forested
+    # PNF = palustrine, all non-forested classes
+    
+    # the first 4 are only relevant if SOCCR1 or SOCCR2 are used.  The last 6
+    # are only relevant if freshwater emissions are included.
+    
+    Wetland_EFs <- data.frame("E2"=c(10.3,15.29*16.043/12.011), 
+                              "M2"=c(10.3,15.29*16.043/12.011),
+                              "PFO"=c(36,18.52*16.043/12.011),
+                              "PNF"=c(36,24.92*16.043/12.011),
+                              "L1"=5,
+                              "L2"=5,
+                              "R1"=7.88,
+                              "R2"=7.88,
+                              "R3"=7.88,
+                              "R4"=7.88)
+    rownames(Wetland_EFs) <- c("SOCCR1","SOCCR2")
+
+    # convert from g CH4 per m2 per yr to nmol/m2/s
+    Wetland_EFs=Wetland_EFs*1E9/(16.043*365.25*24*60*60)      
+
     
     #Wastewater
     GHGI_national_wastewater_septic <- 227 #kt CH4/yr
