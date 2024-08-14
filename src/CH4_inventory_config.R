@@ -28,7 +28,11 @@ main_config <- function(){
   
   #Options are: "INT1U", "INT1S", "INT2U", "INT2S", "INT4U", "INT4S", "INT8U",
   #"INT8S", "FLT4S", "FLT8S".
-  terraOptions(datatype="FLT8S")
+  
+  #also setting progress=0 to prevent progress bars for steps that take a longer
+  #time/memory.  Individual steps won't be clear to the user, so these are not
+  #useful.
+  terraOptions(datatype="FLT8S",progress=0)
   
   #Sectors to process
   {
