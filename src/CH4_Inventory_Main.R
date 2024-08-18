@@ -119,10 +119,10 @@ vulcan_directory="G:/My Drive/Shepson Group Drive/General Inventories and Shapef
 verbose=TRUE
 
 #an easy way to switch to stress-testing code.  Changes year to 2016, resolution
-#to 0.1 and reprojects to a cylindrical projection to make sure functions still
-#run without failing.  ALWAYS REVERT TO F after running to avoid confusion!
-testmode <- FALSE 
-
+#to 0.1 and reprojects to a cylindrical projection (or the Vulcan one) to make
+#sure functions still run without failing.
+testmode <- F
+testmode_vulcan <- F
 ################################################################################
 #User input
 
@@ -142,7 +142,7 @@ XESMF <- F
 ################################################################################
 #load all packages necessary throughout processsing
 
-packagecheck <- c("terra", "ncdf4", "readxl", "pracma", "jsonlite","dplyr")
+packagecheck <- c("terra", "ncdf4", "readxl","jsonlite","dplyr")
 # 
 # #install each package and library them.  Ensures all are up to date. 
 # lapply(packagecheck,install.packages,dependencies=T,quiet=T)
@@ -165,26 +165,23 @@ rm(packagecheck,i)
 #terra = raster dataclasses and processing functions
 #ncdf4 = .nc filetype functions
 #readxl = enables loading in .xlsx or similar filetypes
-#pracma = haversine function to calculate distances from lat/long points
 #jsonlite = allows simple loading of JSON files, primarily for downloading input data via API
 
 
 #may need, but may be able to avoid using
-#sf and sp = many spatial dataclasses
-#raster = raster dataclasses and processing functions
-#geosphere = some processing functions for spatial data
 #dplyr = part of tidyverse for cleaner, sometimes more efficient code.
 #        Landfill sector uses piping, group_by, and slice_max from this.
 
 
 #shouldn't need anymore, may need to code out in some scripts still
+#geosphere = some processing functions for spatial data
 #fBasics = timpallete colorscale
+#pracma = haversine function to calculate distances from lat/long points.  terra can do this
 #rvest and httr = easier access to html data
 #rgdal = dead package for spatial processing
 #maps = basic maps, other datasets are better
-
-#could use, but don't have to by any means
-#could use entire tidyverse throughout if desired...
+#sf and sp = many spatial dataclasses
+#raster = raster dataclasses and processing functions
 
 ################################################################################
 #Create input/output directories
@@ -233,8 +230,84 @@ source(paste0(code_directory,"WETCHARTS_downscaling.R"))
 source(paste0(code_directory,"Wetland_fraction_r2_WIP.R"))
 source(paste0(code_directory,"Wetland_emissions_r2.R"))
 
+################################################################################
+#some early error checking, mostly looking at config.  Are the options
+#acceptable, properly formatted, etc.?
+
 #run the config and pull all user-set variables from it
 main_config()
+
+error_text <- ""
+error_found <- FALSE
+
+#each of the below is just a combination of config options that is unusable
+#(e.g., all activity data choices for a sector set to F).  Add to error text so
+#all config errors can be presented at once.
+if((!Use_ACES & !Use_Vulcan) & (Process_stationary_combustion | Process_natural_gas_distribution)){
+  error_found <- TRUE
+  error_text <- paste0(error_text,"\n\nMust set both Process_stationary_combustion and Process_natural_gas_distribution to FALSE or set either Use_ACES or Use_Vulcan to TRUE to disaggregate stationary combustion and natural gas distribution data")
+}
+
+if(Process_stationary_combustion & (!stationary_combustion_by_state & !stationary_combustion_by_domain)){
+  error_found <- TRUE
+  error_text <- paste0(error_text,"\n\nMust set Process_stationary_combustion to FALSE or set either stationary_combustion_by_state or stationary_combustion_by_domain to TRUE to disaggregate stationary combustion data")
+}
+
+if(Process_stationary_combustion & (!stationary_combustion_by_state & !stationary_combustion_by_domain)){
+  error_found <- TRUE
+  error_text <- paste0(error_text,"\n\nMust set Process_stationary_combustion to FALSE or set either stationary_combustion_by_state or stationary_combustion_by_domain to TRUE to disaggregate stationary combustion data")
+}
+
+if(Process_natural_gas_distribution & (!NG_distribution_by_LDC & !NG_distribution_by_state & !NG_distribution_by_domain)){
+  error_found <- TRUE
+  error_text <- paste0(error_text,"\n\nMust set Process_natural_gas_distribution to FALSE or set either NG_distribution_by_LDC or NG_distribution_by_state or NG_distribution_by_domain to TRUE to disaggregate natural gas distribution data")
+}
+
+if(Process_natural_gas_distribution & (!NG_distribution_by_LDC & !NG_distribution_by_state & !NG_distribution_by_domain)){
+  error_found <- TRUE
+  error_text <- paste0(error_text,"\n\nMust set Process_natural_gas_distribution to FALSE or set either NG_distribution_by_LDC or NG_distribution_by_state or NG_distribution_by_domain to TRUE to disaggregate natural gas distribution data")
+}
+
+if(Process_wastewater & (!Wastewater_use_CWNS & !Wastewater_use_DMR)){
+  error_found <- TRUE
+  error_text <- paste0(error_text,"\n\nMust set Process_wastewater to FALSE or set either Wastewater_use_CWNS or Wastewater_use_DMR to TRUE as these are the only options available for input data")
+}
+
+if(Process_wastewater & (!Wastewater_Municipal_Method_Moore_linear & !Wastewater_Municipal_Method_Moore_EF & !Wastewater_Municipal_Method_GHGI)){
+  error_found <- TRUE
+  error_text <- paste0(error_text,"\n\nMust set Process_wastewater to FALSE or set either Wastewater_Municipal_Method_Moore_linear or Wastewater_Municipal_Method_Moore_EF or Wastewater_Municipal_Method_GHGI to TRUE to convert activity data to emissions")
+}
+
+if(Process_wastewater & (!Wastewater_Municipal_Method_Moore_linear & !Wastewater_Municipal_Method_Moore_EF & !Wastewater_Municipal_Method_GHGI)){
+  error_found <- TRUE
+  error_text <- paste0(error_text,"\n\nMust set Process_wastewater to FALSE or set either Wastewater_Municipal_Method_Moore_linear or Wastewater_Municipal_Method_Moore_EF or Wastewater_Municipal_Method_GHGI to TRUE to convert activity data to emissions")
+}
+
+if(Process_wastewater & (!Wastewater_national_septic & !Wastewater_state_septic)){
+  error_found <- TRUE
+  error_text <- paste0(error_text,"\n\nMust set Process_wastewater to FALSE or set either Wastewater_national_septic or Wastewater_state_septic to TRUE as these are the only methods available to calculate septic emissions")
+}
+
+if(Process_wetlands_and_inland_waters & (!Use_SOCCR1 & !Use_SOCCR2 & !Use_Wetcharts)){
+  error_found <- TRUE
+  error_text <- paste0(error_text,"\n\nMust set Process_wetlands_and_inland_waters to FALSE or set either Use_SOCCR1 or Use_SOCCR2 or Use_Wetcharts to TRUE as these are the only methods available to calculate wetland emissions")
+}
+
+if(Process_wetlands_and_inland_waters & Use_Wetcharts & (!Use_NLCD & !Use_NALCMS)){
+  error_found <- TRUE
+  error_text <- paste0(error_text,"\n\nMust set Process_wetlands_and_inland_waters or Use_Wetcharts to FALSE or set either Use_NLCD or Use_NALCMS to TRUE to disaggregate wetcharts")
+}
+
+if(Process_wastewater & sum(c("scaled","reported")!=unique(Wastewater_State_info[,4]))){
+  error_found <- TRUE
+  error_text <- paste0(error_text,"\n\nMust set Process_wastewater to FALSE or set Wastewater_State_info method values to either scaled or reported for all entries")
+}
+if(error_found){
+  stop(error_text)
+}
+
+#check with Israel, need to add checks for data types throughout too
+
 ################################################################################
 #create the domain and set it to all NaN
 if(testmode){
@@ -255,10 +328,11 @@ if(class(domain)=="SpatRaster"){
                  crs=domain_crs)
   rm(domain_res,domain_crs)
 }
-if(testmode){
+if(testmode_vulcan){
+  domain <- project(domain,"+proj=lcc +lat_1=33 +lat_2=45 +lat_0=40 +lon_0=-97 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs") #Lambert Conic Conformal, same as Vulcan/ACES
+}else if(testmode){
   domain <- project(domain,"epsg:4087") #Equidistant Cylindrical - nothing we use has this, significantly different spatially, good test option
 }
-
 ################################################################################
 #load in Census tigerlines necessary for several functions
 
@@ -493,9 +567,7 @@ if(Process_wastewater){
                         state_name_list=state_name_list,
                         State_Tigerlines=State_Tigerlines,
                         output_directory=output_directory)
-  
-  
-  
+
   # rm(list=setdiff(ls(),c("input_directory","domain","output_directory",
   #                        "inventory_year","verbose","clear","state_name_list",
   #                        "code_directory",
