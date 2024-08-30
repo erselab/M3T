@@ -388,7 +388,7 @@ NG_distribution <- function(domain,
   
   
   starttime <- Sys.time()
-  cat("Starting wastewater sector: Wastewater\n")
+  cat("Starting natural gas distribution sector: NG_distribution_emissions\n")
   
   if(!NG_distribution_by_LDC){
     ################################################################################
@@ -474,7 +474,7 @@ NG_distribution <- function(domain,
                          grepl(pattern = paste0("\\b",state.abb[A],"\\b"),x=GHGRP_csv$facility_name.y,ignore.case = T)) & GHGRP_csv$state!=state.abb[A]
       }
       if(sum(match_indx)>0){
-        cat("\n",paste(GHGRP_csv$facility_name[match_indx],collapse="  &  "),"rewritten from",paste(GHGRP_csv$state_name[match_indx],collapse="  &  "),"to",state.name[A])
+        cat(paste(GHGRP_csv$facility_name[match_indx],collapse="  &  "),"rewritten from",paste(GHGRP_csv$state_name[match_indx],collapse="  &  "),"to",state.name[A],"\n")
       }
       GHGRP_csv[match_indx,"operating_state"]=state.abb[A]
       GHGRP_csv[match_indx,"operating_state_name"]=state.name[A]
@@ -1021,7 +1021,7 @@ NG_distribution <- function(domain,
       all_merge_LCC$count <- 1:nrow(all_merge_LCC)
       cover_all <- all_merge_LCC %>% 
         split(f=all_merge_LCC$HIFLD_SVCTERID) %>%
-        lapply(function(x){cat("\rProcessing",x$count,"of",LDC_count,"LDCs using ACES            ");extract(aces_res,x,weights=T,exact=T,cells=T)})
+        lapply(function(x){cat("\rProcessing",x$count,"of",LDC_count,"LDCs using ACES                                   ");extract(aces_res,x,weights=T,exact=T,cells=T)})
 
       disaggregation(aces_res,res_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
       disaggregation(aces_com,com_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
@@ -1033,12 +1033,12 @@ NG_distribution <- function(domain,
       all_merge_LCC$count <- 1:nrow(all_merge_LCC)
       cover_all <- all_merge_LCC %>% 
         split(f=all_merge_LCC$HIFLD_SVCTERID) %>%
-        lapply(function(x){cat("\rProcessing",x$count,"of",LDC_count,"LDCs using vulcan            ");extract(vu_res,x,weights=T,exact=T,cells=T)})
+        lapply(function(x){cat("\rProcessing",x$count,"of",LDC_count,"LDCs using vulcan                                  ");extract(vu_res,x,weights=T,exact=T,cells=T)})
 
       disaggregation(vu_res,res_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
       disaggregation(vu_com,com_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
     }
-    cat("Finished disaggregating emissions to pixels from the LDC scale at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
+    cat("\rFinished disaggregating emissions to pixels from the LDC scale at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
   }
   
   ################################################################################
@@ -1084,7 +1084,7 @@ NG_distribution <- function(domain,
     disaggregation(vu_res,res_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all,out_envir=environment())
     disaggregation(vu_com,com_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all,out_envir=environment())
   }
-  cat("Finished disaggregating emissions to pixels from the state scale at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
+  cat("\rFinished disaggregating emissions to pixels from the state scale at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
   ################################################################################
   #Repeat when aggregated to the domain total.
   
@@ -1110,7 +1110,7 @@ NG_distribution <- function(domain,
     disaggregation(vu_com,com_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
   }
   
-  cat("Finished disaggregating emissions to pixels from the domain scale at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
+  cat("\rFinished disaggregating emissions to pixels from the domain scale at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
   ################################################################################
   #write a function to save, dependent on whether or not we use XESMF
   if(XESMF){
