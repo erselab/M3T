@@ -26,8 +26,8 @@
 #'  as separately for above grade and below grade stations.  If calculating by
 #'  LDC, the PHMSA miles of pipeline per LDC is used in the calculation of
 #'  stations per mile, rather than the GHGRP, though the miles of pipeline for
-#'  each LDC in GHGRP and PHMSA are compared and if any LDC differs by > 5\%
-#'  an error will be flagged.
+#'  each LDC in GHGRP and PHMSA are compared and if any LDC differs by > 5\% an
+#'  error will be flagged.
 #'
 #'  The GHGI Annex data is then pulled and includes emission factors and
 #'  activity data for metering an regulating stations separated by inlet
@@ -54,16 +54,16 @@
 #'  differ slightly if calculating by LDC.
 #'
 #'  If not calculating by LDC, then there is no HIFLD csv file necessary,
-#'  leaving the HIFLD shapefile, the PHMSA pipeline activity and emissions data,
-#'  the EIA sales data, and the GHGRP pipeline activity data.
+#'  leaving the PHMSA activity data, the EIA sales data, and the GHGRP activity
+#'  data.
 #'
-#'  If calculating by LDC a HIFLD csv (containing the same information as the
-#'  shapefile) is also included.  The residuals (LDCs that could not be matched
-#'  across datasets) are assigned to an "OTHER" LDC that includes all territory
-#'  in the state not already accounted for by an LDC.  The number of stations
-#'  for each LDC is now overwritten to be the values for that specific LDC from
-#'  the GHGRP.  State average stations per mile (calculated from the GHGRP) are
-#'  then applied only to LDCs that did not report to the GHGRP.
+#'  If calculating by LDC a HIFLD csv and shapefile (containing the same
+#'  information) are also included.  The residuals (LDCs that could not be
+#'  matched across datasets) are assigned to an "OTHER" LDC that includes all
+#'  land in the state not already accounted for by an LDC.  The number of
+#'  stations for each LDC is now overwritten to be the values for that specific
+#'  LDC from the GHGRP.  State average stations per mile (calculated from the
+#'  GHGRP) are then applied only to LDCs that did not report to the GHGRP.
 #'
 #'  Service and pipeline emissions are then split into residential and
 #'  commercial fractions.  This is calculated for residential as the sum of all
@@ -108,6 +108,24 @@
 #'  level.  As such, producing output at the state and LDC level will result in
 #'  slightly different output than running only at the state level.
 #'
+#'
+#'  So, to summarize this relatively complex sector, PHMSA data on miles of
+#'  pipeline by type and number of services by type of pipeline is combined with
+#'  emission factors to calculate emissions.  GHGRP state average numbers of M&R
+#'  facilities per mile are also combined with an emission factor, broken down
+#'  by pressure.  If calculating byLDC and GHGRP data exists for an LDC, the
+#'  reported counts are used instead.  These emissions are then distributed to the
+#'  appropriate LDC territories using HIFLD shapefiles, or aggregated at the
+#'  state level. To further disaggregate the emissions, they are broken into
+#'  residential and commercial portions using the fraction of customers as
+#'  reported to the EIA. They are then distributed to the pixel scale using the
+#'  residential and commercial sectors of the CO2 inventories Vulcan/ACES.  As
+#'  such, GHGRP emissions are not directly used at all, PHMSA is the source of
+#'  most activity data with GHGRP providing the numbers of M&R facilities, HIFLD
+#'  solely provides shapefiles for each LDC if operating by LDC, and EIA
+#'  provides a breakdown of residential vs commercial customers.
+#'
+#'
 #'  GHGRP data is available starting in 2010 and generally is about 2 years
 #'  behind present day, the GHGI is available starting in 1990 and is updated
 #'  approximately in sync with the GHGRP.  The HIFLD dataset is updated
@@ -145,7 +163,7 @@
 #'  al.}, \href{https://doi.org/10.1021/acs.est.8b03217}{Fischer et al.},
 #'  \href{https://doi.org/10.1029/2020JD032974}{Vulcan} and,
 #'  \href{https://doi.org/10.1002/2017JD027359}{ACES}
-#'  
+#'
 #'@param domain SpatRaster providing the desired output grid, including the
 #'  desired resolution and coordinate reference system
 #'@param state_name_list Character vector listing all states within the desired
@@ -367,53 +385,34 @@ NG_distribution <- function(domain,
                             plot_directory,
                             County_Tigerlines,
                             focus_city_tigerlines){
-  ################################################################################
-  #load in and filter the various files, excluding the GHGI one for now
+  # EIA_file = file.path(input_directory,"176 Type of Operations and Sector Items.xlsx");
+  # PHMSA_file = file.path(input_directory,"annual_gas_distribution_2010_present/annual_gas_distribution_2019.xlsx");
+  GHGI_file = file.path(input_directory,"2022_ghgi_natural_gas_systems_annex36_tables.xlsx");
+  GHGI_EF_sheet = "3.6-2";
+  GHGI_Activity_sheet = "3.6-7";
   
-  # Load in HIFLD shapefile containing the LDC service territories
-  HIFLD_shp <- vect("https://services1.arcgis.com/Hp6G80Pky0om7QvQ/arcgis/rest/services/Natural_Gas_Service_Territories/FeatureServer/0/query?outFields=*&where=1%3D1&f=geojson")
-  # HIFLD_shp_old <- vect("https://services1.arcgis.com/Hp6G80Pky0om7QvQ/arcgis/rest/services/Natural_Gas_Service_Territories/FeatureServer/0/query?outFields=*&where=1%3D1&f=geojson")
-  # HIFLD_shp_new <- vect("https://services1.arcgis.com/Hp6G80Pky0om7QvQ/arcgis/rest/services/Natural_Gas_Local_Distribution_Company_Service_Territories/FeatureServer/0/query?outFields=*&where=1%3D1&f=geojson")
-  if(NG_distribution_by_LDC){
-    # Load in the HIFLD csv file containing the clean company IDs that we'll use for cross-referencing
-    HIFLD_csv <- read_excel(HIFLD_file)
-  }else{
-    #note that dates are not translated well from this
-    HIFLD_csv <- as.data.frame(HIFLD_shp)
-  }
+  NG_distribution_by_LDC=T
+  starttime <- Sys.time()
+  cat("Starting wastewater sector: Wastewater\n")
   
-  # Load the EIA company-level data for 2019 - this may have been edited to add a
-  # dummy 'OTHER' entry
-  EIA_csv <- read_xlsx(EIA_file,skip=1,col_names = T)
-  # Load the PHMSA data for 2019 - this file may have had company ID's edited to
-  # be consistent with EIA for the states that we will use
-  PHMSA_csv <- read_xlsx(PHMSA_file,skip=2,col_names = T)
-  
-  # Filter the PHMSA file by commodity
-  PHMSA_csv_NG <- PHMSA_csv[which(PHMSA_csv$COMMODITY == 'Natural Gas'),]
-  
-  #filter to only those for the relevant states and those with a company ID in
-  #HIFLD (present at all).
-  PHMSA_csv_NG <- PHMSA_csv_NG[which(PHMSA_csv_NG$STOP%in%state_name_list),]
-  HIFLD_csv <- HIFLD_csv[HIFLD_csv$LDC_STATE %in% state_name_list | HIFLD_csv$COMPID=="OTHER",]
-  HIFLD_csv <- HIFLD_csv[HIFLD_csv$COMPID!="NOT AVAILABLE",]
-  HIFLD_csv <- HIFLD_csv[!is.na(HIFLD_csv$COMPID),]
-  
-  #add the LDC state abbreviation if the user hasn't done so manually (irrelevant
-  #if not calculating by LDC)
-  HIFLD_check <- substr(HIFLD_csv$COMPID,start = nchar(HIFLD_csv$COMPID)-1,stop = nchar(HIFLD_csv$COMPID))
-  HIFLD_check2 <- sapply(gregexpr("[[:alpha:]]",HIFLD_check),FUN=function(x){x==-1}[1])
-  for(A in 1:length(HIFLD_check)){
-    if(HIFLD_check2[A]){
-      HIFLD_csv[A,"COMPID"] <- paste0(HIFLD_csv[A,"COMPID"],HIFLD_csv[A,"LDC_STATE"])
-    }
-  }
-  
-  # rm(PHMSA_csv,EIA_file,HIFLD_check,HIFLD_check2,PHMSA_file,A)
-  if(NG_distribution_by_LDC){
-    GHGRP_csv <- read_xls(GHGRP_file,sheet=as.character(inventory_year),col_names = T,skip = 5)
-    GHGRP_csv <- GHGRP_csv[!is.na(GHGRP_csv$`Company ID`),]
-  }else{
+  if(!NG_distribution_by_LDC){
+    ################################################################################
+    #load in and filter the various files, excluding the GHGI one for now
+    
+    # Load the EIA company-level data for 2019 - this may have been edited to add a
+    # dummy 'OTHER' entry
+    EIA_csv <- read_xlsx(EIA_file,skip=1,col_names = T)
+    # Load the PHMSA data for 2019 - this file may have had company ID's edited to
+    # be consistent with EIA for the states that we will use
+    PHMSA_csv <- read_xlsx(PHMSA_file,skip=2,col_names = T)
+    
+    # Filter the PHMSA file by commodity
+    PHMSA_csv_NG <- PHMSA_csv[which(PHMSA_csv$COMMODITY == 'Natural Gas'),]
+    
+    #filter to only those for the relevant states and those with a company ID in
+    #HIFLD (present at all).
+    PHMSA_csv_NG <- PHMSA_csv_NG[which(PHMSA_csv_NG$STOP%in%state_name_list),]
+
     ################################################################################
     #Download the relevant ghgrp emissions data using the API
     #(https://www.epa.gov/enviro/envirofacts-data-service-api) and combine the
@@ -445,7 +444,7 @@ NG_distribution <- function(domain,
     
     #download data
     ghgrp_facility_info <- fromJSON(data_URLs)
-
+    
     #subset to the desired year
     ghgrp_facility_info <- ghgrp_facility_info[ghgrp_facility_info$year==inventory_year,]
     
@@ -456,7 +455,6 @@ NG_distribution <- function(domain,
     #convert the relevant columns to numeric class
     GHGRP_csv[,c("latitude","longitude","Reported_CH4")] <- apply(GHGRP_csv[,c("latitude","longitude","Reported_CH4")],
                                                                   2,FUN=function(x){as.numeric(x)})
-    
     
     #now we need to adjust the GHGRP data as some LDC's provide their
     #headquarters, not the location of operation.  Use facility names to correct
@@ -492,155 +490,227 @@ NG_distribution <- function(domain,
     
     #cleanup a column that is in all 3 GHRGP datasets and are identical (or ~so).
     GHGRP_csv[,c("facility_name.x","facility_name.y")] <- NULL
-
+    
     #delete all tempfiles and clean up working environment
-    rm(A,data_URLs,ghgrp_facility_info,ghgrp_w_only_emissions,match_indx,ghgrp_NN_data)
-  }
-  
-  ################################################################################
-  #do some webscraping to add a few additional variables for GHGRP facilities
-  
-  download_dest <- tempfile(fileext = ".html")
-  GHGRP_csv[,c("Miles_of_Mains","N_of_above_grade_T-D_transfer_stations","N_of_above_grade_non_T-D_MR_stations",
-               "N_of_below_grade_T-D_transfer_stations","N_of_below_grade_non_T-D_MR_stations")] <- 0
-  #save to the temp file destination.  Add several new variables to GHGRP_csv
-  
-  for(A in 1:nrow(GHGRP_csv)){
-    counter = 0
-    repeat{
-      counter=counter+1
-      info=tryCatch(
-        #the url is build from the GHGRP ID, the desired year, and a common url.
-        #This file contains more information about the facility that isn't in the
-        #downloaded file.
-        download.file(paste0("https://ghgdata.epa.gov/ghgp/service/html/",inventory_year,"?id=",GHGRP_csv$facility_id[A],"&et=undefined"),
-                      destfile=download_dest,quiet = T),
-        warning = function(w) {
-          Sys.sleep(1)
-          NA
-        },
-        error = function(e) {
-          Sys.sleep(1)
-          NA
+    # rm(A,data_URLs,ghgrp_facility_info,ghgrp_w_only_emissions,match_indx,ghgrp_NN_data)
+    ################################################################################
+    #do some webscraping to add a few additional variables for GHGRP facilities
+    
+    download_dest <- tempfile(fileext = ".html")
+    GHGRP_csv[,c("Miles_of_Mains","N_of_above_grade_T-D_transfer_stations","N_of_above_grade_non_T-D_MR_stations",
+                 "N_of_below_grade_T-D_transfer_stations","N_of_below_grade_non_T-D_MR_stations")] <- 0
+    #save to the temp file destination.  Add several new variables to GHGRP_csv
+    
+    for(A in 1:nrow(GHGRP_csv)){
+      counter = 0
+      repeat{
+        counter=counter+1
+        info=tryCatch(
+          #the url is build from the GHGRP ID, the desired year, and a common url.
+          #This file contains more information about the facility that isn't in the
+          #downloaded file.
+          download.file(paste0("https://ghgdata.epa.gov/ghgp/service/html/",inventory_year,"?id=",GHGRP_csv$facility_id[A],"&et=undefined"),
+                        destfile=download_dest,quiet = T),
+          warning = function(w) {
+            Sys.sleep(1)
+            NA
+          },
+          error = function(e) {
+            Sys.sleep(1)
+            NA
+          }
+        )
+        if(!is.na(info)) {
+          break
         }
-      )
-      if(!is.na(info)) {
-        break
+        if(counter>=10){
+          stop("Failed to download ",GHGRP_csv$facility_name.x[A]," data from\n",
+               paste0("https://ghgdata.epa.gov/ghgp/service/html/",inventory_year,"?id=",GHGRP_csv$facility_id[A],"&et=undefined\n"),
+               "The links used may no longer be accurate.  Check the GHGRP FLIGHT website.")
+        }
       }
-      if(counter>=10){
-        stop("Failed to download ",GHGRP_csv$facility_name.x[A]," data from\n",
-             paste0("https://ghgdata.epa.gov/ghgp/service/html/",inventory_year,"?id=",GHGRP_csv$facility_id[A],"&et=undefined\n"),
-             "The links used may no longer be accurate.  Check the GHGRP FLIGHT website.")
+      #try to download the url, and retry up to 10x with 1s between runs as the link
+      #seems to fail on occasion.
+      #from https://stackoverflow.com/a/60880960
+      
+      HTML_data <- readChar(download_dest,file.info(download_dest)$size)
+      #Now read in the whole html as text
+      
+      text_loc <- gregexpr("Distribution Mains, Gas Service",text = HTML_data)
+      answer <- 0
+      #initialize an output and locate some text near data we want (amount of
+      #pipeline of various pipe types)
+      for(B in 1:length(text_loc[[1]])){
+        #should have found 1 value for each type of pipeline
+        text <- substr(HTML_data,text_loc[[1]][B],text_loc[[1]][B]+attributes(text_loc[[1]])$match.length[B]+200)
+        sub_answer <- regexpr(">[[:digit:]]*[[:punct:]]*[[:digit:]]*</td>",text)
+        #see https://www.debuggex.com/cheatsheet/regex/pcre
+        answer <- answer+as.numeric(substr(text,sub_answer+1,sub_answer+attributes(sub_answer)$match.length-6))
+        #first subset to the located text + buffer, then regex to find a number
+        #with/without a decimal in it as formatted html text, then grab just this
+        #value and add it to the answer (we only want the total across all pipeline
+        #types)
       }
+      GHGRP_csv$Miles_of_Mains[A] <- answer
+      
+      #now repeat the same type of process for various other variables
+      text_loc <- regexpr("Number of above grade T-D transfer stations at the facility",text = HTML_data)
+      text <- substr(HTML_data,text_loc,text_loc+attributes(text_loc)$match.length+50)
+      answer <- regexpr(">[[:digit:]]*[[:punct:]]*[[:digit:]]*</td>",text)
+      answer <- substr(text,answer+1,answer+attributes(answer)$match.length-6)
+      GHGRP_csv$'N_of_above_grade_T-D_transfer_stations'[A] <- as.numeric(answer)
+      
+      text_loc <- regexpr("Number of above grade metering-regulating stations that are not T-D transfer stations",text = HTML_data)
+      text <- substr(HTML_data,text_loc,text_loc+attributes(text_loc)$match.length+50)
+      answer <- regexpr(">[[:digit:]]*[[:punct:]]*[[:digit:]]*</td>",text)
+      answer <- substr(text,answer+1,answer+attributes(answer)$match.length-6)
+      GHGRP_csv$'N_of_above_grade_non_T-D_MR_stations'[A] <- as.numeric(answer)
+      
+      text_loc <- gregexpr("Below Grade T-D Station, Gas Service, Inlet Pressure ",text = HTML_data)
+      answer <- 0
+      for(B in 1:length(text_loc[[1]])){
+        text <- substr(HTML_data,text_loc[[1]][B],text_loc[[1]][B]+attributes(text_loc[[1]])$match.length[B]+200)
+        sub_answer <- regexpr(">[[:digit:]]*[[:punct:]]*[[:digit:]]*</td>",text)
+        answer <- answer+as.numeric(substr(text,sub_answer+1,sub_answer+attributes(sub_answer)$match.length-6))
+      }
+      GHGRP_csv$'N_of_below_grade_T-D_transfer_stations'[A] <- answer
+      
+      text_loc <- gregexpr("Below Grade M-R Station, Gas Service, Inlet Pressure",text = HTML_data)
+      answer <- 0
+      for(B in 1:length(text_loc[[1]])){
+        text <- substr(HTML_data,text_loc[[1]][B],text_loc[[1]][B]+attributes(text_loc[[1]])$match.length[B]+200)
+        sub_answer <- regexpr(">[[:digit:]]*[[:punct:]]*[[:digit:]]*</td>",text)
+        answer <- answer+as.numeric(substr(text,sub_answer+1,sub_answer+attributes(sub_answer)$match.length-6))
+      }
+      GHGRP_csv$'N_of_below_grade_non_T-D_MR_stations'[A] <- answer
+      
+      cat("\rFinished downloading GHGRP data for",A,"of",nrow(GHGRP_csv),"                 ")
+      #user update
     }
-    #try to download the url, and retry up to 10x with 1s between runs as the link
-    #seems to fail on occasion.
-    #from https://stackoverflow.com/a/60880960
     
-    HTML_data <- readChar(download_dest,file.info(download_dest)$size)
-    #Now read in the whole html as text
+    #attempt to remove the downloaded html file
+    unlink(download_dest)
     
-    text_loc <- gregexpr("Distribution Mains, Gas Service",text = HTML_data)
-    answer <- 0
-    #initialize an output and locate some text near data we want (amount of
-    #pipeline of various pipe types)
-    for(B in 1:length(text_loc[[1]])){
-      #should have found 1 value for each type of pipeline
-      text <- substr(HTML_data,text_loc[[1]][B],text_loc[[1]][B]+attributes(text_loc[[1]])$match.length[B]+200)
-      sub_answer <- regexpr(">[[:digit:]]*[[:punct:]]*[[:digit:]]*</td>",text)
-      #see https://www.debuggex.com/cheatsheet/regex/pcre
-      answer <- answer+as.numeric(substr(text,sub_answer+1,sub_answer+attributes(sub_answer)$match.length-6))
-      #first subset to the located text + buffer, then regex to find a number
-      #with/without a decimal in it as formatted html text, then grab just this
-      #value and add it to the answer (we only want the total across all pipeline
-      #types)
-    }
-    GHGRP_csv$Miles_of_Mains[A] <- answer
+      #same process, but using GHGRP Miles of mains
+      GHGRP_csv$above_grade_stations_per_mile_of_pipe <- (GHGRP_csv$'N_of_above_grade_T-D_transfer_stations'+
+                                                            GHGRP_csv$'N_of_above_grade_non_T-D_MR_stations')/
+        GHGRP_csv$Miles_of_Mains
+      GHGRP_csv$below_grade_stations_per_mile_of_pipe <- (GHGRP_csv$'N_of_below_grade_T-D_transfer_stations'+
+                                                            GHGRP_csv$'N_of_below_grade_non_T-D_MR_stations')/
+        GHGRP_csv$Miles_of_Mains
+      GHGRP_csv$stations_per_mile_of_pipe <- (GHGRP_csv$'N_of_above_grade_T-D_transfer_stations'+
+                                                GHGRP_csv$'N_of_above_grade_non_T-D_MR_stations'+
+                                                GHGRP_csv$'N_of_below_grade_T-D_transfer_stations'+
+                                                GHGRP_csv$'N_of_below_grade_non_T-D_MR_stations')/
+        GHGRP_csv$Miles_of_Mains
+
+    rm(A,B,text_loc,answer,download_dest,sub_answer,HTML_data,text,info,counter)
+    ################################################################################
+    #merge the files.  Not including HIFLD or GHGRP data if not
+    #calculating by LDC
     
-    #now repeat the same type of process for various other variables
-    text_loc <- regexpr("Number of above grade T-D transfer stations at the facility",text = HTML_data)
-    text <- substr(HTML_data,text_loc,text_loc+attributes(text_loc)$match.length+50)
-    answer <- regexpr(">[[:digit:]]*[[:punct:]]*[[:digit:]]*</td>",text)
-    answer <- substr(text,answer+1,answer+attributes(answer)$match.length-6)
-    GHGRP_csv$'N_of_above_grade_T-D_transfer_stations'[A] <- as.numeric(answer)
+    # Then select the columns we need and aggregate the entries which share the same company ID or state
+    PHMSA_cols_to_keep <- paste0("PHMSA_",c('MMILES_STEEL_UNP_BARE',
+                            'MMILES_STEEL_UNP_COATED',
+                            'MMILES_STEEL_CP_BARE',
+                            'MMILES_STEEL_CP_COATED',
+                            'MMILES_PLASTIC',
+                            'MMILES_CI',
+                            'MMILES_DI',
+                            'MMILES_CU',
+                            'MMILES_OTHER',
+                            'MMILES_RCI',
+                            'MMILES_TOTAL',
+                            'NUM_SRVS_STEEL_UNP_BARE',
+                            'NUM_SRVS_STEEL_UNP_COATED',
+                            'NUM_SRVS_STEEL_CP_BARE',
+                            'NUM_SRVS_STEEL_CP_COATED',
+                            'NUM_SRVS_PLASTIC',
+                            'NUM_SRVS_CI',
+                            'NUM_SRVS_DI',
+                            'NUM_SRVS_CU',
+                            'NUM_SRVS_OTHER',
+                            'NUM_SRVS_RCI',
+                            'NUM_SRVCS_TOTAL',
+                            "AVERAGE_LENGTH"))
     
-    text_loc <- regexpr("Number of above grade metering-regulating stations that are not T-D transfer stations",text = HTML_data)
-    text <- substr(HTML_data,text_loc,text_loc+attributes(text_loc)$match.length+50)
-    answer <- regexpr(">[[:digit:]]*[[:punct:]]*[[:digit:]]*</td>",text)
-    answer <- substr(text,answer+1,answer+attributes(answer)$match.length-6)
-    GHGRP_csv$'N_of_above_grade_non_T-D_MR_stations'[A] <- as.numeric(answer)
+    EIA_cols_to_keep <- paste0("EIA_",c("Residential_Total_Volume_(Mcf)",
+                                        "Residential_Total_Customers",
+                                        'Commercial_Total_Volume_(Mcf)',
+                                        'Commercial_Total_Customers',
+                                        'Industrial_Total_Volume_(Mcf)',
+                                        'Industrial_Total_Customers',
+                                        'Electric_Total_Volume_(Mcf)',
+                                        'Electric_Total_Customers'))
     
-    text_loc <- gregexpr("Below Grade T-D Station, Gas Service, Inlet Pressure ",text = HTML_data)
-    answer <- 0
-    for(B in 1:length(text_loc[[1]])){
-      text <- substr(HTML_data,text_loc[[1]][B],text_loc[[1]][B]+attributes(text_loc[[1]])$match.length[B]+200)
-      sub_answer <- regexpr(">[[:digit:]]*[[:punct:]]*[[:digit:]]*</td>",text)
-      answer <- answer+as.numeric(substr(text,sub_answer+1,sub_answer+attributes(sub_answer)$match.length-6))
-    }
-    GHGRP_csv$'N_of_below_grade_T-D_transfer_stations'[A] <- answer
+    cols_to_keep <- c(EIA_cols_to_keep,
+                      PHMSA_cols_to_keep,
+                      names(State_Tigerlines))
     
-    text_loc <- gregexpr("Below Grade M-R Station, Gas Service, Inlet Pressure",text = HTML_data)
-    answer <- 0
-    for(B in 1:length(text_loc[[1]])){
-      text <- substr(HTML_data,text_loc[[1]][B],text_loc[[1]][B]+attributes(text_loc[[1]])$match.length[B]+200)
-      sub_answer <- regexpr(">[[:digit:]]*[[:punct:]]*[[:digit:]]*</td>",text)
-      answer <- answer+as.numeric(substr(text,sub_answer+1,sub_answer+attributes(sub_answer)$match.length-6))
-    }
-    GHGRP_csv$'N_of_below_grade_non_T-D_MR_stations'[A] <- answer
+    #first rename all data to make it obvious where it came from - much easier to
+    #understand where things come from later
+    colnames(PHMSA_csv_NG) <- paste0("PHMSA_",gsub(" ","_",colnames(PHMSA_csv_NG)))
+    colnames(EIA_csv) <- paste0("EIA_",gsub(" ","_",colnames(EIA_csv)))
+
+
+    #rename the state data for these for clarity/consistency
+    colnames(PHMSA_csv_NG) <- gsub("STOP","State",colnames(PHMSA_csv_NG))
     
-    cat("\rFinished downloading GHGRP data for",A,"of",nrow(GHGRP_csv),"                 ")
-    #user update
-  }
-  
-  #attempt to remove the downloaded html file
-  unlink(download_dest)
-  
-  if(NG_distribution_by_LDC){
-    GHGRP_csv$'Miles_of_Mains(PHMSA)' <- sapply(GHGRP_csv$`Company ID`,
-                                                FUN=function(x){sum(PHMSA_csv_NG$MMILES_TOTAL[which(x==PHMSA_csv_NG$Company_ID)])})
-    #copy the corresponding PHMSA total miles to the GHGRP file for comparison and
-    #simpler calculations
-    GHGRP_csv$'Miles_of_Mains(PHMSA)'[GHGRP_csv$`FACILITY NAME`=="UGI Utilities, Inc."] <- 12028
-    #manually correct this one.  It's set to other in PHMSA as it corresponds to a
-    #few facilities, but also varying shapes depending on the datasource.
+    PHMSA_csv_NG_agg <- aggregate(PHMSA_csv_NG[PHMSA_cols_to_keep],
+                                  list(PHMSA_State=PHMSA_csv_NG$PHMSA_State),
+                                  sum,na.rm=T)
+    EIA_csv_agg <- aggregate(EIA_csv[EIA_cols_to_keep],
+                             list(EIA_State=EIA_csv$EIA_State),
+                             sum,na.rm=T)
     
-    GHGRP_csv$above_grade_stations_per_mile_of_pipe <- (GHGRP_csv$'N_of_above_grade_T-D_transfer_stations'+
-                                                          GHGRP_csv$'N_of_above_grade_non_T-D_MR_stations')/
-      GHGRP_csv$`Miles_of_Mains(PHMSA)`
-    GHGRP_csv$below_grade_stations_per_mile_of_pipe <- (GHGRP_csv$'N_of_below_grade_T-D_transfer_stations'+
-                                                          GHGRP_csv$'N_of_below_grade_non_T-D_MR_stations')/
-      GHGRP_csv$`Miles_of_Mains(PHMSA)`
-    GHGRP_csv$stations_per_mile_of_pipe <- (GHGRP_csv$'N_of_above_grade_T-D_transfer_stations'+
-                                              GHGRP_csv$'N_of_above_grade_non_T-D_MR_stations'+
-                                              GHGRP_csv$'N_of_below_grade_T-D_transfer_stations'+
-                                              GHGRP_csv$'N_of_below_grade_non_T-D_MR_stations')/
-      GHGRP_csv$`Miles_of_Mains(PHMSA)`
-    #calculate a few ratios
+    # Now merge csv stuff and state shapefile together
+    all_merge <- merge(EIA_csv_agg, PHMSA_csv_NG_agg, by.x='EIA_State', by.y='PHMSA_State')
+    all_merge <- merge(State_Tigerlines,all_merge,by.x="STUSPS",by.y="EIA_State")
     
-    GHGRP_PHMSA_comparison <- abs(GHGRP_csv$'Miles_of_Mains(PHMSA)' - GHGRP_csv$Miles_of_Mains)/mean(c(GHGRP_csv$'Miles_of_Mains(PHMSA)',GHGRP_csv$Miles_of_Mains))*100
-    if(max(GHGRP_PHMSA_comparison)>5){
-      View(GHGRP_csv[GHGRP_PHMSA_comparison>5,c("FACILITY NAME","Miles_of_Mains","Miles_of_Mains(PHMSA)")])
-      stop("Double check the GHGRP facilities:\n",paste(GHGRP_csv$`FACILITY NAME`[GHGRP_PHMSA_comparison>5],collapse = "\n"),"\n\nas the miles of mains was >5% different than the corresponding PHMSA facility.  One of them is likely wrong.")
-    }
-    #user update check - PHMSA and GHGRP should agree very well.  Any that differ a
-    #lot could be due to mislabeling.
-    rm(GHGRP_PHMSA_comparison)
+    # Clean up
+    all_merge_clean <- all_merge[cols_to_keep]
+    
+    #just so the state variable is consistent with the byLDC version
+    names(all_merge_clean) <- gsub("STUSPS","PHMSA_State",names(all_merge_clean))
+    ############################################################################
+    # M&R stations - can't use GHGRP data without matching facilities, so estimate
+    # based on avg stations per mile for reporters in each state. Then split by
+    # pressure and function assuming the same split as at the national level (from
+    # the GHGI national inventory report).
+    
+    main_miles_ghgrp <- aggregate(GHGRP_csv$Miles_of_Mains,
+                                  list(State=GHGRP_csv$operating_state),
+                                  sum,
+                                  na.rm=TRUE)
+    above_grade_MnR <- aggregate((GHGRP_csv$`N_of_above_grade_T-D_transfer_stations` +
+                                    GHGRP_csv$`N_of_above_grade_non_T-D_MR_stations`),
+                                 list(State=GHGRP_csv$operating_state),
+                                 sum,
+                                 na.rm=TRUE)
+    below_grade_MnR <- aggregate((GHGRP_csv$`N_of_below_grade_non_T-D_MR_stations` +
+                                    GHGRP_csv$`N_of_below_grade_T-D_transfer_stations`),
+                                 list(State=GHGRP_csv$operating_state),
+                                 sum,
+                                 na.rm=TRUE)
+    # Calculate average stations per mile in each state
+    above_grade_MnR$stations_per_mile <- above_grade_MnR$x/main_miles_ghgrp$x
+    below_grade_MnR$stations_per_mile <- below_grade_MnR$x/main_miles_ghgrp$x
+    
+    # allocate average stations per mile in each state to all facilities if not
+    # calculating by LDC
+    state_indx <- match(all_merge_clean$PHMSA_State,above_grade_MnR$State)
+    all_merge_clean$GHGRP_MnR_above <- all_merge_clean$PHMSA_MMILES_TOTAL*above_grade_MnR$stations_per_mile[state_indx]
+    all_merge_clean$GHGRP_MnR_below <- all_merge_clean$PHMSA_MMILES_TOTAL*below_grade_MnR$stations_per_mile[state_indx]
+    
+    cat("Finished downloading and merging all input data at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
   }else{
-    #same process, but using GHGRP Miles of mains
-    GHGRP_csv$above_grade_stations_per_mile_of_pipe <- (GHGRP_csv$'N_of_above_grade_T-D_transfer_stations'+
-                                                          GHGRP_csv$'N_of_above_grade_non_T-D_MR_stations')/
-      GHGRP_csv$Miles_of_Mains
-    GHGRP_csv$below_grade_stations_per_mile_of_pipe <- (GHGRP_csv$'N_of_below_grade_T-D_transfer_stations'+
-                                                          GHGRP_csv$'N_of_below_grade_non_T-D_MR_stations')/
-      GHGRP_csv$Miles_of_Mains
-    GHGRP_csv$stations_per_mile_of_pipe <- (GHGRP_csv$'N_of_above_grade_T-D_transfer_stations'+
-                                              GHGRP_csv$'N_of_above_grade_non_T-D_MR_stations'+
-                                              GHGRP_csv$'N_of_below_grade_T-D_transfer_stations'+
-                                              GHGRP_csv$'N_of_below_grade_non_T-D_MR_stations')/
-      GHGRP_csv$Miles_of_Mains
+    ############################################################################
+    #load in the output of NG_distribution_by_LDC_prep.R.  Note that is a
+    #script, not a function, as it requires some manual efforts.  This one is
+    #calculated at the LDC scale, not state level.
+    all_merge_clean <- vect(file.path(input_directory,"/byLDC_merged/byLDC_merged.shp"))
+    names(all_merge_clean) <- unlist(read.table(file.path(input_directory,"/byLDC_merged/colnames.txt")))
   }
-  
-  rm(A,B,text_loc,answer,download_dest,sub_answer,HTML_data,text,info,counter)
   ################################################################################
   #Pull the GHGI data we'll need later and save it to a few dataframes
   
@@ -694,318 +764,138 @@ NG_distribution <- function(domain,
                                  "EF"=as.numeric(unlist(sapply(Data_list,FUN=function(x){GHGI_p2[GHGI_p2[,1]==x,as.character(inventory_year)]})))*
                                    1000/(16.043*60*60*24*365),#convert from kg/yr to mol/s
                                  row.names = NULL)
-
+  
   rm(GHGI_p1,GHGI_p2,Data_list,GHGI_file,first_col)
-  ################################################################################
-  ## Calculate emissions (all in mol/s):
+  ##############################################################################
+  #convert a lot of the activity data to emissions data
   
-  PHMSA_csv_NG$bare_steel_mains_ER <- (rowSums(PHMSA_csv_NG[,c("MMILES_STEEL_UNP_BARE","MMILES_STEEL_CP_BARE","MMILES_CU")],
-                                               na.rm=T)*
-                                         GHGI_natural_gas_pipeline_emission_factors[1,"Leaks_per_mile"]*
-                                         GHGI_natural_gas_pipeline_emission_factors[1,"Avg_emissions_mol_per_s"])
-  PHMSA_csv_NG$iron_mains_ER <- (rowSums(PHMSA_csv_NG[,c("MMILES_CI","MMILES_DI","MMILES_RCI")],
-                                         na.rm=T)*
-                                   GHGI_natural_gas_pipeline_emission_factors[2,"Leaks_per_mile"]*
-                                   GHGI_natural_gas_pipeline_emission_factors[2,"Avg_emissions_mol_per_s"])
-  PHMSA_csv_NG$coat_steel_mains_ER <- (rowSums(PHMSA_csv_NG[,c("MMILES_STEEL_UNP_COATED","MMILES_STEEL_CP_COATED","MMILES_OTHER")],
-                                               na.rm=T)*
-                                         GHGI_natural_gas_pipeline_emission_factors[3,"Leaks_per_mile"]*
-                                         GHGI_natural_gas_pipeline_emission_factors[3,"Avg_emissions_mol_per_s"])
-  PHMSA_csv_NG$plastic_mains_ER <- (PHMSA_csv_NG$MMILES_PLASTIC*
-                                      GHGI_natural_gas_pipeline_emission_factors[4,"Leaks_per_mile"]*
-                                      GHGI_natural_gas_pipeline_emission_factors[4,"Avg_emissions_mol_per_s"])
-  #Mains using EFs from Weller et al., or as specified at the top of the code
+  #Mains using EFs from Weller et al., or as specified in config
+  all_merge_clean$bare_steel_mains_ER <- (rowSums(as.data.frame(all_merge_clean)[,c("PHMSA_MMILES_STEEL_UNP_BARE","PHMSA_MMILES_STEEL_CP_BARE","PHMSA_MMILES_CU")],
+                                                        na.rm=T)*
+                                                  GHGI_natural_gas_pipeline_emission_factors[1,"Leaks_per_mile"]*
+                                                  GHGI_natural_gas_pipeline_emission_factors[1,"Avg_emissions_mol_per_s"])
+  all_merge_clean$iron_mains_ER <- (rowSums(as.data.frame(all_merge_clean)[,c("PHMSA_MMILES_CI","PHMSA_MMILES_DI","PHMSA_MMILES_RCI")],
+                                                  na.rm=T)*
+                                            GHGI_natural_gas_pipeline_emission_factors[2,"Leaks_per_mile"]*
+                                            GHGI_natural_gas_pipeline_emission_factors[2,"Avg_emissions_mol_per_s"])
+  all_merge_clean$coat_steel_mains_ER <- (rowSums(as.data.frame(all_merge_clean)[,c("PHMSA_MMILES_STEEL_UNP_COATED","PHMSA_MMILES_STEEL_CP_COATED","PHMSA_MMILES_OTHER")],
+                                                        na.rm=T)*
+                                                  GHGI_natural_gas_pipeline_emission_factors[3,"Leaks_per_mile"]*
+                                                  GHGI_natural_gas_pipeline_emission_factors[3,"Avg_emissions_mol_per_s"])
+  all_merge_clean$plastic_mains_ER <- (all_merge_clean$PHMSA_MMILES_PLASTIC*
+                                               GHGI_natural_gas_pipeline_emission_factors[4,"Leaks_per_mile"]*
+                                               GHGI_natural_gas_pipeline_emission_factors[4,"Avg_emissions_mol_per_s"])
   
-  PHMSA_csv_NG$UNP_steel_serv_ER <- (rowSums(PHMSA_csv_NG[,c("NUM_SRVS_STEEL_UNP_COATED","NUM_SRVS_STEEL_UNP_BARE")],
-                                             na.rm=T)*
-                                       GHGI_Services$EF[1])
-  PHMSA_csv_NG$CP_steel_serv_ER <- (rowSums(PHMSA_csv_NG[,c("NUM_SRVS_STEEL_CP_BARE","NUM_SRVS_STEEL_CP_COATED","NUM_SRVS_OTHER")],
-                                            na.rm=T)*
-                                      GHGI_Services$EF[2])
-  PHMSA_csv_NG$plastic_serv_ER <- (PHMSA_csv_NG$NUM_SRVS_PLASTIC*
-                                     GHGI_Services$EF[3])
-  PHMSA_csv_NG$copper_serv_ER <- (rowSums(PHMSA_csv_NG[,c("NUM_SRVS_CU","NUM_SRVS_CI","NUM_SRVS_DI","NUM_SRVS_RCI")],
-                                          na.rm=T)*
-                                    GHGI_Services$EF[4])
   # Services using EFs from the EPA GHGI, or national inventory report
+  all_merge_clean$UNP_steel_serv_ER <- (rowSums(as.data.frame(all_merge_clean)[,c("PHMSA_NUM_SRVS_STEEL_UNP_COATED","PHMSA_NUM_SRVS_STEEL_UNP_BARE")],
+                                                      na.rm=T)*
+                                                GHGI_Services$EF[1])
+  all_merge_clean$CP_steel_serv_ER <- (rowSums(as.data.frame(all_merge_clean)[,c("PHMSA_NUM_SRVS_STEEL_CP_BARE","PHMSA_NUM_SRVS_STEEL_CP_COATED","PHMSA_NUM_SRVS_OTHER")],
+                                                     na.rm=T)*
+                                               GHGI_Services$EF[2])
+  all_merge_clean$plastic_serv_ER <- (all_merge_clean$PHMSA_NUM_SRVS_PLASTIC*
+                                              GHGI_Services$EF[3])
+  all_merge_clean$copper_serv_ER <- (rowSums(as.data.frame(all_merge_clean)[,c("PHMSA_NUM_SRVS_CU","PHMSA_NUM_SRVS_CI","PHMSA_NUM_SRVS_DI","PHMSA_NUM_SRVS_RCI")],
+                                                   na.rm=T)*
+                                             GHGI_Services$EF[4])
   
-  # M&R stations - can't use GHGRP data without matching facilities, so estimate
-  # based on avg stations per mile for reporters in each state. Then split by
-  # pressure and function assuming the same split as at the national level (from
-  # the GHGI national inventory report).
+  #split by function/pressure
+  GHGI_MnR_above <- sum(GHGI_MnR$Total_stations[-grep('Vault', GHGI_MnR$Type)])
+  GHGI_MnR_below <- sum(GHGI_MnR$Total_stations[grep('Vault', GHGI_MnR$Type)])
   
-  main_miles_ghgrp <- aggregate(GHGRP_csv$Miles_of_Mains,
-                                list(State=GHGRP_csv$operating_state),
-                                sum,
-                                na.rm=TRUE)
-  above_grade_MnR <- aggregate((GHGRP_csv$`N_of_above_grade_T-D_transfer_stations` +
-                                  GHGRP_csv$`N_of_above_grade_non_T-D_MR_stations`),
-                               list(State=GHGRP_csv$operating_state),
-                               sum,
-                               na.rm=TRUE)
-  below_grade_MnR <- aggregate((GHGRP_csv$`N_of_below_grade_non_T-D_MR_stations` +
-                                  GHGRP_csv$`N_of_below_grade_T-D_transfer_stations`),
-                               list(State=GHGRP_csv$operating_state),
-                               sum,
-                               na.rm=TRUE)
-  above_grade_MnR$stations_per_mile <- above_grade_MnR$x/main_miles_ghgrp$x
-  below_grade_MnR$stations_per_mile <- below_grade_MnR$x/main_miles_ghgrp$x
-  # Calculate average stations per mile in each state
+  # Estimate emissions by function/pressure
+  all_merge_clean$MnR_HiP_ER <- (all_merge_clean$GHGRP_MnR_above*                                                    # Abv grade stations
+                                   GHGI_MnR$Total_stations[which(GHGI_MnR$Type == 'M&R >300')]/GHGI_MnR_above* # Type fraction
+                                   GHGI_MnR$EF[which(GHGI_MnR$Type == 'M&R >300')]) # Emission factor
   
-  if(!NG_distribution_by_LDC){
-    state_indx <- match(PHMSA_csv_NG$STOP,above_grade_MnR$State)
-    PHMSA_csv_NG$MnR_above <- PHMSA_csv_NG$MMILES_TOTAL*above_grade_MnR$stations_per_mile[state_indx]
-    PHMSA_csv_NG$MnR_below <- PHMSA_csv_NG$MMILES_TOTAL*below_grade_MnR$stations_per_mile[state_indx]
-  }
-  # allocate average stations per mile in each state to all facilities if not
-  # calculating by LDC
+  all_merge_clean$MnR_MidP_ER <- (all_merge_clean$GHGRP_MnR_above*
+                                    GHGI_MnR$Total_stations[which(GHGI_MnR$Type == 'M&R 100-300')]/GHGI_MnR_above*
+                                    GHGI_MnR$EF[which(GHGI_MnR$Type == 'M&R 100-300')])
   
-  ################################################################################
-  #prep to merge the many files, excluding the GHGI for now, calculate a few
-  #additional variables
+  all_merge_clean$MnR_LoP_ER <- (all_merge_clean$GHGRP_MnR_above*
+                                   GHGI_MnR$Total_stations[which(GHGI_MnR$Type == 'M&R <100')]/GHGI_MnR_above*
+                                   GHGI_MnR$EF[which(GHGI_MnR$Type == 'M&R <100')])
   
-  PHMSA_csv_NG$Miles_main_and_serv <- PHMSA_csv_NG$MMILES_TOTAL + PHMSA_csv_NG$NUM_SRVCS_TOTAL*PHMSA_csv_NG$AVERAGE_LENGTH/5280
-  # We're going to need the total miles of pipeline (inc. services) later -
-  # calculate that here from AVERAGE_LENGTH (in ft)
+  all_merge_clean$Reg_HiP_ER <- (all_merge_clean$GHGRP_MnR_above*
+                                   GHGI_MnR$Total_stations[which(GHGI_MnR$Type == 'Reg >300')]/GHGI_MnR_above*
+                                   GHGI_MnR$EF[which(GHGI_MnR$Type == 'Reg >300')])
   
-  # Then select the columns we need and aggregate the entries which share the same company ID or state
-  PHMSA_cols_to_keep <- c('MMILES_STEEL_UNP_BARE',
-                          'MMILES_STEEL_UNP_COATED',
-                          'MMILES_STEEL_CP_BARE',
-                          'MMILES_STEEL_CP_COATED',
-                          'MMILES_PLASTIC',
-                          'MMILES_CI',
-                          'MMILES_DI',
-                          'MMILES_CU',
-                          'MMILES_OTHER',
-                          'MMILES_RCI',
-                          'MMILES_TOTAL',
-                          'NUM_SRVS_STEEL_UNP_BARE',
-                          'NUM_SRVS_STEEL_UNP_COATED',
-                          'NUM_SRVS_STEEL_CP_BARE',
-                          'NUM_SRVS_STEEL_CP_COATED',
-                          'NUM_SRVS_PLASTIC',
-                          'NUM_SRVS_CI',
-                          'NUM_SRVS_DI',
-                          'NUM_SRVS_CU',
-                          'NUM_SRVS_OTHER',
-                          'NUM_SRVS_RCI',
-                          'NUM_SRVCS_TOTAL',
-                          'Miles_main_and_serv',
-                          "bare_steel_mains_ER",
-                          "iron_mains_ER",
-                          "coat_steel_mains_ER",
-                          "plastic_mains_ER",
-                          "UNP_steel_serv_ER",
-                          "CP_steel_serv_ER",
-                          "plastic_serv_ER",
-                          "copper_serv_ER")
+  all_merge_clean$Reg_MidP_ER <- (all_merge_clean$GHGRP_MnR_above*
+                                    GHGI_MnR$Total_stations[which(GHGI_MnR$Type == 'Reg 100-300')]/GHGI_MnR_above*
+                                    GHGI_MnR$EF[which(GHGI_MnR$Type == 'Reg 100-300')])
   
-  if(!NG_distribution_by_LDC){
-    PHMSA_cols_to_keep <- c(PHMSA_cols_to_keep,
-                            'MnR_above',
-                            'MnR_below')
-  }
-  #if not calculating by LDC, these variables are in the PHMSA.  Otherwise,
-  #they're in the ghgrp data
+  all_merge_clean$Reg_LoP_ER <- (all_merge_clean$GHGRP_MnR_above*
+                                   GHGI_MnR$Total_stations[which(GHGI_MnR$Type == 'Reg 40-100')]/GHGI_MnR_above*
+                                   GHGI_MnR$EF[which(GHGI_MnR$Type == 'Reg 40-100')])
   
-  EIA_cols_to_keep <- c("Residential Total Volume (Mcf)",
-                        "Residential Total Customers",
-                        'Commercial Total Volume (Mcf)',
-                        'Commercial Total Customers',
-                        'Industrial Total Volume (Mcf)',
-                        'Industrial Total Customers',
-                        'Electric Total Volume (Mcf)',
-                        'Electric Total Customers')
+  all_merge_clean$Reg_VLP_ER <- (all_merge_clean$GHGRP_MnR_above*
+                                   GHGI_MnR$Total_stations[which(GHGI_MnR$Type == 'Reg <40')]/GHGI_MnR_above*
+                                   GHGI_MnR$EF[which(GHGI_MnR$Type == 'Reg <40')])
   
-  if(NG_distribution_by_LDC){
-    cols_to_keep <- c('Company',
-                      'Company Name',
-                      'SVCTERID',
-                      'State',
-                      EIA_cols_to_keep,
-                      PHMSA_cols_to_keep,
-                      'MMiles_PHMSA_GHGRP',
-                      'MnR_above',
-                      'MnR_below')
-  }else{
-    cols_to_keep <- c('State',
-                      EIA_cols_to_keep,
-                      PHMSA_cols_to_keep,
-                      'Miles_of_Mains')
-  }
-  #No HIFLD or GHGRP data if not calculating by LDC
+  all_merge_clean$RegV_HiP_ER <- (all_merge_clean$GHGRP_MnR_below*
+                                    GHGI_MnR$Total_stations[which(GHGI_MnR$Type == 'R-Vault >300')]/GHGI_MnR_below*
+                                    GHGI_MnR$EF[which(GHGI_MnR$Type == 'R-Vault >300')])
   
-  if(NG_distribution_by_LDC){
-    PHMSA_csv_NG_agg <- aggregate(PHMSA_csv_NG[PHMSA_cols_to_keep],
-                                  list(COMPANY_ID=PHMSA_csv_NG$Company_ID,
-                                       STOP=PHMSA_csv_NG$STOP),
-                                  sum,na.rm=T)
-    #combine by ID
-    
-    
-    EIA_PHMSA_merge <- merge(EIA_csv, PHMSA_csv_NG_agg, by.x='Company', by.y='COMPANY_ID')
-    EIA_PHMSA_HIFLD_merge <- merge(EIA_PHMSA_merge, HIFLD_csv, by.x='Company', by.y='COMPID')
-    all_merge <- merge(EIA_PHMSA_HIFLD_merge, GHGRP_csv, by.x='Company', by.y='Company ID', all.x=TRUE)
-    # Now merge csv stuff together
-    
-    all_merge$State <- all_merge$STOP  # rename for clarity
-    all_merge$MMiles_PHMSA_GHGRP <- all_merge$`Miles_of_Mains(PHMSA)`# Essentially the same as MMILES_TOTAL, but slightly different due to the way we've combined some PHMSA entries
-    all_merge$MnR_above <- all_merge$`N_of_above_grade_T-D_transfer_stations`+ all_merge$`N_of_above_grade_non_T-D_MR_stations`
-    all_merge$MnR_below <- all_merge$`N_of_below_grade_T-D_transfer_stations` + all_merge$`N_of_below_grade_non_T-D_MR_stations`
-    # Clean up
-    
-    all_merge_clean <- all_merge[cols_to_keep]
-    
-    EIA_state_totals <- aggregate(EIA_csv[EIA_cols_to_keep],
-                                  list(State=EIA_csv$State),
-                                  sum,
-                                  na.rm = TRUE)
-    # Calculate residual EIA values from state totals
-    
-    EIA_merge_state_totals <-  aggregate(all_merge_clean[EIA_cols_to_keep],
-                                         list(State=all_merge_clean$State),
-                                         sum,
-                                         na.rm = TRUE)
-    
-    for(a_state in unique(all_merge_clean$State)){
-      residuals <- (EIA_state_totals[which(EIA_state_totals$State == a_state),-1] -
-                      EIA_merge_state_totals[which(EIA_merge_state_totals$State == a_state),-1])
-      all_merge_clean[which(all_merge_clean$Company == 'OTHER' & all_merge_clean$State == a_state), EIA_cols_to_keep] <- residuals
-    }
-    # Loop through states and assign residual EIA values to OTHER
-    
-    # M&R stations - can use GHGRP data for those stations that report, otherwise estimate based on avg stations per mile
-    # for reporters in each state. Then split by pressure and function assuming the same split as at the national level
-    # (from the EPA national inventory report, also called GHGI).
-    
-    # Use the original GHGRP_csv df here - it includes UGI data in PA, which we had to exclude from all_merge_clean because there
-    # was no good shapefile for it, but the underlying activity data is fine.
-    # Note that for PA this means the average stations_per_mile value for reporters included here does not equal the default
-    # stations_per_mile value assigned to non-reporters below.
-    main_miles_ghgrp <- aggregate(GHGRP_csv$`Miles_of_Mains(PHMSA)`,
-                                  list(State=GHGRP_csv$operating_state),
-                                  sum,
-                                  na.rm=TRUE)
-    above_grade_MnR <- aggregate((GHGRP_csv$`N_of_above_grade_T-D_transfer_stations` +
-                                    GHGRP_csv$`N_of_above_grade_non_T-D_MR_stations`),
-                                 list(State=GHGRP_csv$operating_state),
-                                 sum,
-                                 na.rm=TRUE)
-    below_grade_MnR <- aggregate((GHGRP_csv$`N_of_below_grade_non_T-D_MR_stations` +
-                                    GHGRP_csv$`N_of_below_grade_T-D_transfer_stations`),
-                                 list(State=GHGRP_csv$operating_state),
-                                 sum,
-                                 na.rm=TRUE)
-    
-    above_grade_MnR$stations_per_mile <- above_grade_MnR$x/main_miles_ghgrp$x
-    below_grade_MnR$stations_per_mile <- below_grade_MnR$x/main_miles_ghgrp$x
-    # Calculate average stations per mile in each state
-    
-    non_ghgrp_indx <- which(is.na(all_merge_clean$MnR_above))
-    non_ghgrp_state <- all_merge_clean$State[non_ghgrp_indx]
-    state_indx <- match(non_ghgrp_state,above_grade_MnR$State)
-    all_merge_clean$MnR_above[non_ghgrp_indx] <- all_merge_clean$MMILES_TOTAL[non_ghgrp_indx]*above_grade_MnR$stations_per_mile[state_indx]
-    all_merge_clean$MnR_below[non_ghgrp_indx] <- all_merge_clean$MMILES_TOTAL[non_ghgrp_indx]*below_grade_MnR$stations_per_mile[state_indx]
-    # Estimate number of stations for non-reporters
-  }else{
-    PHMSA_csv_NG_agg <- aggregate(PHMSA_csv_NG[PHMSA_cols_to_keep],
-                                  list(STOP=PHMSA_csv_NG$STOP),
-                                  sum,na.rm=T)
-    EIA_csv_agg <- aggregate(EIA_csv[EIA_cols_to_keep],
-                             list(State=EIA_csv$State),
-                             sum,na.rm=T)
-    GHGRP_csv_agg <- aggregate(GHGRP_csv[,"Miles_of_Mains"],
-                               list(STATE=GHGRP_csv$operating_state),
-                               sum,na.rm=T)
-    colnames(GHGRP_csv_agg) <- c("operating_state","Miles_of_Mains")
-    EIA_PHMSA_merge <- merge(EIA_csv_agg, PHMSA_csv_NG_agg, by.x='State', by.y='STOP')
-    all_merge <- merge(EIA_PHMSA_merge, GHGRP_csv_agg, by.x='State', by.y='operating_state', all.x=TRUE)
-    # Now merge csv stuff together
-    
-    all_merge_clean <- all_merge[cols_to_keep]
-    # Clean up
-  }
+  all_merge_clean$RegV_MidP_ER <- (all_merge_clean$GHGRP_MnR_below*
+                                     GHGI_MnR$Total_stations[which(GHGI_MnR$Type == 'R-Vault 100-300')]/GHGI_MnR_below*
+                                     GHGI_MnR$EF[which(GHGI_MnR$Type == 'R-Vault 100-300')])
   
-  # Calculate the total mains emissions to be distributed according to residential and commercial CO2 emissions
-  # This is calculated for each company according to the ratio of residential:commercial customers
-  # Industrial customer numbers are much smaller, so we ignore these here
+  all_merge_clean$RegV_LoP_ER <- (all_merge_clean$GHGRP_MnR_below*
+                                    GHGI_MnR$Total_stations[which(GHGI_MnR$Type == 'R-Vault 40-100')]/GHGI_MnR_below*
+                                    GHGI_MnR$EF[which(GHGI_MnR$Type == 'R-Vault 40-100')])
+  
+  # Consumer meters - use emission factors from the EPA national inventory report, also known as the GHGI
+  all_merge_clean$Res_meter_ER <- all_merge_clean$EIA_Residential_Total_Customers*GHGI_meters$EF[1]
+  all_merge_clean$Com_meter_ER <- all_merge_clean$EIA_Commercial_Total_Customers*GHGI_meters$EF[2]
+  all_merge_clean$Ind_meter_ER <- all_merge_clean$EIA_Industrial_Total_Customers*GHGI_meters$EF[3]
+  
+  # Maintenance and upsets
+  # We're going to need the total miles of pipeline (inc. services) -
+  # calculate that here from AVERAGE_LENGTH (converting ft to miles)
+  all_merge_clean$Miles_main_and_serv <- all_merge_clean$PHMSA_MMILES_TOTAL + all_merge_clean$PHMSA_NUM_SRVCS_TOTAL*all_merge_clean$PHMSA_AVERAGE_LENGTH/5280
+  all_merge_clean$Relief_valve_ER <- all_merge_clean$PHMSA_MMILES_TOTAL*GHGI_maintenance$EF[1]
+  all_merge_clean$Blowdown_ER <- all_merge_clean$Miles_main_and_serv*GHGI_maintenance$EF[2]
+  all_merge_clean$Mishap_ER <- all_merge_clean$Miles_main_and_serv*GHGI_maintenance$EF[3]
+  
+  # Post-meter, in this case it's entirely allocated to residential (no data on
+  # commercial buildings)
+  all_merge_clean$post_meter_ER_total_res <- all_merge_clean$`EIA_Residential_Total_Volume_(Mcf)`*1000*natural_gas_post_meter_emission_factor
+  #McF = thousand cubic ft
+  ##############################################################################
+  #break the emissions into residential and commercial fractions
+  
+  # Calculate the total mains emissions to be distributed according to
+  # residential and commercial CO2 emissions This is calculated for each company
+  # according to the ratio of residential:commercial customers Industrial
+  # customer numbers are much smaller, so we ignore these here
   all_merge_clean$mains_ER_total_res <- ((all_merge_clean$bare_steel_mains_ER + 
                                             all_merge_clean$iron_mains_ER +
                                             all_merge_clean$coat_steel_mains_ER +
                                             all_merge_clean$plastic_mains_ER)*
-                                           all_merge_clean$"Residential Total Customers"/
-                                           (all_merge_clean$"Residential Total Customers" + all_merge_clean$"Commercial Total Customers"))
+                                           all_merge_clean$EIA_Residential_Total_Customers/
+                                           (all_merge_clean$EIA_Residential_Total_Customers + all_merge_clean$EIA_Commercial_Total_Customers))
   
   all_merge_clean$mains_ER_total_com <- ((all_merge_clean$bare_steel_mains_ER + 
                                             all_merge_clean$iron_mains_ER +
                                             all_merge_clean$coat_steel_mains_ER +
                                             all_merge_clean$plastic_mains_ER)*
-                                           all_merge_clean$"Commercial Total Customers"/
-                                           (all_merge_clean$"Residential Total Customers" + all_merge_clean$"Commercial Total Customers"))
+                                           all_merge_clean$EIA_Commercial_Total_Customers/
+                                           (all_merge_clean$EIA_Residential_Total_Customers + all_merge_clean$EIA_Commercial_Total_Customers))
   
   all_merge_clean$serv_ER_total_res <- ((all_merge_clean$UNP_steel_serv_ER + 
                                            all_merge_clean$CP_steel_serv_ER +
                                            all_merge_clean$plastic_serv_ER +
                                            all_merge_clean$copper_serv_ER)*
-                                          all_merge_clean$"Residential Total Customers"/
-                                          (all_merge_clean$"Residential Total Customers" + all_merge_clean$"Commercial Total Customers"))
+                                          all_merge_clean$EIA_Residential_Total_Customers/
+                                          (all_merge_clean$EIA_Residential_Total_Customers + all_merge_clean$EIA_Commercial_Total_Customers))
   
   all_merge_clean$serv_ER_total_com <- ((all_merge_clean$UNP_steel_serv_ER + 
                                            all_merge_clean$CP_steel_serv_ER +
                                            all_merge_clean$plastic_serv_ER +
                                            all_merge_clean$copper_serv_ER)*
-                                          all_merge_clean$"Commercial Total Customers"/
-                                          (all_merge_clean$"Residential Total Customers" + all_merge_clean$"Commercial Total Customers"))
-  
-  ################################################################################
-  #Calculate a few additional emissions
-  
-  GHGI_MnR_above <- sum(GHGI_MnR$Total_stations[-grep('Vault', GHGI_MnR$Type)])
-  GHGI_MnR_below <- sum(GHGI_MnR$Total_stations[grep('Vault', GHGI_MnR$Type)])
-  #split by function/pressure
-  
-  # Estimate emissions by function/pressure
-  all_merge_clean$MnR_HiP_ER <- (all_merge_clean$MnR_above*                                                    # Abv grade stations
-                                   GHGI_MnR$Total_stations[which(GHGI_MnR$Type == 'M&R >300')]/GHGI_MnR_above* # Type fraction
-                                   GHGI_MnR$EF[which(GHGI_MnR$Type == 'M&R >300')]) # Emission factor
-  
-  all_merge_clean$MnR_MidP_ER <- (all_merge_clean$MnR_above*
-                                    GHGI_MnR$Total_stations[which(GHGI_MnR$Type == 'M&R 100-300')]/GHGI_MnR_above*
-                                    GHGI_MnR$EF[which(GHGI_MnR$Type == 'M&R 100-300')])
-  
-  all_merge_clean$MnR_LoP_ER <- (all_merge_clean$MnR_above*
-                                   GHGI_MnR$Total_stations[which(GHGI_MnR$Type == 'M&R <100')]/GHGI_MnR_above*
-                                   GHGI_MnR$EF[which(GHGI_MnR$Type == 'M&R <100')])
-  
-  all_merge_clean$Reg_HiP_ER <- (all_merge_clean$MnR_above*
-                                   GHGI_MnR$Total_stations[which(GHGI_MnR$Type == 'Reg >300')]/GHGI_MnR_above*
-                                   GHGI_MnR$EF[which(GHGI_MnR$Type == 'Reg >300')])
-  
-  all_merge_clean$Reg_MidP_ER <- (all_merge_clean$MnR_above*
-                                    GHGI_MnR$Total_stations[which(GHGI_MnR$Type == 'Reg 100-300')]/GHGI_MnR_above*
-                                    GHGI_MnR$EF[which(GHGI_MnR$Type == 'Reg 100-300')])
-  
-  all_merge_clean$Reg_LoP_ER <- (all_merge_clean$MnR_above*
-                                   GHGI_MnR$Total_stations[which(GHGI_MnR$Type == 'Reg 40-100')]/GHGI_MnR_above*
-                                   GHGI_MnR$EF[which(GHGI_MnR$Type == 'Reg 40-100')])
-  
-  all_merge_clean$Reg_VLP_ER <- (all_merge_clean$MnR_above*
-                                   GHGI_MnR$Total_stations[which(GHGI_MnR$Type == 'Reg <40')]/GHGI_MnR_above*
-                                   GHGI_MnR$EF[which(GHGI_MnR$Type == 'Reg <40')])
-  
-  all_merge_clean$RegV_HiP_ER <- (all_merge_clean$MnR_below*
-                                    GHGI_MnR$Total_stations[which(GHGI_MnR$Type == 'R-Vault >300')]/GHGI_MnR_below*
-                                    GHGI_MnR$EF[which(GHGI_MnR$Type == 'R-Vault >300')])
-  
-  all_merge_clean$RegV_MidP_ER <- (all_merge_clean$MnR_below*
-                                     GHGI_MnR$Total_stations[which(GHGI_MnR$Type == 'R-Vault 100-300')]/GHGI_MnR_below*
-                                     GHGI_MnR$EF[which(GHGI_MnR$Type == 'R-Vault 100-300')])
-  
-  all_merge_clean$RegV_LoP_ER <- (all_merge_clean$MnR_below*
-                                    GHGI_MnR$Total_stations[which(GHGI_MnR$Type == 'R-Vault 40-100')]/GHGI_MnR_below*
-                                    GHGI_MnR$EF[which(GHGI_MnR$Type == 'R-Vault 40-100')])
-  
+                                          all_merge_clean$EIA_Commercial_Total_Customers/
+                                          (all_merge_clean$EIA_Residential_Total_Customers + all_merge_clean$EIA_Commercial_Total_Customers))
+
   all_merge_clean$MnR_ER_total_res <- ((all_merge_clean$MnR_HiP_ER + 
                                           all_merge_clean$MnR_MidP_ER +
                                           all_merge_clean$MnR_LoP_ER +
@@ -1016,8 +906,8 @@ NG_distribution <- function(domain,
                                           all_merge_clean$RegV_HiP_ER +
                                           all_merge_clean$RegV_MidP_ER +
                                           all_merge_clean$RegV_LoP_ER)*
-                                         all_merge_clean$"Residential Total Customers"/
-                                         (all_merge_clean$"Residential Total Customers" + all_merge_clean$"Commercial Total Customers"))
+                                         all_merge_clean$EIA_Residential_Total_Customers/
+                                         (all_merge_clean$EIA_Residential_Total_Customers + all_merge_clean$EIA_Commercial_Total_Customers))
   
   all_merge_clean$MnR_ER_total_com <- ((all_merge_clean$MnR_HiP_ER + 
                                           all_merge_clean$MnR_MidP_ER +
@@ -1029,14 +919,9 @@ NG_distribution <- function(domain,
                                           all_merge_clean$RegV_HiP_ER +
                                           all_merge_clean$RegV_MidP_ER +
                                           all_merge_clean$RegV_LoP_ER)*
-                                         all_merge_clean$"Commercial Total Customers"/
-                                         (all_merge_clean$"Residential Total Customers" + all_merge_clean$"Commercial Total Customers"))
-  
-  # Consumer meters - use emission factors from the EPA national inventory report, also known as the GHGI
-  all_merge_clean$Res_meter_ER <- all_merge_clean$"Residential Total Customers"*GHGI_meters$EF[1]
-  all_merge_clean$Com_meter_ER <- all_merge_clean$"Commercial Total Customers"*GHGI_meters$EF[2]
-  all_merge_clean$Ind_meter_ER <- all_merge_clean$"Industrial Total Customers"*GHGI_meters$EF[3]
-  
+                                         all_merge_clean$EIA_Commercial_Total_Customers/
+                                         (all_merge_clean$EIA_Residential_Total_Customers + all_merge_clean$EIA_Commercial_Total_Customers))
+
   # We could allocate the industrial meter emissions by ACES and Vulcan industrial sector
   # But this sector is dominated by a handful of large point sources, many of which don't even use natural gas
   # So instead, share these emissions out between the residential and commercial CO2 maps
@@ -1053,111 +938,24 @@ NG_distribution <- function(domain,
                                            all_merge_clean$Com_meter_ER/
                                            (all_merge_clean$Res_meter_ER + all_merge_clean$Com_meter_ER))
   
-  # Maintenance and upsets
-  all_merge_clean$Relief_valve_ER <- all_merge_clean$MMILES_TOTAL*GHGI_maintenance$EF[1]
-  all_merge_clean$Blowdown_ER <- all_merge_clean$Miles_main_and_serv*GHGI_maintenance$EF[2]
-  all_merge_clean$Mishap_ER <- all_merge_clean$Miles_main_and_serv*GHGI_maintenance$EF[3]
   
   all_merge_clean$upset_ER_total_res <- ((all_merge_clean$Relief_valve_ER + 
                                             all_merge_clean$Blowdown_ER +
                                             all_merge_clean$Mishap_ER)*
-                                           all_merge_clean$"Residential Total Customers"/
-                                           (all_merge_clean$"Residential Total Customers" + all_merge_clean$"Commercial Total Customers"))
+                                           all_merge_clean$EIA_Residential_Total_Customers/
+                                           (all_merge_clean$EIA_Residential_Total_Customers + all_merge_clean$EIA_Commercial_Total_Customers))
   
   all_merge_clean$upset_ER_total_com <- ((all_merge_clean$Relief_valve_ER + 
                                             all_merge_clean$Blowdown_ER +
                                             all_merge_clean$Mishap_ER)*
-                                           all_merge_clean$"Commercial Total Customers"/
-                                           (all_merge_clean$"Residential Total Customers" + all_merge_clean$"Commercial Total Customers"))
+                                           all_merge_clean$EIA_Commercial_Total_Customers/
+                                           (all_merge_clean$EIA_Residential_Total_Customers + all_merge_clean$EIA_Commercial_Total_Customers))
   
-  # Post-meter
-  all_merge_clean$post_meter_ER_total_res <- all_merge_clean$"Residential Total Volume (Mcf)"*1000*natural_gas_post_meter_emission_factor
-  #McF = thousand cubic ft
-  
+  cat("Finished calculating emissions and distributing to residential/commercial portions at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
   ################################################################################
-  #Start working with the shape files if calculating by LDC
+  #Load in ACES/Vulcan 
   
-  ## Now we have the emissions by company as a dataframe
-  # Next do some pre-processing of the HIFLD shapefile so we can sptially allocate these emissions:
-  # - SVCTERID number LDC360007 needs splitting into three bits based on NYS county polygons
-  # - SVCTERID numbers LDC420001 and LDC420022 need merging (these companies merged so the 2019 data is combined)
-  
-  if(NG_distribution_by_LDC){
-    LI_shp <- County_Tigerlines[which(County_Tigerlines$COUNTYNS %in% c('00974149', '00974128')),]
-    LI_shp <- aggregate(LI_shp)
-    NYC_shp <- County_Tigerlines[which(County_Tigerlines$COUNTYNS %in% c('00974122', '00974139', '00974141', '00974129', '00974101')),]
-    NYC_shp <- aggregate(NYC_shp_temp)
-    #combine a few LDCs
-    
-    state_shp_trans <- project(State_Tigerlines,crs(HIFLD_shp))
-    LI_shp_trans <- project(LI_shp, crs(HIFLD_shp))
-    NYC_shp_trans <- project(NYC_shp, crs(HIFLD_shp))
-    # Move everything onto the target crs
-    
-    NGrid_shp <- HIFLD_shp[which(HIFLD_shp$SVCTERID == 'LDC360007'),]
-    NGrid_LI <- terra::intersect(LI_shp_trans,NGrid_shp)
-    NGrid_LI <- NGrid_shp*LI_shp_trans
-    
-    NGrid_LI <- st_intersection(st_as_sf(NGrid_shp), st_as_sf(LI_shp_trans))
-    NGrid_NYC <- st_intersection(st_as_sf(NGrid_shp), st_as_sf(NYC_shp_trans))
-    NGrid_other <- st_difference(NGrid_shp, st_union(LI_shp_trans, NYC_shp_trans))
-    # # Split up the National Grid LDC polygon
-    
-    HIFLD_shp <- rbind(HIFLD_shp, HIFLD_shp[rep(which(HIFLD_shp$SVCTERID == 'LDC360007'), 3),])
-    # Add new entries for the shapefile containing the new split NGrid polygon
-    
-    HIFLD_shp$SVCTERID[nrow(HIFLD_shp)-2] <- 'LDC360007a'
-    HIFLD_shp$SVCTERID[nrow(HIFLD_shp)-1] <- 'LDC360007b'
-    HIFLD_shp$SVCTERID[nrow(HIFLD_shp)] <- 'LDC360007c'
-    
-    st_geometry(HIFLD_shp[which(HIFLD_shp$SVCTERID == 'LDC360007a'),]) <- st_geometry(NGrid_LI)
-    st_geometry(HIFLD_shp[which(HIFLD_shp$SVCTERID == 'LDC360007b'),]) <- st_geometry(NGrid_NYC)
-    st_geometry(HIFLD_shp[which(HIFLD_shp$SVCTERID == 'LDC360007c'),]) <- st_geometry(NGrid_other)
-    
-    PPL_NG_combined <- st_combine(HIFLD_shp[which(HIFLD_shp$SVCTERID %in% c('LDC420001','LDC420022')),])
-    st_geometry(HIFLD_shp[which(HIFLD_shp$SVCTERID == 'LDC420001'),]) <- PPL_NG_combined
-    # Merge the Peoples Natural Gas LDC geometries
-    
-    HIFLD_shp[which(HIFLD_shp$SVCTERID=="LDC240007"),] <- st_intersection(HIFLD_shp[which(HIFLD_shp$SVCTERID=="LDC240007"),],
-                                                                          state_shp_trans[which(state_shp_trans$STUSPS == "MD"),])[names(HIFLD_shp)]
-    #this shapefile bleeds over into VA, even though GHGRP and the other inputs
-    #separate the data by state.  Removing the VA portion here
-    
-    all_merge_with_poly <- merge(all_merge_clean, HIFLD_shp[c('SVCTERID', 'geometry')], all.x=TRUE)
-    # Now merge the geometries from HIFLD_shp with the entries in all_merge_clean
-    
-    all_merge_sf <- st_as_sf(all_merge_with_poly, sf_column_name='geometry', crs=crs(HIFLD_shp))
-    # Turn into sf object
-    
-    for(a_state in unique(all_merge_sf$State)){
-      other_indx <- which(all_merge_sf$State == a_state & all_merge_sf$Company == 'OTHER')
-      if(length(other_indx)){  # if there is an 'OTHER' entry for this state
-        state_poly <- state_shp_trans[which(state_shp_trans$STUSPS == a_state),]
-        st_geometry(all_merge_sf[other_indx,]) <- st_geometry(st_difference(state_poly, st_union(all_merge_sf)))
-        all_merge_sf[other_indx,'SVCTERID'] <- paste0('DUMMY_', a_state)
-      }
-    }
-    # Go through each state and get the geometry of the OTHER entry for all_merge_clean (i.e. areas not covered by all_merge_sf)
-    # Also change SVCTERID from DUMMY to a unique value
-    
-    ################################################################################
-    #plot the updated LDCs
-    
-    for(A in 1:length(state_name_list)){
-      png(file.path(output_directory,paste0('/Updated_',state_name_list[A],'_LDC_shapefile.png')),)
-      par(oma = c(0, 0, 0, 4))
-      current_state <- state_name_list[A]
-      plot(all_merge_sf[all_merge_sf$State==current_state,1],key.length=0.9,
-           key.pos=4,main=paste0(current_state," SVCTERID"),
-           pal=timPalette(n=nrow(all_merge_sf[all_merge_sf$State==current_state,1])))
-      graphics.off()
-    }
-    
-  }
-  
-  ################################################################################
-  #Load in ACES/Vulcan and use them to redistribute residential/commercial emissions
-  
+  #the various subsectors
   res_totals <- c('mains_ER_total_res',
                   'serv_ER_total_res',
                   'MnR_ER_total_res',
@@ -1170,8 +968,9 @@ NG_distribution <- function(domain,
                   'MnR_ER_total_com',
                   'meter_ER_total_com',
                   'upset_ER_total_com')
-  #the various subsectors
   
+  # Load in ACES and Vulcan sectors - these are in different units, but it
+  # doesn't matter as we'll only use fractions
   if(Use_ACES){
     aces_res <- rast(paste0(ACES_directory,"/Sectoral/",ACES_year,'_Annual_ACES_Residential.nc'))
     aces_res <- flip(aces_res)
@@ -1185,34 +984,66 @@ NG_distribution <- function(domain,
     vu_res <- rast(paste0(vulcan_directory,"/Sectoral/","Vulcan_v3_US_annual_1km_residential_mn.nc4"), subds='carbon_emissions', lyrs=vulcan_band)
     vu_com <- rast(paste0(vulcan_directory,"/Sectoral/",'Vulcan_v3_US_annual_1km_commercial_mn.nc4'), subds='carbon_emissions', lyrs=vulcan_band)
   }
-  # Load in ACES and Vulcan sectors - these are in different units, but it
-  # doesn't matter as we'll only use fractions
   
+  ################################################################################
+  #use ACES/Vulcan to redistribute residential/commercial emissions at the LDC
+  #level
   if(NG_distribution_by_LDC){
-    all_merge_sf_LCC <- st_transform(all_merge_sf, crs(crs_to_use))
-    # Transform to ACES/Vulcan CRS
-    
-    all_merge_sp_LCC <- as(all_merge_sf_LCC, 'Spatial')
-    # Convert all_merge_sf_LCC to Spatial so we can use it with raster more
-    # easily.  
-    
     if(Use_ACES){
-      cover_all <- cellFromPolygon(aces_res, all_merge_sp_LCC, weights = TRUE)
-      # Get the fraction of each cell covered by each polygon - this is much quicker
-      # that rasterize(getCover=T) although it does have strange bug (as of
-      # raster_3.4-5) that calculates weights that are exactly a factor of 100 too
-      # low i.e. they give 0.01 when the whole cell is covered
+      # tempdata <- aces_res
+      # values(tempdata) <- 0
+      #convert to the proper crs
+      all_merge_LCC <- project(all_merge_clean,aces_res)
       
-      # do this 1 time now instead of doing it 1x per sector (com and res).
-      
-      disaggregation(aces_res,res_totals,agg_level="LDC",sf_input=all_merge_sf_LCC)
-      disaggregation(aces_com,com_totals,agg_level="LDC",sf_input=all_merge_sf_LCC)
+      # all_merge_LCC <- all_merge_LCC[2,]
+      # tempdata <- crop(tempdata,all_merge_LCC)
+      # tempdata2 <- tempdata
+      # tempdata3 <- tempdata
+      # start <- Sys.time()
+      # test1=cells(tempdata,all_merge_LCC,exact=T,touches=T)
+      # tempdata[test1[,'cell']] <- test1[,"weights"]
+      # end1 <- Sys.time()
+      # 
+      # 
+      # test2=extract(tempdata,all_merge_LCC,weights=T,exact=T,cells=T)
+      # tempdata2[test2[,'cell']] <- test2[,"weight"]
+      # end2 <- Sys.time()
+      # 
+      # test3 <- cells(tempdata3,all_merge_LCC,exact=F,touches=T)
+      # test3 <- cells(tempdata3[test3[,'cell'],drop=F],all_merge_LCC,exact=T,touches=T)
+      # tempdata3[test3[,'cell']] <- test3[,"weights"]
+      # end3 <- Sys.time()
+
+      # LDC_count <- nrow(all_merge_LCC)
+      # all_merge_LCC$count <- 1:nrow(all_merge_LCC)
+      # cover_all <- all_merge_LCC %>% 
+      #   split(f=all_merge_LCC$HIFLD_SVCTERID) %>%
+      #   lapply(function(x){cells(aces_res,x,weights=T,exact=T);cat("\rProcessing",x$count,"of",LDC_count,"LDCs            ")})
+      # 
+      # aces_res_temp <- crop(aces_res,ext(project(State_Tigerlines,aces_res))*1.2) - untested impact
+      # 
+      LDC_count <- nrow(all_merge_LCC)
+      all_merge_LCC$count <- 1:nrow(all_merge_LCC)
+      cover_all <- all_merge_LCC %>% 
+        split(f=all_merge_LCC$HIFLD_SVCTERID) %>%
+        lapply(function(x){cat("\rProcessing",x$count,"of",LDC_count,"LDCs using ACES            ");extract(aces_res,x,weights=T,exact=T,cells=T)})
+
+      disaggregation(aces_res,res_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
+      disaggregation(aces_com,com_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
     }
     if(Use_Vulcan){
-      cover_all <- cellFromPolygon(vu_res, all_merge_sp_LCC, weights = TRUE)
-      disaggregation(vu_res,res_totals,agg_level="LDC",sf_input=all_merge_sf_LCC)
-      disaggregation(vu_com,com_totals,agg_level="LDC",sf_input=all_merge_sf_LCC)
+      all_merge_LCC <- project(all_merge_clean,vu_res)
+      
+      LDC_count <- nrow(all_merge_LCC)
+      all_merge_LCC$count <- 1:nrow(all_merge_LCC)
+      cover_all <- all_merge_LCC %>% 
+        split(f=all_merge_LCC$HIFLD_SVCTERID) %>%
+        lapply(function(x){cat("\rProcessing",x$count,"of",LDC_count,"LDCs using vulcan            ");extract(vu_res,x,weights=T,exact=T,cells=T)})
+
+      disaggregation(vu_res,res_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
+      disaggregation(vu_com,com_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
     }
+    cat("Finished disaggregating emissions to pixels from the LDC scale at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
   }
   
   ################################################################################
@@ -1225,12 +1056,17 @@ NG_distribution <- function(domain,
   # residential/commercial split should closely match that of the high emitting
   # company, not the high consumer company.
   
-  all_merge_state <- aggregate(all_merge_clean[!(names(all_merge_clean) %in% c('SVCTERID', 'Company', 'Company Name', 'State'))],
-                               list(State=all_merge_clean$State),
-                               sum,na.rm=T)
+  if(NG_distribution_by_LDC){
+    all_merge_state <- aggregate(as.data.frame(all_merge_clean[,!(names(all_merge_clean) %in% c('HIFLD_SVCTERID', 'EIA_Company', 'EIA_Company_Name', 'PHMSA_State'))]),
+                                 list(PHMSA_State=all_merge_clean$PHMSA_State),
+                                 sum,na.rm=T)
+    # Merge the geometries
+    all_merge_state_poly <- merge(State_Tigerlines, all_merge_state, by.y='PHMSA_State', by.x='STUSPS')
+    names(all_merge_state_poly) <- gsub("STUSPS","PHMSA_State",names(all_merge_state_poly))
+  }else{
+    all_merge_state_poly <- all_merge_clean
+  }
   
-  # Merge the geometries
-  all_merge_state_poly <- terra::merge(State_Tigerlines, all_merge_state, by.y='State', by.x='STUSPS')
   
   if(Use_ACES){
     #convert state scale version to the proper crs
@@ -1241,7 +1077,7 @@ NG_distribution <- function(domain,
       lapply(function(x){extract(aces_res,x,weights=T,exact=T,cells=T)})
     
     disaggregation(aces_res,res_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all,out_envir=environment())
-    disaggregation(aces_com,com_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all,out_envir=environment())
+    disaggregation(aces_com,com_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all,out_envir=environment())
   }
   if(Use_Vulcan){
     all_merge_LCC_state <- project(all_merge_state_poly,vu_res)
@@ -1251,13 +1087,14 @@ NG_distribution <- function(domain,
       lapply(function(x){extract(vu_res,x,weights=T,exact=T,cells=T)})
     
     disaggregation(vu_res,res_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all,out_envir=environment())
-    disaggregation(vu_com,com_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all,out_envir=environment())
+    disaggregation(vu_com,com_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all,out_envir=environment())
   }
-  
+  cat("Finished disaggregating emissions to pixels from the state scale at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
   ################################################################################
   #Repeat when aggregated to the domain total.
   
-  all_merge_domain <- as.data.frame(colSums(all_merge_clean[!(names(all_merge_clean) %in% c('SVCTERID', 'Company', 'Company Name', 'State'))]))
+  all_merge_domain <- apply(as.data.frame(all_merge_clean),2,as.numeric)
+  all_merge_domain <- colSums(all_merge_domain)
   
   all_merge_domain_poly <- aggregate(State_Tigerlines)
   values(all_merge_domain_poly) <- t(all_merge_domain)
@@ -1278,6 +1115,7 @@ NG_distribution <- function(domain,
     disaggregation(vu_com,com_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
   }
   
+  cat("Finished disaggregating emissions to pixels from the domain scale at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
   ################################################################################
   #write a function to save, dependent on whether or not we use XESMF
   if(XESMF){
@@ -1330,7 +1168,7 @@ NG_distribution <- function(domain,
         subsector_name <- "post-meter residential leakage and usage"
       }
       
-      if(grepl("ldc",disaggregation_level)){
+      if(grepl("LDC",disaggregation_level)){
         disaggregation_name <- "local distribution company"
       }else if(grepl("state",disaggregation_level)){
         disaggregation_name <- "individual-state"
@@ -1437,16 +1275,15 @@ NG_distribution <- function(domain,
   names(com_data) <- gsub("com_ch4","by",unlist(com_data_objects))
   rownames(com_data) <- names(com_data_list[,1])
   
-  if(NG_distribution_by_LDC){
-    input_totals_LDC <- st_drop_geometry(all_merge_sf_LCC[,grep(glob2rx("*_ER*"),colnames(all_merge_sf_LCC))])
-    input_totals_LDC <- colSums(input_totals_LDC)
-  }
-  input_totals_state <- all_merge_clean[,grep(glob2rx("*_ER*"),colnames(all_merge_clean))]
-  input_totals_domain <- all_merge_domain[grep(glob2rx("*_ER*"),rownames(all_merge_domain)),1]
-  names(input_totals_domain) <- rownames(all_merge_domain)[grep(glob2rx("*_ER*"),rownames(all_merge_domain))]
-  input_totals_state <- colSums(input_totals_state)
   #original data that was distributed in the rasters.  The totals should still
   #match.
+  if(NG_distribution_by_LDC){
+    input_totals_LDC <- as.data.frame(all_merge_clean[,grep(glob2rx("*_ER*"),names(all_merge_clean))])
+    input_totals_LDC <- colSums(input_totals_LDC)
+  }
+  input_totals_state <- all_merge_state[,grep(glob2rx("*_ER*"),colnames(all_merge_state))]
+  input_totals_state <- colSums(input_totals_state)
+  input_totals_domain <- all_merge_domain[grep(glob2rx("*_ER*"),names(all_merge_domain))]
   
   ch4_totals_df <- rbind(res_data,com_data)
   if(NG_distribution_by_LDC){
@@ -1462,12 +1299,15 @@ NG_distribution <- function(domain,
   
   
   ch4_totals_df <- apply(ch4_totals_df,2,FUN=function(x){as.numeric(x)})
+  ch4_totals_df[is.na(ch4_totals_df)] <- 0
   
-  if(!all(as.vector(round(ch4_totals_df,7)==round(ch4_totals_df[,1],7)))){
-    #round each to 7 digits and compare every column to the first column.  Check
-    #that all are TRUE
+  percent_change <- abs(ch4_totals_df - ch4_totals_df[,1])/ch4_totals_df[,1]
+  if(!all(percent_change<0.001,na.rm=T)){
+    #Check if all values are within half a percent of the first column (i.e.,
+    #all are ~identical other than minor rounding)
     View(ch4_totals_df)
-    stop("Something has gone wrong - the total across the domain when disaggregated by LDC vs by state vs by domain or by using ACES vs Vulcan disagree")
+    stop("Something has gone wrong - the total across the domain when disaggregated by LDC vs by state vs by domain or by using ACES vs Vulcan disagree by more than rounding error (0.1%)")
   }
   
+  cat("Finished natural gas distribution sector: NG_distribution_emissions in",difftime(Sys.time(),starttime,units = "min"),"minutes\n")
 }
