@@ -385,13 +385,8 @@ NG_distribution <- function(domain,
                             plot_directory,
                             County_Tigerlines,
                             focus_city_tigerlines){
-  # EIA_file = file.path(input_directory,"176 Type of Operations and Sector Items.xlsx");
-  # PHMSA_file = file.path(input_directory,"annual_gas_distribution_2010_present/annual_gas_distribution_2019.xlsx");
-  GHGI_file = file.path(input_directory,"2022_ghgi_natural_gas_systems_annex36_tables.xlsx");
-  GHGI_EF_sheet = "3.6-2";
-  GHGI_Activity_sheet = "3.6-7";
   
-  NG_distribution_by_LDC=T
+  
   starttime <- Sys.time()
   cat("Starting wastewater sector: Wastewater\n")
   
