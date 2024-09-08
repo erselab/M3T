@@ -606,7 +606,10 @@ if(Process_wetlands_and_inland_waters){
   NWI_Wetland_fraction(input_directory=input_directory,
                        output_directory=output_directory,
                        domain=domain,
-                       state_name_list=state_name_list)
+                       state_name_list=state_name_list,
+                       Use_SOCCR1=Use_SOCCR1,
+                       Use_SOCCR2=Use_SOCCR2,
+                       Include_freshwater=Include_freshwater)
   # rm(list=setdiff(ls(),c("plot_directory","domain","output_directory",
   #                        "code_directory","verbose","County_Tigerlines",
   #                        "State_Tigerlines","focus_city_tigerlines")))
