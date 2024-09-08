@@ -137,6 +137,9 @@ Disaggregate_Wetcharts <- function(
     NLCD_file,
     NALCMS_file,
     Wetcharts_model_subset){
+  
+  starttime <- Sys.time()
+  cat("Starting wetland sector: Disaggregate_Wetcharts\n")
   ################################################################################
   #download and load in  wetcharts
   
@@ -158,6 +161,7 @@ Disaggregate_Wetcharts <- function(
   Wetcharts_file <- paste0(input_directory,"WetCHARTs_v1_3_1_",Wetcharts_year,".nc")
   
   if(!file.exists(Wetcharts_file)){
+    cat("Downloading Wetcharts data, this may take a few minutes\n")
     #default is to timeout if a download takes more than a minute.  Set that to 20
     #minutes given these are large files
     default_timeout <- options("timeout")
@@ -178,7 +182,7 @@ Disaggregate_Wetcharts <- function(
   ################################################################################
   #define the domain of interest + a little buffer, crop wetcharts
   
-  Wetcharts <- crop(Wetcharts,ext(domain)+0.5)
+  Wetcharts <- crop(Wetcharts,ext(project(domain,crs(Wetcharts)))+0.5)
   ################################################################################
   #load in the landcover - national land cover database or North
   #American Land Change Monitoring System (NLCD and NALCMS)
@@ -193,7 +197,7 @@ Disaggregate_Wetcharts <- function(
     NALCMS <- crop(NALCMS,
                    project(x=ext(Wetcharts),from=crs(Wetcharts),to=crs(NALCMS)))
   }
-  
+  cat("Finished loading in all data at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
   ################################################################################
   #set wetlands to a value of 1 and all other land cover to 0, then project to
   #domain CRS at 0.1 deg.
@@ -327,11 +331,11 @@ Disaggregate_Wetcharts <- function(
   #redistribute using wetland fraction and crop to domain
   if(Use_NLCD){
     NLCD_Downscaled_Averaged_wetcharts <- lapply(Downscaled_Averaged_wetcharts,FUN=function(x){
-      crop(x*NLCD_wetland_fraction/cellSize(x),domain,snap="out")})
+      crop(x*NLCD_wetland_fraction/cellSize(x),project(domain,crs(NLCD_wetland_fraction)),snap="out")})
   }
   if(Use_NALCMS){
     NALCMS_Downscaled_Averaged_wetcharts <- lapply(Downscaled_Averaged_wetcharts,FUN=function(x){
-      crop(x*NALCMS_wetland_fraction/cellSize(x),domain,snap="out")})
+      crop(x*NALCMS_wetland_fraction/cellSize(x),project(domain,crs(NALCMS_wetland_fraction)),snap="out")})
   }
   
   ################################################################################
@@ -401,7 +405,7 @@ Disaggregate_Wetcharts <- function(
   
   #if the domain cuts off partial 0.5 deg pixels from Wetcharts, the domain-total
   #pre downscaling will not match.  So crop everything slightly to avoid this.
-  comparable_domain <- crop(Averaged_wetcharts[[1]][[1]],domain)
+  comparable_domain <- crop(Averaged_wetcharts[[1]][[1]],project(domain,crs(Averaged_wetcharts[[1]])),snap="in")
   
   colnamelist <- vector()
   if(Use_NLCD){
@@ -462,5 +466,6 @@ Disaggregate_Wetcharts <- function(
     }
   }
   
-  
+  cat("Finished wetland sector: Disaggregate_Wetcharts in",difftime(Sys.time(),starttime,units = "min"),"minutes\n")
 }
+
