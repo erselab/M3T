@@ -94,6 +94,7 @@ NLCD_open_and_low_int <- function(NLCD_file,
   #initialize output data frame for state totals
   area_df <- data.frame("developed_open_or_low_intensity"=vector())
 
+  subset_tmpfile <- tempfile(fileext = ".tif")
   for(A in 1:length(state_name_list)){
     #separate states
     state_sub_poly <- subset(NLCD_states_trans, NLCD_states_trans$STUSPS==state_name_list[A])
@@ -113,6 +114,9 @@ NLCD_open_and_low_int <- function(NLCD_file,
     NLCD_suburban_subset <- extend(NLCD_suburban_subset,fill=0,
                                    ext(NLCD_suburban_subset)+(res(project(domain,crs(NLCD_suburban)))*5))
     
+    writeRaster(NLCD_suburban_subset,subset_tmpfile)
+    NLCD_suburban_subset <- rast(subset_tmpfile)
+    
     #project to the exact domain (resolution, origin, extent, etc.) using an
     #average.  Represents the fractional coverage of wetlands in each pixel (0 -
     #1).
@@ -128,6 +132,7 @@ NLCD_open_and_low_int <- function(NLCD_file,
                force_v4=T,
                overwrite=T)
     }
+    unlink(subset_tmpfile)
     cat("Finished processing",state_name_list[A],"landcover at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
   }
   colnames(area_df) <- c("open_or_low_int_area")
