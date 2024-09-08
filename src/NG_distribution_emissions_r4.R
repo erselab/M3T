@@ -1298,7 +1298,7 @@ NG_distribution <- function(domain,
   
   percent_change <- abs(ch4_totals_df - ch4_totals_df[,1])/ch4_totals_df[,1]
   if(!all(percent_change<0.001,na.rm=T)){
-    #Check if all values are within half a percent of the first column (i.e.,
+    #Check if all values are within 0.1 percent of the first column (i.e.,
     #all are ~identical other than minor rounding)
     View(ch4_totals_df)
     stop("Something has gone wrong - the total across the domain when disaggregated by LDC vs by state vs by domain or by using ACES vs Vulcan disagree by more than rounding error (0.1%)")
