@@ -39,6 +39,13 @@
 #'  input data
 #'@param output_directory Character providing the full filepath to save
 #'  processed data
+#'@param Use_SOCCR1 Logical.  Pulled from config file.  Indicating whether or
+#'  not to calculate emissions using SOCCR1.
+#'@param Use_SOCCR2 Logical.  Pulled from config file.  Indicating whether or
+#'  not to calculate emissions using SOCCR2.
+#'@param Include_freshwater Logical.  Pulled from config file.  Indicating
+#'  whether or not to calculate emissions for freshwater wetlands using
+#'  Rosentreter et al.
 #'@returns Nothing is returned from the function, but the main outputs are TIFF
 #'  files of the fractional wetland coverage per pixel for each wetland type and
 #'  state.  They are titled "state abbreviation _ wetland type
@@ -55,6 +62,9 @@
 #'
 #' NWI_Wetland_fraction(input_directory="~/../Desktop/input/",
 #'                      output_directory="~/../Desktop/",
+#'                      Use_SOCCR1=TRUE,
+#'                      Use_SOCCR2=TRUE,
+#'                      Include_freshwater=TRUE,
 #'                      domain=grid,
 #'                      state_name_list=c("DE","MD","NJ","NY","PA"))
 #'@author Joe Pitt, \email{madeup@@wisc.edu}
@@ -65,12 +75,15 @@
 NWI_Wetland_fraction <- function(input_directory,
                                  output_directory,
                                  domain,
-                                 state_name_list){
+                                 state_name_list,
+                                 Use_SOCCR1,
+                                 Use_SOCCR2,
+                                 Include_freshwater){
   
   # Calculate wetland fraction using NWI state wetland cover data
-  
-  #need to make crop or extend depending on d01
-  
+
+  starttime <- Sys.time()
+  cat("Starting wetland sector: NWI_Wetland_fraction\n")
   ################################################################################
   #Some settings
   
@@ -81,9 +94,8 @@ NWI_Wetland_fraction <- function(input_directory,
   #min)
   options(timeout = 60*20)
   
-  #try west virginia and minnesota
-  
   ################################################################################
+  #create output folders (multiple nested folders will be created via download)
   
   dir.create(paste0(input_directory,"NWI"),showWarnings = F)
   dir.create(paste0(output_directory,"NWI"),showWarnings = F)
@@ -93,18 +105,18 @@ NWI_Wetland_fraction <- function(input_directory,
   
   ################################################################################
   #Create a function that will reproject to the proper CRS and then rasterize,
-  #potentially account for invalid polygons, and if too large, split the job into
-  #many smaller parts (doable/faster)
-  Split_rasterize <- function(input){
+  #potentially account for invalid polygons 
+  
+  rasterize_plus <- function(input){
     #need for naming - substitute only works if it's pulled from elsewhere.  Once
     #created within the function, it will be ~= get.
     input_name <- substitute(input)
     
-    cat("Starting",input_name,"for",state_name_list[i],"\n")
-    if(paste0(state_name_list[i],'_',input_name,".tiff") %in% Processed_NWI_files){
-      #if already processed, stop the function without error
-      return(NULL)
-    }
+    cat("Starting",input_name,"for",state_name_list[i],"at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
+    # if(paste0(state_name_list[i],'_',input_name,".tiff") %in% Processed_NWI_files){
+    #   #if already processed, stop the function without error
+    #   return(NULL)
+    # }
     #identify any invalid polygons (errors such as too few vertices or
     #self-intersection).  Has to be done in multiple steps or it doesn't seem to
     #work.
@@ -156,8 +168,8 @@ NWI_Wetland_fraction <- function(input_directory,
   Processed_NWI_files <- list.files(NWI_output_directory,pattern=".tiff")
   
   for(i in 1:length(state_name_list)){
-    cat("Starting processing for",state_name_list[i],"\n")
-    
+    cat("Starting processing for",state_name_list[i],"at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
+
     #filename on the NWI website
     NWI_filename <- paste0(state_name_list[i],"_shapefile_wetlands.zip")
     if(!Downloaded_NWI_files[i]){
@@ -180,11 +192,11 @@ NWI_Wetland_fraction <- function(input_directory,
     
     NWI_filename <- gsub(".zip","",NWI_filename)
     
-    if(paste0(state_name_list[i],"_PNF.tiff") %in% Processed_NWI_files){
-      #if already processed (PNF is last in the list), move on to the next state.
-      cat("Already processed\n")
-      next
-    }else{
+    # if(paste0(state_name_list[i],"_PNF.tiff") %in% Processed_NWI_files){
+    #   #if already processed (PNF is last in the list), move on to the next state.
+    #   cat("Already processed\n")
+    #   next
+    # }else{
       #progressively remove files to isolate just the relevant wetland files. some
       #have historic files, there's metadata, shape outline files, some states have
       #other types (e.g. MO riparian), etc.
@@ -208,8 +220,7 @@ NWI_Wetland_fraction <- function(input_directory,
         wetlands <- vect(wetland_files)
         wetlands <- wetlands[,"ATTRIBUTE"]
       }
-      cat("Finished loading and combining all wetland files\n")
-      
+      cat("Finished loading and combining all wetland files at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
       ################################################################################
       #split them into the relevant parts and rasterize/save them
       
@@ -222,69 +233,67 @@ NWI_Wetland_fraction <- function(input_directory,
       
       #split the wetlands file into the relevant wetland types
       Attribute_text <- wetlands$ATTRIBUTE
-      M1 <- wetlands[startsWith(Attribute_text, 'M1'),]
-      M2 <- wetlands[startsWith(Attribute_text, 'M2'),]
-      E1 <- wetlands[startsWith(Attribute_text, 'E1'),]
-      E2 <- wetlands[startsWith(Attribute_text, 'E2'),]
-      R1 <- wetlands[startsWith(Attribute_text, 'R1'),]
-      R2 <- wetlands[startsWith(Attribute_text, 'R2'),]
-      R3 <- wetlands[startsWith(Attribute_text, 'R3'),]
-      R4 <- wetlands[startsWith(Attribute_text, 'R4'),]
-      L1 <- wetlands[startsWith(Attribute_text, 'L1'),]
-      L2 <- wetlands[startsWith(Attribute_text, 'L2'),]
-      PFO <- wetlands[startsWith(Attribute_text, 'PFO'),]
-      PNF <- wetlands[startsWith(Attribute_text, 'P')&!startsWith(Attribute_text, 'PFO'),]
-      
-      # if there is some of category M1
-      if(dim(M1)[1]!=0){
-        #get the fraction of M1 polygons covering each cell and save
-        Split_rasterize(M1)
+      if(Include_freshwater){
+        R1 <- wetlands[startsWith(Attribute_text, 'R1'),]
+        R2 <- wetlands[startsWith(Attribute_text, 'R2'),]
+        R3 <- wetlands[startsWith(Attribute_text, 'R3'),]
+        R4 <- wetlands[startsWith(Attribute_text, 'R4'),]
+        L1 <- wetlands[startsWith(Attribute_text, 'L1'),]
+        L2 <- wetlands[startsWith(Attribute_text, 'L2'),]
+      }
+      if(Use_SOCCR1 | Use_SOCCR2){
+        M2 <- wetlands[startsWith(Attribute_text, 'M2'),]
+        E2 <- wetlands[startsWith(Attribute_text, 'E2'),]
+        PFO <- wetlands[startsWith(Attribute_text, 'PFO'),]
+        PNF <- wetlands[startsWith(Attribute_text, 'P')&!startsWith(Attribute_text, 'PFO'),]
       }
       
-      if(dim(M2)[1]!=0){
-        Split_rasterize(M2)
+      if(Use_SOCCR1 | Use_SOCCR2){
+        # if there is some of category R1
+        if(dim(R1)[1]!=0){
+          rasterize_plus(R1)
+        }
+        
+        if(dim(R2)[1]!=0){
+          rasterize_plus(R2)
+        }
+        
+        if(dim(R3)[1]!=0){
+          rasterize_plus(R3)
+        }
+        
+        if(dim(R4)[1]!=0){
+          rasterize_plus(R4)
+        }
+        
+        if(dim(L1)[1]!=0){
+          rasterize_plus(L1)
+        }
+        
+        if(dim(L2)[1]!=0){
+          rasterize_plus(L2)
+        }
+      }
+      if(Include_freshwater){
+        if(dim(M2)[1]!=0){
+          rasterize_plus(M2)
+        }
+        
+        if(dim(E2)[1]!=0){
+          rasterize_plus(E2)
+        }
+        
+        if(dim(PFO)[1]!=0){
+          rasterize_plus(PFO)
+        }
+        
+        if(dim(PNF)[1]!=0){
+          rasterize_plus(PNF)
+        }
       }
       
-      if(dim(E1)[1]!=0){
-        Split_rasterize(E1)
-      }
-      
-      if(dim(E2)[1]!=0){
-        Split_rasterize(E2)
-      }
-      
-      if(dim(R1)[1]!=0){
-        Split_rasterize(R1)
-      }
-      
-      if(dim(R2)[1]!=0){
-        Split_rasterize(R2)
-      }
-      
-      if(dim(R3)[1]!=0){
-        Split_rasterize(R3)
-      }
-      
-      if(dim(R4)[1]!=0){
-        Split_rasterize(R4)
-      }
-      
-      if(dim(L1)[1]!=0){
-        Split_rasterize(L1)
-      }
-      
-      if(dim(L2)[1]!=0){
-        Split_rasterize(L2)
-      }
-      
-      if(dim(PFO)[1]!=0){
-        Split_rasterize(PFO)
-      }
-      
-      if(dim(PNF)[1]!=0){
-        Split_rasterize(PNF)
-      }
-    }
-    cat("Finished processing",state_name_list[i],"which is",i,"of",length(state_name_list),"\n\n")
+      # }
+    cat("Finished processing",state_name_list[i],"which is",i,"of",length(state_name_list),"at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n\n")
   }
+  cat("Finished wetland sector: NWI_Wetland_fraction in",difftime(Sys.time(),starttime,units = "min"),"minutes\n")
 }
