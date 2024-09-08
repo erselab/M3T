@@ -72,6 +72,9 @@ Prepare_GEPA <- function(inventory_year,
                          output_directory,
                          domain){
   
+  starttime <- Sys.time()
+  cat("Pulling remaining sectors from gridded EPA inventory: Prepare_GEPA\n")
+  ################################################################################
   #Zenodo API to download the appropriate GEPA v2 file.
   #https://zenodo.org/records/8367082
   if(inventory_year>2011 & inventory_year<2019){
@@ -156,5 +159,7 @@ Prepare_GEPA <- function(inventory_year,
            longname=paste0(gsub("_"," ",gsub(".nc","",GEPA_filename))," mobile combustion, coal, petroleum, abandoned oil and gas, natural gas exploration processing and production, petrochemicals, and ferroalloy"),
            missval=-9999,
            overwrite=TRUE)
+  
+  cat("Finished pulling remaining sectors from gridded EPA inventory: Prepare_GEPA in",difftime(Sys.time(),starttime,units = "min"),"minutes\n")
 }
 
