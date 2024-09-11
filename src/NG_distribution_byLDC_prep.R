@@ -221,18 +221,20 @@
     if(A == 6){
       #search for state name anywhere in the facility name (\\b = whole word)
       match_indx <- grepl(pattern = paste0("\\b",state.name[A],"\\b"),
-                          x=GHGRP_csv$facility_name.y,ignore.case = T) & GHGRP_csv$state!=state.abb[A]
+                          x=GHGRP_csv$facility_name,ignore.case = T) & GHGRP_csv$state!=state.abb[A]
     }else if(A==47){
       #search for state name or abbreviation, but state name must be
       #immediately after a dash (several in/near DC have Washington in them)
-      match_indx <- (grepl(pattern = paste0("- \\b",state.name[A],"\\b"),x=GHGRP_csv$facility_name.y,ignore.case = T) | 
-                       grepl(pattern = paste0("\\b",state.abb[A],"\\b"),x=GHGRP_csv$facility_name.y,ignore.case = T)) & GHGRP_csv$state!=state.abb[A]
+      match_indx <- (grepl(pattern = paste0("- \\b",state.name[A],"\\b"),x=GHGRP_csv$facility_name,ignore.case = T) | 
+                       grepl(pattern = paste0("\\b",state.abb[A],"\\b"),x=GHGRP_csv$facility_name,ignore.case = T)) & GHGRP_csv$state!=state.abb[A]
     }else{
       #search state name or abbreviation
-      match_indx <- (grepl(pattern = paste0("\\b",state.name[A],"\\b"),x=GHGRP_csv$facility_name.y,ignore.case = T) | 
-                       grepl(pattern = paste0("\\b",state.abb[A],"\\b"),x=GHGRP_csv$facility_name.y,ignore.case = T)) & GHGRP_csv$state!=state.abb[A]
+      match_indx <- (grepl(pattern = paste0("\\b",state.name[A],"\\b"),x=GHGRP_csv$facility_name,ignore.case = T) | 
+                       grepl(pattern = paste0("\\b",state.abb[A],"\\b"),x=GHGRP_csv$facility_name,ignore.case = T)) & GHGRP_csv$state!=state.abb[A]
     }
-    if(sum(match_indx)>0){
+    #alert user of any updates, only if the state either was in the domain, or
+    #is being updated to be in the domain
+    if(sum(match_indx)>0 & (state.abb[A] %in% state_name_list | any(GHGRP_csv$state[match_indx] %in% state_name_list))){
       cat(paste(GHGRP_csv$facility_name[match_indx],collapse="  &  "),"rewritten from",paste(GHGRP_csv$state_name[match_indx],collapse="  &  "),"to",state.name[A],"\n")
     }
     GHGRP_csv[match_indx,"operating_state"]=state.abb[A]
