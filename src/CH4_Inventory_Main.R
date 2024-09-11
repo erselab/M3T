@@ -628,7 +628,8 @@ if(Process_wetlands_and_inland_waters){
                  verbose=verbose,
                  County_Tigerlines=County_Tigerlines,
                  State_Tigerlines=State_Tigerlines,
-                 focus_city_tigerlines=focus_city_tigerlines)
+                 focus_city_tigerlines=focus_city_tigerlines,
+                 watershed_shapefile=file.path(input_directory,"watersheds_shapefile/watershed_p_v2.shp"))
 }
 if(Incorporate_remaining_sectors_from_gridded_EPA){
   # rm(list=setdiff(ls(),c("input_directory","domain","output_directory",
