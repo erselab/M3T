@@ -152,6 +152,8 @@ Municipal_solid_waste <- function(LMOP_file,
                                   State_Tigerlines,
                                   focus_city_tigerlines){
   
+  starttime <- Sys.time()
+  cat("Starting landfill sector: Municipal_solid_waste\n")
   ################################################################################
   #Download the relevant emissions data using the API
   #(https://www.epa.gov/enviro/envirofacts-data-service-api) and combine the
@@ -344,11 +346,19 @@ Municipal_solid_waste <- function(LMOP_file,
   #Finally, load up some functions and plot up this output nicely
   
   if(verbose){
+    zlim_min=1.0
+    zlim_max <- log10(max(global(ghgrp_flux,max),global(LMOP_flux,max)))
     log_plot(ghgrp_flux,filename="MSW_GHGRP",
-             "Municipal Solid Waste -\n GHGRP reporters")
+             "Municipal Solid Waste -\n GHGRP reporters",
+             zlim_min=zlim_min,zlim_max=zlim_max)
     log_plot(LMOP_flux,filename="MSW_LMOP",
-             "Municipal Solid Waste -\n (GHGI - GHGRP) distributed using \nLandfill Methane Outreach Program")
+             "Municipal Solid Waste -\n (GHGI - GHGRP) distributed using \nLandfill Methane Outreach Program",
+             zlim_min=zlim_min,zlim_max=zlim_max)
+    
+    Summed_solid_waste <- ghgrp_flux+LMOP_flux
+    log_plot(Summed_solid_waste,
+             "Municipal Solid Waste -\n GHGRP reporters + (GHGI - GHGRP) distributed using \nLandfill Methane Outreach Program")
   }
-  
+  cat("Finished landfill sector: Municipal_solid_waste in",difftime(Sys.time(),starttime,units = "min"),"minutes\n")
 }
 
