@@ -152,6 +152,8 @@ Transmission <- function(GHGI_file,
                          State_Tigerlines,
                          focus_city_tigerlines){
   
+  starttime <- Sys.time()
+  cat("Starting natural gas transmission sector: Transmission\n")
   ################################################################################
   #checked and all input data matches the old equivalent
   
@@ -254,7 +256,7 @@ Transmission <- function(GHGI_file,
   
   #combine the datasets by ID, and year
   ghgrp <- merge(ghgrp_facility_info,ghgrp_transmission_compressor_emissions,
-                          by=c("facility_id","year"), all=F)
+                 by=c("facility_id","year"), all=F)
   
   #convert the relevant columns to numeric class
   ghgrp[,c("latitude","longitude","ghg_quantity")] <- apply(ghgrp[,c("latitude","longitude","ghg_quantity")],
@@ -324,12 +326,13 @@ Transmission <- function(GHGI_file,
   
   rm(GHGI_transmission_compressors,GHGI_Pipeline,GHGI_p1,GHGI_p2,first_row,Data_list,
      Engine_transmission_fraction,Turbine_transmission_fraction)
+  cat("Finished loading all input data at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
   ################################################################################
   #process the transmission pipeline data
   
   # Crop to just larger than d03 - don't know if it's necessary to have this buffer but it can't hurt
-  e <- ext(domain)+0.5
-  pipes_crop_EIA <- crop(pipes_EIA,e)
+  e <- ext(domain)*1.1
+  pipes_crop_EIA <- crop(project(pipes_EIA,crs(domain)),e)
   
   pipes_by_cell_EIA=rasterizeGeom(pipes_crop_EIA,domain,fun="length")
   pipes_rast_EIA <- pipes_by_cell_EIA*pipeline_EF   # Set values to the pipe length (in metres) in each cell, multiplied by the effective emission factor in mol/m/s
@@ -338,17 +341,14 @@ Transmission <- function(GHGI_file,
   
   ################################################################################
   # Now onto the transmission compressor stations
-  compressors_crop_HIFLD <- crop(compressors_HIFLD, domain)
-  
-  compressors_ghgrp <- vect(ghgrp,geom=c("longitude","latitude"))
-  compressors_ghgrp_crop <- crop(compressors_ghgrp,domain)
-  crs(compressors_ghgrp_crop) <- "epsg:4326"
-  
+  compressors_crop_HIFLD <- crop(project(compressors_HIFLD,crs(domain)), domain)
   compressors_final <- compressors_crop_HIFLD
-  
-  compressors_final$emiss <- compressor_avg_emissions
   #default for all are the national avg
-  
+  compressors_final$emiss <- compressor_avg_emissions
+
+  compressors_ghgrp <- vect(ghgrp,geom=c("longitude","latitude"))
+  crs(compressors_ghgrp) <- "epsg:4326"
+  compressors_ghgrp_crop <- crop(project(compressors_ghgrp,crs(domain)),domain)
   ################################################################################
   #Now identify the best matching GHGRP facility to the HIFLD ones using location.
   #If > 1 km, flag an error.  Otherwise, overwrite avg national compressor
@@ -370,6 +370,7 @@ Transmission <- function(GHGI_file,
   if(max(combined_data$distance)>1000){
     View(combined_data)
     plot(ext(domain))
+    lines(State_Tigerlines)
     points(compressors_crop_HIFLD,cex=2)
     points(compressors_ghgrp_crop,col="red")
     add_legend("bottom",legend = c("HIFLD","GHGRP"),pt.cex = c(2,1),
@@ -388,13 +389,15 @@ Transmission <- function(GHGI_file,
   ################################################################################
   # And save the output
   
-  # Save point sources as csv files - first just the raw dataframe
-  write.csv(compressors_final, file.path(output_directory,"NG_trans_compressors_all.csv"))
-  
-  # Now just the names, coordinates and emissions
-  compressors_output <- data.frame(compressors_final$NAME,crds(compressors_final),compressors_final$emiss)
-  names(compressors_output) <- c('Site_Name','Longitude','Latitude','Emission_mol_per_s')
-  write.csv(compressors_output,file.path(output_directory,"NG_trans_compressors.csv"),row.names=FALSE)
+  if(verbose){
+    # Save point sources as csv files - first just the raw dataframe
+    write.csv(compressors_final, file.path(output_directory,"NG_trans_compressors_all.csv"))
+    
+    # Now just the names, coordinates and emissions
+    compressors_output <- data.frame(compressors_final$NAME,crds(compressors_final),compressors_final$emiss)
+    names(compressors_output) <- c('Site_Name','Longitude','Latitude','Emission_mol_per_s')
+    write.csv(compressors_output,file.path(output_directory,"NG_trans_compressors.csv"),row.names=FALSE)
+  }
   
   writeCDF(pipes_flux,
            file.path(output_directory,"NG_trans_pipes.nc"),
@@ -417,15 +420,18 @@ Transmission <- function(GHGI_file,
   ################################################################################
   #Finally, load up some functions/datasets and plot up this output nicely
   
-  log_plot(compressor_flux,filename="NG_trans_compressors",
-           "NG transmission - compressors\n GHGRP reporters + (average GHGI emissions distributed using\n Homeland Infrastructure Foundation-Level Database)")
-  
-  not_log_plot(pipes_flux,filename="NG_trans_pipes",
-               "NG transmission - pipelines\n EIA pipeline data * GHGI EF")
-  
-  dir.create("Summed_Sectors",showWarnings = F)
-
-  Summed_NG_transmission = compressor_flux+pipes_flux
-  log_plot(Summed_NG_transmission,
-           "NG Transmission Sector\nEIA for pipelines + HFILD/GHGRP for compressors")
+  if(verbose){
+    log_plot(compressor_flux,filename="NG_trans_compressors",
+             "NG transmission - compressors\n GHGRP reporters + (average GHGI emissions distributed using\n Homeland Infrastructure Foundation-Level Database)")
+    
+    not_log_plot(pipes_flux,filename="NG_trans_pipes",
+                 "NG transmission - pipelines\n EIA pipeline data * GHGI EF")
+    
+    dir.create("Summed_Sectors",showWarnings = F)
+    
+    Summed_NG_transmission = compressor_flux+pipes_flux
+    log_plot(Summed_NG_transmission,
+             "NG Transmission Sector\nEIA for pipelines + HFILD/GHGRP for compressors")
+  }
+  cat("Finished natural gas transmission sector: Transmission in",difftime(Sys.time(),starttime,units = "min"),"minutes\n")
 }
