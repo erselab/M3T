@@ -40,7 +40,7 @@ main_config <- function(){
     Process_landfills <- FALSE
     Process_natural_gas_distribution <- FALSE	#includes residential post-meter
     Process_natural_gas_transmission <- FALSE
-    Process_stationary_combustion <- FALSE
+    Process_stationary_combustion <- TRUE
     Process_wastewater <- FALSE
     Incorporate_remaining_sectors_from_gridded_EPA <- FALSE
     Combine_sectors <- FALSE #create total CH4 inventory(s) by summing across sectors
@@ -58,12 +58,11 @@ main_config <- function(){
     stationary_combustion_by_domain <- TRUE
     
     #Natural Gas Distribution
-    NG_distribution_by_LDC <- FALSE
+    NG_distribution_by_LDC <- TRUE
     NG_distribution_by_state <- TRUE
     NG_distribution_by_domain <- TRUE
     
     #Wastewater
-    # Wastewater_Municipal_file <- "DMR"
     Wastewater_use_CWNS <- TRUE
     Wastewater_use_DMR <- TRUE
     #either CWNS for 2012 clean watershed needs survey discharge flow or DMR which is
@@ -213,15 +212,18 @@ main_config <- function(){
     
     
     
-    #wetlands
-    #SOCCR-based wetlands emission factors.  SOCCR1 values comes from
+    #wetlands SOCCR-based wetlands emission factors.  SOCCR1 values comes from
     #the arithmetic averages of Table F5
     #(https://www.carboncyclescience.us/state-carbon-cycle-report-soccr), SOCCR2
     #values come from the arithmetic averages of Tables 13B.8 to 13B.11 for PFO
-    #and PNF and Table 15A.2 for M2 and E2.
-    #(https://carbon2018.globalchange.gov/).  SOCCR2 values are in g C of
-    #CH4/m2/yr, so are converted to g CH4/m2/yr to be consistent with SOCCR1
-    #first.
+    #and PNF and Table 15A.2 for M2 and E2, limiting values to only those with
+    #salinity >=0.5 (https://carbon2018.globalchange.gov/).  SOCCR2 values are
+    #in g C of CH4/m2/yr, so are converted to g CH4/m2/yr first to be consistent
+    #with SOCCR1.  SOCCR2 also separated tidal emissions by region, so there is
+    #a gulf of mexico, Atlantic, Hudson, and Pacific value (as mapped here:
+    #http://www.cec.org/north-american-environmental-atlas/watersheds/), though
+    #since there is no Hudson or Pacific data, the average across all data is
+    #used.
     
     # Inland water CH4 fluxes are not included in either SOCCR1 or SOCCR2 For
     # lakes, McDonald et al. (10.4319/lo.2012.57.2.0597) show that large lakes
@@ -247,13 +249,19 @@ main_config <- function(){
     # PFO = palustrine, forested
     # PNF = palustrine, all non-forested classes
     
-    # the first 4 are only relevant if SOCCR1 or SOCCR2 are used.  The last 6
+    # the first 10 are only relevant if SOCCR1 or SOCCR2 are used.  The last 6
     # are only relevant if freshwater emissions are included.
     
-    Wetland_EFs <- data.frame("E2"=c(10.3,15.29*16.043/12.011), 
-                              "M2"=c(10.3,15.29*16.043/12.011),
-                              "PFO"=c(36,18.52*16.043/12.011),
-                              "PNF"=c(36,24.92*16.043/12.011),
+    Wetland_EFs <- data.frame("E2_Atlantic"=c(10.3,20.43), 
+                              "M2_Atlantic"=c(10.3,20.43),
+                              "E2_Gulf"=c(10.3,27.47), 
+                              "M2_Gulf"=c(10.3,27.47),
+                              "E2_Pacific"=c(10.3,21.87), 
+                              "M2_Pacific"=c(10.3,21.87),
+                              "E2_Hudson"=c(10.3,21.87), 
+                              "M2_Hudson"=c(10.3,21.87),
+                              "PFO"=c(36,24.74),
+                              "PNF"=c(36,33.28),
                               "L1"=5,
                               "L2"=5,
                               "R1"=7.88,
@@ -264,7 +272,7 @@ main_config <- function(){
 
     # convert from g CH4 per m2 per yr to nmol/m2/s
     Wetland_EFs=Wetland_EFs*1E9/(16.043*365.25*24*60*60)      
-
+    
     
     #Wastewater
     GHGI_national_wastewater_septic <- 227 #kt CH4/yr
