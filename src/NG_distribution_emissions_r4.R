@@ -447,6 +447,10 @@ NG_distribution <- function(domain,
     GHGRP_csv <- merge(ghgrp_facility_info,ghgrp_w_only_emissions,
                        by="facility_id")
     
+    #cleanup a column that is in all GHRGP datasets and are identical (or ~so).
+    GHGRP_csv$facility_name <- GHGRP_csv$facility_name.x
+    GHGRP_csv[,c("facility_name.x","facility_name.y")] <- NULL
+    
     #convert the relevant columns to numeric class
     GHGRP_csv[,c("latitude","longitude","Reported_CH4")] <- apply(GHGRP_csv[,c("latitude","longitude","Reported_CH4")],
                                                                   2,FUN=function(x){as.numeric(x)})
@@ -462,18 +466,20 @@ NG_distribution <- function(domain,
       #Colorado.  Washington can refer to DC or the state.
       if(A == 6){
         #search for state name anywhere in the facility name (\\b = whole word)
-        match_indx <- grepl(pattern = paste0("\\b",state.name[A],"\\b"),x=GHGRP_csv$facility_name.y,ignore.case = T) & GHGRP_csv$state!=state.abb[A]
+        match_indx <- grepl(pattern = paste0("\\b",state.name[A],"\\b"),x=GHGRP_csv$facility_name,ignore.case = T) & GHGRP_csv$state!=state.abb[A]
       }else if(A==47){
         #search for state name or abbreviation, but state name must be
         #immediately after a dash (several in/near DC have Washington in them)
-        match_indx <- (grepl(pattern = paste0("- \\b",state.name[A],"\\b"),x=GHGRP_csv$facility_name.y,ignore.case = T) | 
-                         grepl(pattern = paste0("\\b",state.abb[A],"\\b"),x=GHGRP_csv$facility_name.y,ignore.case = T)) & GHGRP_csv$state!=state.abb[A]
+        match_indx <- (grepl(pattern = paste0("- \\b",state.name[A],"\\b"),x=GHGRP_csv$facility_name,ignore.case = T) | 
+                         grepl(pattern = paste0("\\b",state.abb[A],"\\b"),x=GHGRP_csv$facility_name,ignore.case = T)) & GHGRP_csv$state!=state.abb[A]
       }else{
         #search state name or abbreviation
-        match_indx <- (grepl(pattern = paste0("\\b",state.name[A],"\\b"),x=GHGRP_csv$facility_name.y,ignore.case = T) | 
-                         grepl(pattern = paste0("\\b",state.abb[A],"\\b"),x=GHGRP_csv$facility_name.y,ignore.case = T)) & GHGRP_csv$state!=state.abb[A]
+        match_indx <- (grepl(pattern = paste0("\\b",state.name[A],"\\b"),x=GHGRP_csv$facility_name,ignore.case = T) | 
+                         grepl(pattern = paste0("\\b",state.abb[A],"\\b"),x=GHGRP_csv$facility_name,ignore.case = T)) & GHGRP_csv$state!=state.abb[A]
       }
-      if(sum(match_indx)>0){
+      #alert user of any updates, only if the state either was in the domain, or
+      #is being updated to be in the domain
+      if(sum(match_indx)>0 & (state.abb[A] %in% state_name_list | any(GHGRP_csv$state[match_indx] %in% state_name_list))){
         cat(paste(GHGRP_csv$facility_name[match_indx],collapse="  &  "),"rewritten from",paste(GHGRP_csv$state_name[match_indx],collapse="  &  "),"to",state.name[A],"\n")
       }
       GHGRP_csv[match_indx,"operating_state"]=state.abb[A]
@@ -482,9 +488,6 @@ NG_distribution <- function(domain,
     
     #filter to the states in the domain
     GHGRP_csv <- GHGRP_csv[GHGRP_csv$operating_state %in% state_name_list,]
-    
-    #cleanup a column that is in all 3 GHRGP datasets and are identical (or ~so).
-    GHGRP_csv[,c("facility_name.x","facility_name.y")] <- NULL
     
     #delete all tempfiles and clean up working environment
     # rm(A,data_URLs,ghgrp_facility_info,ghgrp_w_only_emissions,match_indx,ghgrp_NN_data)
@@ -697,7 +700,7 @@ NG_distribution <- function(domain,
     all_merge_clean$GHGRP_MnR_above <- all_merge_clean$PHMSA_MMILES_TOTAL*above_grade_MnR$stations_per_mile[state_indx]
     all_merge_clean$GHGRP_MnR_below <- all_merge_clean$PHMSA_MMILES_TOTAL*below_grade_MnR$stations_per_mile[state_indx]
     
-    cat("Finished downloading and merging all input data at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
+    cat("\nFinished downloading and merging all input data at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
   }else{
     ############################################################################
     #load in the output of NG_distribution_by_LDC_prep.R.  Note that is a
@@ -1060,6 +1063,7 @@ NG_distribution <- function(domain,
     names(all_merge_state_poly) <- gsub("STUSPS","PHMSA_State",names(all_merge_state_poly))
   }else{
     all_merge_state_poly <- all_merge_clean
+    all_merge_state <- as.data.frame(all_merge_clean)
   }
   
   
