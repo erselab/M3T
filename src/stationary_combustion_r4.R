@@ -363,7 +363,7 @@ Stationary_combustion <- function(NEI_file,
   names(domain_total_ch4) <- c('Sector', 'domain_ch4_emiss')
   # Also calculate domain totals (will be identical if only 1 state in domain)
   
-  cat("Finished loading and preparing SEDS data at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n\n")
+  cat("Finished loading and preparing SEDS data at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
   ################################################################################
   #Now load in the NEI data
   
@@ -542,7 +542,7 @@ Stationary_combustion <- function(NEI_file,
   
   
   rm(NEI_state_check,NEI_domain_check,percent_change)
-  cat("Finished loading and preparing NEI data at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n\n")
+  cat("Finished loading and preparing NEI data at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
   ################################################################################
   #Now load in the shapefiles and ACES/Vulcan, merge geometries
   
@@ -606,53 +606,68 @@ Stationary_combustion <- function(NEI_file,
   #create a copy that has names for the bystate or bydomain version that exactly
   #match the totals.  Easier/more consistent to code.
   
-  if(Use_ACES){
-    #convert state/domain scale versions to the proper crs
-    all_merge_LCC_state <- project(all_merge_state,aces_res)
-    all_merge_LCC_domain <- project(all_merge_domain,aces_res)
-    #Calculate per-pixel coverage for each county separately.  First split by
-    #unique state-county number, then calculate per-pixel coverage, output = list
-    #of spatvectors
-    cover_all <- all_merge_LCC_state %>% 
-      split(f=paste0(all_merge_LCC_state$STATEFP,all_merge_LCC_state$COUNTYFP)) %>%
-      lapply(function(x){extract(aces_res,x,weights=T,exact=T,cells=T)})
-    if(stationary_combustion_by_state){
-      disaggregation(aces_res,res_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all,out_envir=environment())
-      disaggregation(aces_com,com_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all,out_envir=environment())
-      disaggregation(aces_ind,ind_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all,out_envir=environment())
-      disaggregation(aces_elec,elec_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all,out_envir=environment())
+  if(stationary_combustion_by_state){
+    if(Use_ACES){
+      #convert state scale versions to the proper crs
+      all_merge_LCC_state <- project(all_merge_state,aces_res)
+      #Calculate per-pixel coverage for each county separately.  First split by
+      #unique state-county number, then calculate per-pixel coverage, output = list
+      #of spatvectors
+      cover_all_aces <- all_merge_LCC_state %>% 
+        split(f=paste0(all_merge_LCC_state$STATEFP,all_merge_LCC_state$COUNTYFP)) %>%
+        lapply(function(x){extract(aces_res,x,weights=T,exact=T,cells=T)})
+      disaggregation(aces_res,res_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all_aces,out_envir=environment())
+      disaggregation(aces_com,com_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_aces,out_envir=environment())
+      disaggregation(aces_ind,ind_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_aces,out_envir=environment())
+      disaggregation(aces_elec,elec_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_aces,out_envir=environment())
     }
-    
-    if(stationary_combustion_by_domain){
-      disaggregation(aces_res,res_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
-      disaggregation(aces_com,com_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
-      disaggregation(aces_ind,ind_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
-      disaggregation(aces_elec,elec_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
+    if(Use_Vulcan){
+      all_merge_LCC_state <- project(all_merge_state,vu_res)
+      cover_all_vulcan <- all_merge_LCC_state %>% 
+        split(f=paste0(all_merge_LCC_state$STATEFP,all_merge_LCC_state$COUNTYFP)) %>%
+        lapply(function(x){extract(vu_res,x,weights=T,exact=T,cells=T)})
+      disaggregation(vu_res,res_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_vulcan,out_envir=environment())
+      disaggregation(vu_com,com_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_vulcan,out_envir=environment())
+      disaggregation(vu_ind,ind_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_vulcan,out_envir=environment())
+      disaggregation(vu_elec,elec_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_vulcan,out_envir=environment())
     }
+    rm(all_merge_LCC_state)
   }
-  if(Use_Vulcan){
-    all_merge_LCC_state <- project(all_merge_state,vu_res)
-    all_merge_LCC_domain <- project(all_merge_domain,vu_res)
-    cover_all <- all_merge_LCC_state %>% 
-      split(f=paste0(all_merge_LCC_state$STATEFP,all_merge_LCC_state$COUNTYFP)) %>%
-      lapply(function(x){extract(vu_res,x,weights=T,exact=T,cells=T)})
-    if(stationary_combustion_by_state){
-      disaggregation(vu_res,res_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all,out_envir=environment())
-      disaggregation(vu_com,com_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all,out_envir=environment())
-      disaggregation(vu_ind,ind_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all,out_envir=environment())
-      disaggregation(vu_elec,elec_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all,out_envir=environment())
-    }
-    
-    if(stationary_combustion_by_domain){
-      disaggregation(vu_res,res_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
-      disaggregation(vu_com,com_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
-      disaggregation(vu_ind,ind_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
-      disaggregation(vu_elec,elec_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
-    }
-  }
-  rm(all_merge_LCC_state,all_merge_LCC_domain)
   
-  cat("Finished disaggregating emissions using Vulcan/ACES at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n\n")
+  cat("\nFinished disaggregating state-scale emissions using Vulcan/ACES at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
+  ################################################################################
+  #now at the domain scale
+  if(stationary_combustion_by_domain){
+    if(Use_ACES){
+      all_merge_LCC_state <- project(all_merge_state,aces_res)
+      #don't recalculate this, only calculate it if we have to
+      if(!stationary_combustion_by_state){
+        cover_all_aces <- all_merge_LCC_state %>% 
+          split(f=paste0(all_merge_LCC_state$STATEFP,all_merge_LCC_state$COUNTYFP)) %>%
+          lapply(function(x){extract(aces_res,x,weights=T,exact=T,cells=T)})
+      }
+      disaggregation(aces_res,res_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_aces,out_envir=environment())
+      disaggregation(aces_com,com_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_aces,out_envir=environment())
+      disaggregation(aces_ind,ind_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_aces,out_envir=environment())
+      disaggregation(aces_elec,elec_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_aces,out_envir=environment())
+    }
+    if(Use_Vulcan){
+      all_merge_LCC_state <- project(all_merge_state,vu_res)
+      all_merge_LCC_domain <- project(all_merge_domain,vu_res)
+      if(!stationary_combustion_by_state){
+        cover_all_vulcan <- all_merge_LCC_state %>% 
+          split(f=paste0(all_merge_LCC_state$STATEFP,all_merge_LCC_state$COUNTYFP)) %>%
+          lapply(function(x){extract(vu_res,x,weights=T,exact=T,cells=T)})
+      }
+      disaggregation(vu_res,res_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_vulcan,out_envir=environment())
+      disaggregation(vu_com,com_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_vulcan,out_envir=environment())
+      disaggregation(vu_ind,ind_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_vulcan,out_envir=environment())
+      disaggregation(vu_elec,elec_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_vulcan,out_envir=environment())
+    }
+    rm(all_merge_LCC_domain)
+  }
+  
+  cat("\nFinished disaggregating domain-scale emissions using Vulcan/ACES at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
   ################################################################################
   #write a function to save, dependent on whether or not we use XESMF
   if(XESMF){
@@ -675,7 +690,7 @@ Stationary_combustion <- function(NEI_file,
   }else{
     #project with terra
     save_data <- function(input){
-      input_name <- deparse(substitute(input))
+      input_name <- gsub("\\[\\[total\\]\\]","",deparse(substitute(input)))
       disaggregation_level <- strsplit(input_name,"by")[[1]][2]
       inventory_name <- strsplit(input_name,"_")[[1]][1]
       #project to a grid with the exact right resolution, extent and origin.
@@ -719,7 +734,7 @@ Stationary_combustion <- function(NEI_file,
       
       writeCDF(input,
                paste0(output_directory,'/',"stat_comb_",sub("_ER","",total),
-                      "_",disaggregation_level,"_",inventory_name,'.nc'),
+                      "_by",disaggregation_level,"_",inventory_name,'.nc'),
                force_v4=TRUE,
                varname='methane_emissions',
                unit='nmol/m2/s',
@@ -933,7 +948,7 @@ Stationary_combustion <- function(NEI_file,
       for(A in 1:nlyr(combined_data)){
         not_log_plot(combined_data[[A]],
                      filename=paste0("stat_comb_",sector_short,"_",fuel_sub_name,"_by",
-                                     disaggregation_level,"_",tolower(inventory_name),".png")[A],
+                                     disaggregation_level,"_",tolower(inventory_name))[A],
                      paste0("Stationary Combustion ",sector_long,
                             " - ",fuel_name,"\n ",disaggregation_level,
                             " totals distributed using NEI CO emissions\n and ",
