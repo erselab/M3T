@@ -639,7 +639,7 @@ Stationary_combustion <- function(NEI_file,
   #now at the domain scale
   if(stationary_combustion_by_domain){
     if(Use_ACES){
-      all_merge_LCC_state <- project(all_merge_state,aces_res)
+      all_merge_LCC_domain <- project(all_merge_domain,aces_res)
       #don't recalculate this, only calculate it if we have to
       if(!stationary_combustion_by_state){
         cover_all_aces <- all_merge_LCC_state %>% 
@@ -652,7 +652,6 @@ Stationary_combustion <- function(NEI_file,
       disaggregation(aces_elec,elec_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_aces,out_envir=environment())
     }
     if(Use_Vulcan){
-      all_merge_LCC_state <- project(all_merge_state,vu_res)
       all_merge_LCC_domain <- project(all_merge_domain,vu_res)
       if(!stationary_combustion_by_state){
         cover_all_vulcan <- all_merge_LCC_state %>% 
