@@ -55,6 +55,10 @@
 #'  shapefile.  Available at
 #'  \url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.
 #'  Only relevant if a focus city was set in main and verbose=TRUE.
+#'@param  watershed_shapefile Character.  Commission for Environmental
+#'  Cooperation watershed shapefile.  Available at
+#'  \url{http://www.cec.org/north-american-environmental-atlas/watersheds/}.
+#'  Only relevant if USE_SOCCR2 = TRUE.
 #'@returns Nothing is returned from the function, but the main outputs are 2
 #'  netcdcf files of the methane emissions from wetlands with 1 file for SOCCR1
 #'  and 1 file for SOCCR2 based emissions.  Lakes and rivers from Rosentreter et
@@ -98,7 +102,8 @@
 #'                verbose=TRUE,
 #'                County_Tigerlines=vect("~/../Desktop/County_Tigerlines/tl_2018_us_county.shp"),
 #'                State_Tigerlines=vect("~/../Desktop/State_Tigerlines/tl_2018_us_state.shp"),
-#'                focus_city_tigerlines=focus_city)
+#'                focus_city_tigerlines=focus_city,
+#'                watershed_shapefile="~/../Desktop/watersheds_shapefile/watershed_p_v2.shp")
 #'
 #'@author Joe Pitt, \email{madeup@@wisc.edu}
 #'@author Kris Hajny, \email{blank@@fake.edu}
@@ -119,7 +124,8 @@ SOCCR_Wetlands <- function(output_directory,
                            verbose,
                            County_Tigerlines,
                            State_Tigerlines,
-                           focus_city_tigerlines){
+                           focus_city_tigerlines,
+                           watershed_shapefile){
   
   ## Wetland_emissions_r2.R
   ## In use: 2021-11-02 20:00
@@ -131,11 +137,56 @@ SOCCR_Wetlands <- function(output_directory,
   starttime <- Sys.time()
   cat("Starting wetland sector: SOCCR_Wetlands\n")
   ################################################################################
+  #load in the watersheds and prepare for use with SOCCR2 EFs
+  
+  if(Use_SOCCR2){
+    watershed <- vect(watershed_shapefile)
+    
+    #we only care about NAW1 in English, so aggregate all polygons to this level
+    #and remove extra data
+    watershed <- watershed["NAW1_EN"]
+    watershed <- aggregate(watershed,by="NAW1_EN")
+    watershed <- crop(watershed,ext(project(domain,crs(watershed)))*1.1)
+    expanded_watershed <- buffer(watershed,2E4)
+    watershed <- aggregate(expanded_watershed-watershed+watershed,"NAW1_EN")
+    watershed <- project(watershed,crs(domain))
+    
+    if(Include_freshwater){
+      #now associate the corresponding EF to each region
+      regional_EFs <- data.frame(t(Wetland_EFs["SOCCR2",c("E2_Atlantic","E2_Gulf","E2_Pacific","E2_Hudson")]),
+                                 t(Wetland_EFs["SOCCR2",c("M2_Atlantic","M2_Gulf","M2_Pacific","M2_Hudson")]),
+                                 Wetland_EFs["SOCCR2","PFO"],
+                                 Wetland_EFs["SOCCR2","PNF"],
+                                 Wetland_EFs["SOCCR2","L1"],
+                                 Wetland_EFs["SOCCR2","L2"],
+                                 Wetland_EFs["SOCCR2","R1"],
+                                 Wetland_EFs["SOCCR2","R2"],
+                                 Wetland_EFs["SOCCR2","R3"],
+                                 Wetland_EFs["SOCCR2","R4"],
+                                 "Region"=c("Atlantic Ocean","Gulf of Mexico","Pacific Ocean","Hudson Bay"))
+      colnames(regional_EFs) <- c("E2","M2","PFO","PNF","L1","L2","R1","R2","R3","R4","Region")
+      watershed <- merge(watershed,regional_EFs,by.x="NAW1_EN",by.y="Region")
+    }else{
+      regional_EFs <- data.frame(t(Wetland_EFs["SOCCR2",c("E2_Atlantic","E2_Gulf","E2_Pacific","E2_Hudson")]),
+                                 t(Wetland_EFs["SOCCR2",c("M2_Atlantic","M2_Gulf","M2_Pacific","M2_Hudson")]),
+                                 Wetland_EFs["SOCCR2","PFO"],
+                                 Wetland_EFs["SOCCR2","PNF"],
+                                 "Region"=c("Atlantic Ocean","Gulf of Mexico","Pacific Ocean","Hudson Bay"))
+      colnames(regional_EFs) <- c("E2","M2","PFO","PNF","Region")
+      watershed <- merge(watershed,regional_EFs,by.x="NAW1_EN",by.y="Region")
+    }
+  }
+  
+  #update wetland EF to simplify SOCCR1 since SOCCR2 E2 and M2 have already been
+  #dealt with
+  Wetland_EFs <- Wetland_EFs[,c("E2_Atlantic","M2_Atlantic","PFO","PNF","L1","L2","R1","R2","R3","R4")]
+  colnames(Wetland_EFs)[1:2] <- c("E2","M2")
+  
+  ################################################################################
   #load in and process the Wetland_fraction_r1 output to convert from wetland
   #coverage to wetland emissions
   
   NWI_files <- list.files(paste0(output_directory,"/NWI/"),".tiff",full.names = T)
-  
   
   Wetland_types <- vector()
   if(Use_SOCCR1 | Use_SOCCR2){
@@ -145,6 +196,14 @@ SOCCR_Wetlands <- function(output_directory,
     Wetland_types <- c(Wetland_types,"R1","R2","R3","R4","L1","L2")
   }
   
+  if(Use_SOCCR2){
+    subset_data <- rast(NWI_files[1])
+    if(nrow(watershed)!=1){
+      coverage <- watershed[,c("NAW1_EN",Wetland_types[i])] %>% 
+        split(f=watershed$NAW1_EN) %>% 
+        lapply(function(x){extract(subset_data,x,weights=T,exact=T,cells=T)})
+    }
+  }
   
   #process separately for each type (different EFs)
   for(i in 1:length(Wetland_types)){
@@ -156,29 +215,41 @@ SOCCR_Wetlands <- function(output_directory,
     names(subset_data) <- Wetland_types[i]
     
     if(i==1){
+      #for a later sanity check
+      all_frac <- subset_data
+      
       if(Use_SOCCR1 | Include_freshwater){
         SOCCR1_flux <- subset_data*Wetland_EFs["SOCCR1",Wetland_types[i]]
       }
       if(Use_SOCCR2){
-        SOCCR2_flux <- subset_data*Wetland_EFs["SOCCR2",Wetland_types[i]]
+        if(nrow(watershed)==1){
+          subset_data <- subset_data*as.numeric(values(watershed[,Wetland_types[i]]))
+        }else{
+          subset_data[coverage[,'cell'],drop=F] <- watershed[coverage[,'cell']*coverage[,'weight'],Wetland_types[i]]
+        }
+        SOCCR2_flux <- subset_data
       }
-      #for a later sanity check
-      all_frac <- subset_data
     }else{
+      all_frac <- all_frac+subset_data
+      
       if(Use_SOCCR1 | Include_freshwater){
         SOCCR1_flux <- c(SOCCR1_flux,subset_data*Wetland_EFs["SOCCR1",Wetland_types[i]])
       }
       if(Use_SOCCR2){
-        SOCCR2_flux <- c(SOCCR2_flux,subset_data*Wetland_EFs["SOCCR2",Wetland_types[i]])
+        if(nrow(watershed)==1){
+          subset_data <- subset_data*as.numeric(values(watershed[,Wetland_types[i]]))
+        }else{
+          subset_data[coverage[,'cell'],drop=F] <- watershed[coverage[,'cell']*coverage[,'weight'],Wetland_types[i]]
+        }
+        SOCCR2_flux <- c(SOCCR2_flux,subset_data)
       }
-      all_frac <- all_frac+subset_data
     }
   }
   
   # Check that the fractions are always between 0 and 1
   max_frac <- unlist(global(all_frac,max))*100
   min_frac <- unlist(global(all_frac,min))*100
-  if(max_frac>100){
+  if(max_frac>100.1){
     stop(paste0("some pixels have over 100% wetland coverage.  Range is ",min_frac,"% to ",max_frac,"%"))
   }
   # if((Use_SOCCR1 | Use_SOCCR2) & Include_freshwater){
