@@ -786,11 +786,11 @@ Wastewater <- function(DMR_file,
     if(Wastewater_use_CWNS){
       if(Wastewater_Municipal_Method_Moore_linear){
         Summed_wastewater_treatment_CWNS_ML = sum(WWTP_CWNS_Moore_Linear_municipal,septic_flux,ghgrp_flux,na.rm=T)
-        CWNS_ML_text="EPA total distributed using CWNS"
+        CWNS_ML_text="Moore log-linear relationship combined with CWNS"
         WWTP_max <- max(WWTP_max,as.numeric(global(Summed_wastewater_treatment_CWNS_ML,max,na.rm=T)))
       }else if(Wastewater_Municipal_Method_GHGI){
         Summed_wastewater_treatment_CWNS_GHGI = sum(WWTP_CWNS_GHGI_municipal,septic_flux2,ghgrp_flux,na.rm=T)
-        CWNS_GHGI_text="Moore log-linear relationship combined with CWNS"
+        CWNS_GHGI_text="EPA total distributed using CWNS"
         WWTP_max <- max(WWTP_max,as.numeric(global(Summed_wastewater_treatment_CWNS_GHGI,max,na.rm=T)))
       }
     }
