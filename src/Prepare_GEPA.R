@@ -29,8 +29,9 @@
 #'   }
 #'  The data is available at \url{https://doi.org/10.5281/zenodo.8367082}.  The
 #'  file will be saved to input_directory to avoid re-downloading every run.
-#'  
-#'  See reference \href{https://doi.org/10.1021/acs.est.3c05138}{Maasakkers et al.}
+#'
+#'  See reference \href{https://doi.org/10.1021/acs.est.3c05138}{Maasakkers et
+#'  al.}
 #'@param domain SpatRaster providing the desired output grid, including the
 #'  desired resolution and coordinate reference system
 #'@param input_directory Character providing the full filepath to save/load
@@ -38,6 +39,9 @@
 #'@param output_directory Character providing the full filepath to save
 #'  processed data
 #'@param inventory_year Numeric indicating the desired year of data to use.
+#'@param verbose Logical indicating whether to save visuals.  It includes 2
+#'  plots of the gridded methane emissions on log scales, one for LMOP
+#'  facilities and one for GHGRP facilities.
 #'@returns Nothing is returned from the function, but the main outputs are 3
 #'  netcdf files of the methane emissions from the gridded EPA product.  They
 #'  are titled "GEPA_thermo.nc" for gridded EPA thermogenic,
@@ -55,7 +59,8 @@
 #' Prepare_GEPA(inventory_year=2018,
 #'              input_directory="~/../Desktop/",
 #'              output_directory="~/../Desktop/",
-#'              domain=grid)
+#'              domain=grid,
+#'              verbose=T)
 #'@author Joe Pitt, \email{madeup@@wisc.edu}
 #'@author Kris Hajny, \email{blank@@fake.edu}
 #'@author Israel Lopez-Coto, \email{test@@test.edu}
@@ -70,7 +75,8 @@
 Prepare_GEPA <- function(inventory_year,
                          input_directory,
                          output_directory,
-                         domain){
+                         domain,
+                         verbose){
   
   starttime <- Sys.time()
   cat("Pulling remaining sectors from gridded EPA inventory: Prepare_GEPA\n")
@@ -100,24 +106,24 @@ Prepare_GEPA <- function(inventory_year,
   GEPA <- project(GEPA,domain)
   
   GEPA_non_thermo_sectors <- c("emi_ch4_5B1_Composting",
-                           "emi_ch4_3A_Enteric_Fermentation",
-                           "emi_ch4_3B_Manure_Management",
-                           "emi_ch4_3C_Rice_Cultivation",
-                           "emi_ch4_3F_Field_Burning")
+                               "emi_ch4_3A_Enteric_Fermentation",
+                               "emi_ch4_3B_Manure_Management",
+                               "emi_ch4_3C_Rice_Cultivation",
+                               "emi_ch4_3F_Field_Burning")
   GEPA_thermo_sectors <- c("emi_ch4_1A_Combustion_Mobile",
-                       "emi_ch4_1B1a_Abandoned_Coal",
-                       "emi_ch4_1B1a_Surface_Coal",
-                       "emi_ch4_1B1a_Underground_Coal",
-                       "emi_ch4_1B2a_Petroleum_Systems_Exploration",
-                       "emi_ch4_1B2a_Petroleum_Systems_Production",
-                       "emi_ch4_1B2a_Petroleum_Systems_Refining",
-                       "emi_ch4_1B2a_Petroleum_Systems_Transport",
-                       "emi_ch4_1B2ab_Abandoned_Oil_Gas",
-                       "emi_ch4_1B2b_Natural_Gas_Exploration",
-                       "emi_ch4_1B2b_Natural_Gas_Processing",
-                       "emi_ch4_1B2b_Natural_Gas_Production",
-                       "emi_ch4_2B8_Industry_Petrochemical",
-                       "emi_ch4_2C2_Industry_Ferroalloy")
+                           "emi_ch4_1B1a_Abandoned_Coal",
+                           "emi_ch4_1B1a_Surface_Coal",
+                           "emi_ch4_1B1a_Underground_Coal",
+                           "emi_ch4_1B2a_Petroleum_Systems_Exploration",
+                           "emi_ch4_1B2a_Petroleum_Systems_Production",
+                           "emi_ch4_1B2a_Petroleum_Systems_Refining",
+                           "emi_ch4_1B2a_Petroleum_Systems_Transport",
+                           "emi_ch4_1B2ab_Abandoned_Oil_Gas",
+                           "emi_ch4_1B2b_Natural_Gas_Exploration",
+                           "emi_ch4_1B2b_Natural_Gas_Processing",
+                           "emi_ch4_1B2b_Natural_Gas_Production",
+                           "emi_ch4_2B8_Industry_Petrochemical",
+                           "emi_ch4_2C2_Industry_Ferroalloy")
   
   #convert units
   #molec/cm2/s to nmol/m2/s
@@ -160,6 +166,26 @@ Prepare_GEPA <- function(inventory_year,
            missval=-9999,
            overwrite=TRUE)
   
+  ################################################################################
+  #Plots
+  
+  if(verbose){
+    zlim_min=-2
+    zlim_max <- log10(max(global(GEPA_landfill,max),global(GEPA_non_thermo,max),global(GEPA_thermo,max)))
+    not_log_plot(GEPA_landfill,filename="GEPA_industrial_landfills",
+                 "Gridded EPA Inventory -\nIndustrial landfills",
+                 zlim_min=zlim_min,zlim_max=zlim_max)
+    not_log_plot(GEPA_thermo,filename="GEPA_thermogenic",
+                 "Gridded EPA Inventory -\nThermogenic Sectors",
+                 zlim_min=zlim_min,zlim_max=zlim_max)
+    not_log_plot(GEPA_non_thermo,filename="GEPA_non_thermogenic",
+                 "Gridded EPA Inventory -\nNon-thermogenic Sectors",
+                 zlim_min=zlim_min,zlim_max=zlim_max)
+    
+    Summed_GEPA <- GEPA_landfill+GEPA_non_thermo+GEPA_thermo
+    not_log_plot(Summed_GEPA,
+             "Gridded EPA Inventory -\nAll sectors pulled directly from the GEPA")
+  }
   cat("Finished pulling remaining sectors from gridded EPA inventory: Prepare_GEPA in",difftime(Sys.time(),starttime,units = "min"),"minutes\n")
 }
 
