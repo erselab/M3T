@@ -40,7 +40,7 @@ main_config <- function(){
     Process_landfills <- FALSE
     Process_natural_gas_distribution <- FALSE	#includes residential post-meter
     Process_natural_gas_transmission <- FALSE
-    Process_stationary_combustion <- TRUE
+    Process_stationary_combustion <- FALSE
     Process_wastewater <- FALSE
     Incorporate_remaining_sectors_from_gridded_EPA <- FALSE
     Combine_sectors <- FALSE #create total CH4 inventory(s) by summing across sectors
@@ -81,14 +81,6 @@ main_config <- function(){
     #The emission factor approach is not fully implemented yet and should not be used.
     Wastewater_national_septic <- TRUE
     Wastewater_state_septic <- TRUE
-    Wastewater_State_info <- data.frame("State"=c("DE", "MD", "NJ", "NY", "PA"),
-                                        "Population"=c(1018396,6164660,9261699,19677151,12972008),
-                                        "Septic_Fraction"=c(0.257,0.181,0.116,0.159,0.245),
-                                        "Method"=c("scaled","scaled","scaled","reported","scaled"))
-    Wastewater_State_info[,4] <- tolower(Wastewater_State_info[,4]) #just in case manually entered with caps
-    #Pulled from census data.  method is either scaled - i.e., from an old
-    #census report, or reported, i.e., use as is from a relatively recent census
-    #report.  Only used if state_septic=TRUE
     
     
     
@@ -288,6 +280,14 @@ main_config <- function(){
     #National total of developed open space and developed low intensity land cover
     #from the national land cover database from Table 7 of 
     #https://doi.org/10.1016/j.isprsjprs.2020.02.019.
+    Wastewater_State_info <- data.frame("State"=c("DE", "MD", "NJ", "NY", "PA"),
+                                        "Population"=c(1018396,6164660,9261699,19677151,12972008),
+                                        "Septic_Fraction"=c(0.257,0.181,0.116,0.159,0.245),
+                                        "Method"=c("scaled","scaled","scaled","reported","scaled"))
+    Wastewater_State_info[,4] <- tolower(Wastewater_State_info[,4]) #just in case manually entered with caps
+    #Pulled from census data.  method is either scaled - i.e., from an old
+    #census report, or reported, i.e., use as is from a relatively recent census
+    #report.  Only used if state_septic=TRUE
     National_wastewater_info <- data.frame("Year"=c(1990,2021),
                                            "Septic_Fraction"=c(0.241,0.152))
     #Only needed if any states are using the scaled method.  National septic
