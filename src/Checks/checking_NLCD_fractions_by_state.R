@@ -282,3 +282,96 @@ rm(old_comparison,new_comparison,delta);gc()
   }
   
 }
+################################################################################
+#Same, but this time use the different input to check its impact
+divergent <- colorRampPalette(c("red","white","blue"))
+
+old_comparison <- rast(nlcd_suburban)
+new_comparison <- mask(NLCD_suburban,NLCD_states_trans)
+new_comparison <- crop(new_comparison,ext(old_comparison))
+
+delta <- old_comparison - new_comparison
+delta[delta==0] <- NA
+
+plot(delta,main="old - new",range=c(-1,1),colNA="black",
+     col="red",mar=c(3.1, 3.1, 2.1, 7.1)+c(0,0,0,2))
+lines(NLCD_states_trans,col="white")
+
+#only 2-3 pixels ON the border of MD and VA - so just a minor mask difference
+#that doesn't really matter right now as new doesn't mask until later anyway.
+
+rm(old_comparison,new_comparison,delta);gc()
+
+{
+  ################################################################################
+  #Finally calculate the sum total for each state and crop to d03 - do so in
+  #both approaches simultaneously and compare stepwise, otherwise we'd need a
+  #lot of memory to hold all of the data
+  
+  subset_tmpfile <- tempfile(fileext = ".tif")
+  for(A in 1:length(State_subset)){
+    #old - first just pull out 1 state
+    state_sub_poly <- subset(state_poly, STUSPS==State_subset[A])
+    suburban_d03 <- crop(nlcd_suburban,state_sub_poly,snap='out')
+    suburban_d03 <- mask(suburban_d03,state_sub_poly,snap='in')
+
+    #new - same process, slightly different code
+    state_sub_poly_new <- subset(NLCD_states_trans, NLCD_states_trans$STUSPS==State_subset[A])
+    NLCD_suburban_subset <- crop(NLCD_suburban,state_sub_poly_new,snap='out')
+    NLCD_suburban_subset <- mask(NLCD_suburban_subset,state_sub_poly_new,touches=F)
+
+    #crop to domain
+    suburban_d03 <- rast(crop(suburban_d03,crop_area_trans,snap='out'))
+    
+    #project with projectraster
+    template <- domain
+    reprojected_suburban <- aggregate(x = suburban_d03,na.rm=T,
+                                      fact = 37,
+                                      fun = mean,expand=T)
+    reprojected_suburban <- project(reprojected_suburban,rast(template),method="near")
+    #project to a grid with the exact right resolution, extent and origin using
+    #nearest neighbor, NOT interpolation, so that we do not change totals.  This
+    #is why the data have to be aggregated to an ~0.01 deg grid first.
+
+    
+
+    NLCD_suburban_subset[is.na(NLCD_suburban_subset)] <- 0
+    NLCD_suburban_subset <- extend(NLCD_suburban_subset,fill=0,
+                                   ext(NLCD_suburban_subset)+(res(project(rast(domain),crs(NLCD_suburban)))*5))
+    
+    #to avoid memory issues with NY, sometimes PA
+    writeRaster(NLCD_suburban_subset,subset_tmpfile)
+    NLCD_suburban_subset <- rast(subset_tmpfile)
+    
+    #project to the exact domain (resolution, origin, extent, etc.) using an
+    #average.  Represents the fractional coverage of wetlands in each pixel (0 -
+    #1).
+    NLCD_suburban_reprojected <- project(NLCD_suburban_subset,rast(domain),method="average")
+    
+    
+    
+    
+    old_comparison <- reprojected_suburban
+    new_comparison <- NLCD_suburban_reprojected
+    ext(old_comparison) == ext(new_comparison)
+    
+    old_comparison[is.na(old_comparison)] <- 0
+    new_comparison[is.na(new_comparison)] <- 0
+    
+    delta <- old_comparison - new_comparison
+    delta[delta==0] <- NA
+    
+    #odd, but plot claims the raster is empty, yet there are some non zero
+    #values (very few)
+    plot(delta,main="old - new",range=c(-1,1),colNA="black",
+         col=divergent(64),mar=c(3.1, 3.1, 2.1, 7.1)+c(0,0,0,2))
+    
+    #Just compare how many septic pixels there are in each, slightly different
+    #(and some are in 1, but not the other, so there's both some missing and
+    #some added from new to old)
+    cat("\n",unlist(global(new_comparison,sum,na.rm=T)))
+    cat("\n",unlist(global(old_comparison,sum,na.rm=T)))
+    unlink(subset_tmpfile)
+  }
+  
+}
