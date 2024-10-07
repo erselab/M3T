@@ -248,7 +248,7 @@ NWI_Wetland_fraction <- function(input_directory,
         PNF <- wetlands[startsWith(Attribute_text, 'P')&!startsWith(Attribute_text, 'PFO'),]
       }
       
-      if(Use_SOCCR1 | Use_SOCCR2){
+      if(Include_freshwater){
         # if there is some of category R1
         if(dim(R1)[1]!=0){
           rasterize_plus(R1)
@@ -274,7 +274,7 @@ NWI_Wetland_fraction <- function(input_directory,
           rasterize_plus(L2)
         }
       }
-      if(Include_freshwater){
+      if(Use_SOCCR1 | Use_SOCCR2){
         if(dim(M2)[1]!=0){
           rasterize_plus(M2)
         }
