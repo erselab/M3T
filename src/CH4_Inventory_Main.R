@@ -97,6 +97,8 @@
 code_directory="~/../../Kristian/Desktop/methane_inventory/src/"
 
 input_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Raw_data_rewrite/"
+# output_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Processed_test/"
+# plot_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Figures_test/"
 output_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Processed_rewrite/"
 plot_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Figures_rewrite/"
 #if desired.  Must either be UACE code entered as numeric or exact text match
@@ -251,22 +253,12 @@ if((!Use_ACES & !Use_Vulcan) & (Process_stationary_combustion | Process_natural_
 
 if(Process_stationary_combustion & (!stationary_combustion_by_state & !stationary_combustion_by_domain)){
   error_found <- TRUE
-  error_text <- paste0(error_text,"\n\nMust set Process_stationary_combustion to FALSE or set either stationary_combustion_by_state or stationary_combustion_by_domain to TRUE to disaggregate stationary combustion data")
-}
-
-if(Process_stationary_combustion & (!stationary_combustion_by_state & !stationary_combustion_by_domain)){
-  error_found <- TRUE
-  error_text <- paste0(error_text,"\n\nMust set Process_stationary_combustion to FALSE or set either stationary_combustion_by_state or stationary_combustion_by_domain to TRUE to disaggregate stationary combustion data")
+  error_text <- paste0(error_text,"\n\nMust set Process_stationary_combustion to FALSE or set stationary_combustion_by_state and/or stationary_combustion_by_domain to TRUE to disaggregate stationary combustion data")
 }
 
 if(Process_natural_gas_distribution & (!NG_distribution_by_LDC & !NG_distribution_by_state & !NG_distribution_by_domain)){
   error_found <- TRUE
-  error_text <- paste0(error_text,"\n\nMust set Process_natural_gas_distribution to FALSE or set either NG_distribution_by_LDC or NG_distribution_by_state or NG_distribution_by_domain to TRUE to disaggregate natural gas distribution data")
-}
-
-if(Process_natural_gas_distribution & (!NG_distribution_by_LDC & !NG_distribution_by_state & !NG_distribution_by_domain)){
-  error_found <- TRUE
-  error_text <- paste0(error_text,"\n\nMust set Process_natural_gas_distribution to FALSE or set either NG_distribution_by_LDC or NG_distribution_by_state or NG_distribution_by_domain to TRUE to disaggregate natural gas distribution data")
+  error_text <- paste0(error_text,"\n\nMust set Process_natural_gas_distribution to FALSE or set NG_distribution_by_LDC and/or NG_distribution_by_state and/or NG_distribution_by_domain to TRUE to disaggregate natural gas distribution data")
 }
 
 #if any of the NG distribution GHGI EFs were not clearly specified, default to
@@ -296,35 +288,30 @@ rm(transmission_GHGI_EFs)
 
 if(Process_wastewater & (!Wastewater_use_CWNS & !Wastewater_use_DMR)){
   error_found <- TRUE
-  error_text <- paste0(error_text,"\n\nMust set Process_wastewater to FALSE or set either Wastewater_use_CWNS or Wastewater_use_DMR to TRUE as these are the only options available for input data")
+  error_text <- paste0(error_text,"\n\nMust set Process_wastewater to FALSE or set Wastewater_use_CWNS and/or Wastewater_use_DMR to TRUE as these are the only options available for input data")
 }
 
 if(Process_wastewater & (!Wastewater_Municipal_Method_Moore_linear & !Wastewater_Municipal_Method_Moore_EF & !Wastewater_Municipal_Method_GHGI)){
   error_found <- TRUE
-  error_text <- paste0(error_text,"\n\nMust set Process_wastewater to FALSE or set either Wastewater_Municipal_Method_Moore_linear or Wastewater_Municipal_Method_Moore_EF or Wastewater_Municipal_Method_GHGI to TRUE to convert activity data to emissions")
-}
-
-if(Process_wastewater & (!Wastewater_Municipal_Method_Moore_linear & !Wastewater_Municipal_Method_Moore_EF & !Wastewater_Municipal_Method_GHGI)){
-  error_found <- TRUE
-  error_text <- paste0(error_text,"\n\nMust set Process_wastewater to FALSE or set either Wastewater_Municipal_Method_Moore_linear or Wastewater_Municipal_Method_Moore_EF or Wastewater_Municipal_Method_GHGI to TRUE to convert activity data to emissions")
+  error_text <- paste0(error_text,"\n\nMust set Process_wastewater to FALSE or set Wastewater_Municipal_Method_Moore_linear and/or Wastewater_Municipal_Method_Moore_EF and/or Wastewater_Municipal_Method_GHGI to TRUE to convert activity data to emissions")
 }
 
 if(Process_wastewater & (!Wastewater_national_septic & !Wastewater_state_septic)){
   error_found <- TRUE
-  error_text <- paste0(error_text,"\n\nMust set Process_wastewater to FALSE or set either Wastewater_national_septic or Wastewater_state_septic to TRUE as these are the only methods available to calculate septic emissions")
+  error_text <- paste0(error_text,"\n\nMust set Process_wastewater to FALSE or set Wastewater_national_septic and/or Wastewater_state_septic to TRUE as these are the only methods available to calculate septic emissions")
 }
 
-if(Process_wetlands_and_inland_waters & (!Use_SOCCR1 & !Use_SOCCR2 & !Use_Wetcharts)){
+if(Process_wetlands_and_inland_waters & (!Use_SOCCR1 & !Use_SOCCR2 & !Use_Wetcharts & !Include_freshwater)){
   error_found <- TRUE
-  error_text <- paste0(error_text,"\n\nMust set Process_wetlands_and_inland_waters to FALSE or set either Use_SOCCR1 or Use_SOCCR2 or Use_Wetcharts to TRUE as these are the only methods available to calculate wetland emissions")
+  error_text <- paste0(error_text,"\n\nMust set Process_wetlands_and_inland_waters to FALSE or set Use_SOCCR1 and/or Use_SOCCR2 and/or Use_Wetcharts and/or Include_freshwater to TRUE as these are the only methods available to calculate wetland/inland water emissions")
 }
 
 if(Process_wetlands_and_inland_waters & Use_Wetcharts & (!Use_NLCD & !Use_NALCMS)){
   error_found <- TRUE
-  error_text <- paste0(error_text,"\n\nMust set Process_wetlands_and_inland_waters or Use_Wetcharts to FALSE or set either Use_NLCD or Use_NALCMS to TRUE to disaggregate wetcharts")
+  error_text <- paste0(error_text,"\n\nMust set Process_wetlands_and_inland_waters or Use_Wetcharts to FALSE or set Use_NLCD and/or Use_NALCMS to TRUE to disaggregate wetcharts")
 }
 
-if(Process_wastewater & sum(c("scaled","reported")!=unique(Wastewater_State_info[,4]))){
+if(Process_wastewater & sum(!unique(Wastewater_State_info[,4]) %in% c("scaled","reported"))){
   error_found <- TRUE
   error_text <- paste0(error_text,"\n\nMust set Process_wastewater to FALSE or set Wastewater_State_info method values to either scaled or reported for all entries")
 }
@@ -428,21 +415,21 @@ rm(UAC_year,Census_filenames,focus_city)
 #Actually run the functions now, based on the config file
 
 #we need ACES and/or Vulcan for both of these sectors
-if(Process_natural_gas_distribution | Process_stationary_combustion){
-  # rm(list=setdiff(ls(),c("input_directory","Use_ACES","Use_Vulcan",
-  #                        "ACES_year","vulcan_band","State_Tigerlines",
-  #                        "code_directory")))
-  # # source(paste0(code_directory,"CH4_inventory_config.R"))
-  # source(paste0(code_directory,"Prepare_ACES_Vulcan.R"))
-  # # main_config()
-  # rm(code_directory)
-  Prepare_ACES_Vulcan(input_directory,
-                      Use_ACES,
-                      Use_Vulcan,
-                      ACES_year,
-                      vulcan_band,
-                      State_Tigerlines)
-}
+# if(Process_natural_gas_distribution | Process_stationary_combustion){
+#   # rm(list=setdiff(ls(),c("input_directory","Use_ACES","Use_Vulcan",
+#   #                        "ACES_year","vulcan_band","State_Tigerlines",
+#   #                        "code_directory")))
+#   # # source(paste0(code_directory,"CH4_inventory_config.R"))
+#   # source(paste0(code_directory,"Prepare_ACES_Vulcan.R"))
+#   # # main_config()
+#   # rm(code_directory)
+#   Prepare_ACES_Vulcan(input_directory,
+#                       Use_ACES,
+#                       Use_Vulcan,
+#                       ACES_year,
+#                       vulcan_band,
+#                       State_Tigerlines)
+# }
 if(Process_landfills){
   # rm(list=setdiff(ls(),c("input_directory","domain","output_directory",
   #                        "inventory_year","verbose","clear","state_name_list",
@@ -688,7 +675,8 @@ if(Incorporate_remaining_sectors_from_gridded_EPA){
   Prepare_GEPA(inventory_year=inventory_year,
                input_directory=input_directory,
                output_directory=output_directory,
-               domain=domain)
+               domain=domain,
+               verbose=verbose)
 }
 if(Combine_sectors){
   
