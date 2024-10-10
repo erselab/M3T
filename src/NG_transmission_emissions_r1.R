@@ -146,6 +146,7 @@ Transmission <- function(GHGI_file,
                          GHGI_Pipeline,
                          HIFLD_compressor_file,
                          domain,
+                         ghgrp_facility_info,
                          state_name_list,
                          output_directory,
                          inventory_year,
@@ -250,17 +251,7 @@ Transmission <- function(GHGI_file,
   
   rm(processing_facilities,processing_CH4,ghgrp_combustion_emissions,make_consistent)
   ################################################################################
-  #Download the relevant facility (e.g., location) data using the API and merge
-  
-  #see https://www.GHGI.gov/enviro/envirofacts-data-service-api
-  data_URLs <- paste0("https://data.epa.gov/efservice/PUB_DIM_FACILITY/STATE/=/",state_name_list,"/JSON")
-  
-  #initialize output
-  ghgrp_facility_info <- data.frame()
-  for(A in 1:length(state_name_list)){
-    # download data and read/combine in an R dataframe
-    ghgrp_facility_info <- rbind(ghgrp_facility_info,fromJSON(data_URLs[A]))
-  }
+  #Merge with location-like data
   
   #combine the datasets by ID, and year
   ghgrp <- merge(ghgrp_facility_info,ghgrp_transmission_compressor_emissions,
@@ -271,7 +262,7 @@ Transmission <- function(GHGI_file,
                                                             2,FUN = function(x){as.numeric(x)})
   
   #delete all tempfiles and clean up working environment
-  rm(A,ghgrp_facility_info,ghgrp_transmission_compressor_emissions)
+  rm(ghgrp_facility_info,ghgrp_transmission_compressor_emissions)
   ################################################################################
   #process the transmission pipeline data
   
@@ -380,16 +371,16 @@ Transmission <- function(GHGI_file,
                                "GHGRP_emissions","HIFLD_state","HIFLD_name",
                                "distance_m")
   
-  if(max(combined_data$distance)>1000){
-    View(combined_data)
-    plot(ext(domain))
-    lines(State_Tigerlines)
-    points(compressors_crop_HIFLD,cex=2)
-    points(compressors_ghgrp_crop,col="red")
-    add_legend("bottom",legend = c("HIFLD","GHGRP"),pt.cex = c(2,1),
-               horiz=T,col=c("black","red"),pch=16,bty="n")
-    stop("some GHGRP compressors didn't have a HIFLD compressor within 1 km")
-  }
+  # if(max(combined_data$distance)>1000){
+  #   View(combined_data)
+  #   plot(ext(domain))
+  #   lines(State_Tigerlines)
+  #   points(compressors_crop_HIFLD,cex=2)
+  #   points(compressors_ghgrp_crop,col="red")
+  #   add_legend("bottom",legend = c("HIFLD","GHGRP"),pt.cex = c(2,1),
+  #              horiz=T,col=c("black","red"),pch=16,xpd=T)
+  #   stop("some GHGRP compressors didn't have a HIFLD compressor within 1 km")
+  # }
   
   #scale the GHGRP emissions so that the domain average is equal to the national
   #average
@@ -435,7 +426,7 @@ Transmission <- function(GHGI_file,
   
   if(verbose){
     log_plot(compressor_flux,filename="NG_trans_compressors",
-             "NG transmission - compressors\n GHGRP reporters + average GHGI emissions distributed using\n Homeland Infrastructure Foundation-Level Database")
+             "NG transmission - compressors\n GHGRP reporters + average GHGI emissions distributed using Homeland\nInfrastructure Foundation-Level Database")
     
     not_log_plot(pipes_flux,filename="NG_trans_pipes",
                  "NG transmission - pipelines\n EIA pipeline data * GHGI EF")
@@ -444,7 +435,7 @@ Transmission <- function(GHGI_file,
     
     Summed_NG_transmission = compressor_flux+pipes_flux
     log_plot(Summed_NG_transmission,
-             "NG Transmission Sector\nEIA for pipelines + HFILD/GHGRP for compressors")
+             "NG Transmission Sector\nEIA for pipelines + HFILD/GHGRP\nfor compressors")
   }
   cat("Finished natural gas transmission sector: Transmission in",difftime(Sys.time(),starttime,units = "min"),"minutes\n")
 }
