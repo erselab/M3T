@@ -311,6 +311,7 @@ Wastewater <- function(DMR_file,
                        Wastewater_Municipal_method,
                        Wastewater_Municipal_file,
                        domain,
+                       ghgrp_facility_info,
                        inventory_year,
                        state_name_list,
                        National_wastewater_info,
@@ -568,17 +569,7 @@ Wastewater <- function(DMR_file,
   ghgrp_data <- fromJSON("https://data.epa.gov/efservice/II_SUBPART_LEVEL_INFORMATION/JSON")
   colnames(ghgrp_data) <- c("facility_id","year","facility_name","ghg_quantity","ghg_name")
   ################################################################################
-  #Download the relevant facility (e.g., location) data using the API and merge
-  
-  #see https://www.epa.gov/enviro/envirofacts-data-service-api
-  data_URLs <- paste0("https://data.epa.gov/efservice/PUB_DIM_FACILITY/STATE/=/",state_name_list,"/JSON")
-  
-  #initialize output
-  ghgrp_facility_info <- data.frame()
-  for(A in 1:length(state_name_list)){
-    # download data and read/combine in an R dataframe
-    ghgrp_facility_info <- rbind(ghgrp_facility_info,fromJSON(data_URLs[A]))
-  }
+  #Merge with location-like data
   
   #combine the datasets by ID, and year
   ghgrp_all_data <- merge(ghgrp_facility_info,ghgrp_data,
@@ -605,15 +596,17 @@ Wastewater <- function(DMR_file,
   ghgrp_flux[is.na(ghgrp_flux)]<-0
   
   if(verbose){
-    # Save point sources as csv files - first just the raw dataframe
-    write.csv(ghgrp_crop, file.path(output_directory,"WWTP_industrial_all.csv"))
-    
-    # Now just the names, coordinates and emissions
-    ghgrp_crop_output <- data.frame(ghgrp_crop$facility_name.x,
-                                    geom(ghgrp_crop)[,"x"],geom(ghgrp_crop)[,"y"],
-                                    ghgrp_crop$emiss)
-    names(ghgrp_crop_output) <- c('Site_Name','Longitude','Latitude','Emission_mol_per_s')
-    write.csv(ghgrp_crop_output, file.path(output_directory,"WWTP_industrial.csv"),row.names = F)
+    if(nrow(ghgrp_crop)>0){
+      # Save point sources as csv files - first just the raw dataframe
+      write.csv(ghgrp_crop, file.path(output_directory,"WWTP_industrial_all.csv"))
+      
+      # Now just the names, coordinates and emissions
+      ghgrp_crop_output <- data.frame(ghgrp_crop$facility_name.x,
+                                      geom(ghgrp_crop)[,"x"],geom(ghgrp_crop)[,"y"],
+                                      ghgrp_crop$emiss)
+      names(ghgrp_crop_output) <- c('Site_Name','Longitude','Latitude','Emission_mol_per_s')
+      write.csv(ghgrp_crop_output, file.path(output_directory,"WWTP_industrial.csv"),row.names = F)
+    }
   }
   cat("Finished calculating industrial treatment plant emissions at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
   ################################################################################
@@ -831,24 +824,24 @@ Wastewater <- function(DMR_file,
     if(Wastewater_use_CWNS){
       if(Wastewater_state_septic){
         log_plot(Summed_wastewater_treatment_CWNS_state,
-                 paste0("Wastewater Treatment Sector\n",CWNS_state_text," (Domestic facilities)\nand GHGRP (industrial) and developed open space/low intensity\nNLCD land cover * state septic data (Septic)"),
+                 paste0("Wastewater Treatment Sector\n",CWNS_state_text," (Domestic facilities)\nand GHGRP (industrial) and developed open space/low intensity NLCD\nland cover * state septic data (Septic)"),
                  WWTP_min,WWTP_max)
       }
       if(Wastewater_national_septic){
         log_plot(Summed_wastewater_treatment_CWNS_national,
-                 paste0("Wastewater Treatment Sector\n",CWNS_national_text," (Domestic facilities)\nand GHGRP (industrial) and developed open space/low intensity\nNLCD land cover * national septic data (Septic)"),
+                 paste0("Wastewater Treatment Sector\n",CWNS_national_text," (Domestic facilities)\nand GHGRP (industrial) and developed open space/low intensity NLCD\nland cover * national septic data (Septic)"),
                  WWTP_min,WWTP_max)
       }
     }
     if(Wastewater_use_DMR){
       if(Wastewater_state_septic){
         log_plot(Summed_wastewater_treatment_DMR_state,
-                 paste0("Wastewater Treatment Sector\n",DMR_state_text," (Domestic facilities)\nand GHGRP (industrial) and developed open space/low intensity\nNLCD land cover * state septic data (Septic)"),
+                 paste0("Wastewater Treatment Sector\n",DMR_state_text," (Domestic facilities)\nand GHGRP (industrial) and developed open space/low intensity NLCD\nland cover * state septic data (Septic)"),
                  WWTP_min,WWTP_max)
       }
       if(Wastewater_national_septic){
         log_plot(Summed_wastewater_treatment_DMR_national,
-                 paste0("Wastewater Treatment Sector\n",DMR_national_text," (Domestic facilities)\nand GHGRP (industrial) and developed open space/low intensity\nNLCD land cover * national septic data (Septic)"),
+                 paste0("Wastewater Treatment Sector\n",DMR_national_text," (Domestic facilities)\nand GHGRP (industrial) and developed open space/low intensity NLCD\nland cover * national septic data (Septic)"),
                  WWTP_min,WWTP_max)
       }
     }
