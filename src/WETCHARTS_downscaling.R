@@ -203,7 +203,9 @@ Disaggregate_Wetcharts <- function(
   #domain CRS at 0.1 deg.
   
   #solely for the exact grid to project to
-  template <- disagg(Wetcharts,fact=5)
+  template <- disagg(Wetcharts[[1]],fact=5)
+  values(template) <- 1
+  template_poly <- as.polygons(template)
   
   if(Use_NLCD){
     #force all values between 0 and 89 to 0.  values between 89 and 200 are forced
@@ -211,13 +213,16 @@ Disaggregate_Wetcharts <- function(
     NLCD <- classify(NLCD,matrix(c(0,89,0,
                                    89,200,1),
                                  ncol=3,byrow=T))
-    #aggregate to near 0.1 deg resolution, then reproject to the domain CRS
-    NLCD <- aggregate(NLCD,
-                      fact=res(project(template,crs(NLCD)))/res(NLCD),
-                      fun=sum)
-    NLCD <- project(NLCD,template)
+    
+    #project to a grid with the exact right resolution, extent and origin. First
+    #put domain in ACES/Vulcan res, then crop/mask input to it.  Then finally
+    #reproject via average.
+    template_poly <- project(template_poly,crs(NLCD))
+    NLCD=crop(NLCD,template_poly,snap="out")
+    NLCD=mask(x=NLCD,mask=template_poly,touches=F)
+    NLCD[is.na(NLCD)] <- 0
+    NLCD=project(NLCD,template,method="sum")
   }
-  
   if(Use_NALCMS){
     #force all values between 0 and 13 or 14.6 to 5000 to 0.  values between 13.5
     #and 14.5 are 1.  14 = wetland land cover for NALCMS.
@@ -225,12 +230,26 @@ Disaggregate_Wetcharts <- function(
                                        13.5,14.5,1,
                                        14.6,5000,0),
                                      ncol=3,byrow=T))
-    #aggregate to a similar resolution, then reproject to the domain CRS
-    NALCMS <- aggregate(NALCMS,
-                        fact=res(project(template,crs(NALCMS)))/res(NALCMS),
-                        fun=sum)
-    NALCMS <- project(NALCMS,template)
+    #project to a grid with the exact right resolution, extent and origin. First
+    #put domain in ACES/Vulcan res, then crop/mask input to it.  Then finally
+    #reproject via average.
+    template_reproj <- project(template,crs(NALCMS))
+    NALCMS=crop(NALCMS,template_reproj,snap="out")
+    
+    # writeRaster(NALCMS,subset_tmpfile)
+    # NALCMS <- rast(subset_tmpfile)
+    template_reproj <- as.polygons(template_reproj)
+    # writeVector(template_reproj,subset_tmpfile)
+    # template_reproj <- vect(subset_tmpfile)
+    
+    
+    NALCMS=mask(x=NALCMS,mask=template_reproj,touches=F)
+    NALCMS[is.na(NALCMS)] <- 0
+    NALCMS=project(NALCMS,template,method="sum")
+    
+    # unlink(subset_tmpfile)
   }
+  cat("Finished reprojecting land cover data at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
   ################################################################################
   #now calculate the wetland fraction
   
@@ -294,9 +313,7 @@ Disaggregate_Wetcharts <- function(
   #pull the months from the names of wetcharts this time
   Wetcharts_months <- lapply(Wetcharts,FUN = function(x){
     as.numeric(sapply(strsplit(names(x),"_"),"[[",5))})
-  
-  
-  
+
   #initialize output, 1 per model subset with 12 blank layers each
   Averaged_wetcharts <- Wetcharts
   for(B in 1:length(Wetcharts)){
@@ -332,12 +349,45 @@ Disaggregate_Wetcharts <- function(
   if(Use_NLCD){
     NLCD_Downscaled_Averaged_wetcharts <- lapply(Downscaled_Averaged_wetcharts,FUN=function(x){
       crop(x*NLCD_wetland_fraction/cellSize(x),project(domain,crs(NLCD_wetland_fraction)),snap="out")})
+    
+    #for comparison later
+    NLCD_pixel_check <- NLCD_Downscaled_Averaged_wetcharts[[1]]
   }
   if(Use_NALCMS){
     NALCMS_Downscaled_Averaged_wetcharts <- lapply(Downscaled_Averaged_wetcharts,FUN=function(x){
       crop(x*NALCMS_wetland_fraction/cellSize(x),project(domain,crs(NALCMS_wetland_fraction)),snap="out")})
+    NALCMS_pixel_check <- NALCMS_Downscaled_Averaged_wetcharts[[1]]
   }
+
+  ################################################################################
+  # reproject output to match domain
   
+  #aggregate/disaggregate to a similar resolution
+  domain_trans <- project(domain,crs(Downscaled_Averaged_wetcharts[[1]]))
+  domain_res <- res(domain_trans)
+  if(any(domain_res<res(Downscaled_Averaged_wetcharts[[1]]))){
+    if(Use_NLCD){
+      NLCD_Downscaled_Averaged_wetcharts <- lapply(NLCD_Downscaled_Averaged_wetcharts,FUN=function(x){disagg(x,round(res(x)/domain_res,3),"near")})
+      
+      #reproject to exact domain now.  Here using nearest neighbor to prevent
+      #only 1 row/column of higher res pixels on the border from being
+      #interpolated.
+      NLCD_Downscaled_Averaged_wetcharts <- lapply(NLCD_Downscaled_Averaged_wetcharts,FUN=function(x){project(x,domain,method="near")})
+    }
+    if(Use_NALCMS){
+      NALCMS_Downscaled_Averaged_wetcharts <- lapply(NALCMS_Downscaled_Averaged_wetcharts,FUN=function(x){disagg(x,round(res(x)/domain_res,3),"near")})
+      NALCMS_Downscaled_Averaged_wetcharts <- lapply(NALCMS_Downscaled_Averaged_wetcharts,FUN=function(x){project(x,domain,method="near")})
+    }
+  }else if(any(domain_res>res(GEPA))){
+    if(Use_NLCD){
+      #reproject to exact domain now using an average to effectively aggregate
+      #while reprojecting.
+      NLCD_Downscaled_Averaged_wetcharts <- lapply(NLCD_Downscaled_Averaged_wetcharts,FUN=function(x){project(x,domain,method="average")})
+    }
+    if(Use_NALCMS){
+      NALCMS_Downscaled_Averaged_wetcharts <- lapply(NALCMS_Downscaled_Averaged_wetcharts,FUN=function(x){project(x,domain,method="average")})
+    }
+  }
   ################################################################################
   #write output
   
@@ -389,7 +439,7 @@ Disaggregate_Wetcharts <- function(
         model_list_string <- paste0(substr(model_list_string,0,50),"\n",
                                     substr(model_list_string,51,999))
       }
-
+      
       for(A in 1:12){
         if(Use_NLCD){
           log_plot(input = NLCD_Downscaled_Averaged_wetcharts[[B]][[A]],zlim_min = zlim_min,
@@ -414,20 +464,21 @@ Disaggregate_Wetcharts <- function(
   #if the domain cuts off partial 0.5 deg pixels from Wetcharts, the domain-total
   #pre downscaling will not match.  So crop everything slightly to avoid this.
   comparable_domain <- crop(Averaged_wetcharts[[1]][[1]],project(domain,crs(Averaged_wetcharts[[1]])),snap="in")
+  comparable_poly <- project(as.polygons(comparable_domain),domain)
   
   colnamelist <- vector()
   if(Use_NLCD){
     #combine the list into multiple layers (we don't care about separation here)
     NLCD_check <- rast(NLCD_Downscaled_Averaged_wetcharts)
     #crop to proper domain and sum
-    NLCD_check <- crop(NLCD_check*cellSize(NLCD_check),comparable_domain)
+    NLCD_check <- crop(NLCD_check*cellSize(NLCD_check),comparable_poly)
     domain_total <- global(NLCD_check,sum,na.rm=T)
     colnamelist <- c(colnamelist,"NLCD_downscaled")
   }
   
   if(Use_NALCMS){
     NALCMS_check <- rast(NALCMS_Downscaled_Averaged_wetcharts)
-    NALCMS_check <- crop(NALCMS_check*cellSize(NALCMS_check),comparable_domain)
+    NALCMS_check <- crop(NALCMS_check*cellSize(NALCMS_check),comparable_poly)
     if(Use_NLCD){
       domain_total <- cbind(domain_total,global(NALCMS_check,sum,na.rm=T))
     }else{
@@ -456,19 +507,24 @@ Disaggregate_Wetcharts <- function(
   
   Averaged_wetcharts_check[is.na(Averaged_wetcharts_check)] <- 0
   
+  #can't really do this as it would depend on the domain projection.  Could
+  #potentially use the value pre projection if saved...
+  
   if(Use_NLCD){
-    NLCD_check[is.na(NLCD_check)] <- 0
+    NLCD_pixel_check <- crop(NLCD_pixel_check*cellSize(NLCD_pixel_check),comparable_poly)
+    NLCD_pixel_check[is.na(NLCD_pixel_check)] <- 0
     #given pixels can be > 1E11 mol/s, differing by < 1 is considered rounding
     #error.
-    if(max(global(abs(aggregate(NLCD_check,fact=5,sum) - 
+    if(max(global(abs(aggregate(NLCD_pixel_check,fact=5,sum) -
                       Averaged_wetcharts_check),max,na.rm=T))>1){
       stop("Something's gone wrong.  There are pixels that differ between downscaled and original wetcharts when aggregating the NLCD downscaled values back to the original resolution.")
     }
   }
-  
+
   if(Use_NALCMS){
-    NALCMS_check[is.na(NALCMS_check)] <- 0
-    if(max(global(abs(aggregate(NALCMS_check,fact=5,sum) - 
+    NALCMS_pixel_check <- crop(NALCMS_pixel_check*cellSize(NALCMS_pixel_check),comparable_poly)
+    NALCMS_pixel_check[is.na(NALCMS_pixel_check)] <- 0
+    if(max(global(abs(aggregate(NALCMS_pixel_check,fact=5,sum) -
                       Averaged_wetcharts_check),max,na.rm=T))>1){
       stop("Something's gone wrong.  There are pixels that differ between downscaled and original wetcharts when aggregating the NALCMS downscaled values back to the original resolution.")
     }
