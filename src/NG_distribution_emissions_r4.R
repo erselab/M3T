@@ -1172,8 +1172,19 @@ NG_distribution <- function(domain,
       disaggregation_level <- substring(text = input_name,regexpr("by",input_name),
                                         regexpr("\\[",input_name)-1)
       inventory_name <- strsplit(input_name,"_")[[1]][1]
+      
       #project to a grid with the exact right resolution, extent and origin.
-      input <- project(input,domain)
+      #First put domain in ACES/Vulcan res, then crop/mask input to it, add a
+      #few pixels worth of buffer (at the domain resolution) filled with 0's so
+      #the average doesn't consider these NA values to ignore in calculations
+      #(drastically impacts avg).  Then finally reproject via average.
+      domain_reproj <- project(domain,crs(input))
+      input=crop(aces_res_ch4_byLDC$post_meter_ER_total_res,domain_reproj,snap="out")
+      input=mask(input,as.polygons(domain_reproj),touches=F,updatevalue=0)
+      input=extend(input,fill=0,
+                  ext(input)+(res(domain_reproj)*5))
+      input=project(input,domain,method="average")
+      
       #convert from mol/km2s to nmol/m2s
       input <- input*1000
       
