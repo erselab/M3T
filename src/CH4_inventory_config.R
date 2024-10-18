@@ -195,8 +195,8 @@ main_config <- function(){
     # GHGI_transmission_compressors <- data.frame("Type"          =c("Station Total Emissions","Dehydrator vents (Transmission)","Flaring (Transmission)","Engines (Transmission)","Turbines (Transmission)","Engines (Storage)","Turbines (Storage)","Generators (Engines)","Generators (Turbines)","Pneumatic Devices Transmission","Station Venting Transmission"),
     #                                             "Emissions"     =c(1357.80542776983         ,5.03531064009076                 ,1.00340431488143        ,306.078942722016        ,3.21765775547095         ,48.1136980930844   ,0.401407734674907   ,27.7850987048789     ,0.00778115471743365   ,73.1035216017783                ,325.070554268957),
     #                                             "Total_stations"=c(NA                       ,1411334.29888                    ,2214.08                 ,62146.3313543826        ,14828.6256215819         ,5266.15217486325   ,1849.89376479857    ,3041.14137496572     ,35.8595720791757      ,73384.96                        ,2214.08))
-    # GHGI_Pipeline <- "GHGI"
-    # GHGI_transmission_compressors <- "GHGI"
+    GHGI_Pipeline <- "GHGI"
+    GHGI_transmission_compressors <- "GHGI"
 
     
     #Stationary Combustion
