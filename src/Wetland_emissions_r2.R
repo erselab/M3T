@@ -179,8 +179,8 @@ SOCCR_Wetlands <- function(output_directory,
   
   #update wetland EF to simplify SOCCR1 since SOCCR2 E2 and M2 have already been
   #dealt with
-  Wetland_EFs <- Wetland_EFs[,c("E2_Atlantic","M2_Atlantic","PFO","PNF","L1","L2","R1","R2","R3","R4")]
-  colnames(Wetland_EFs)[1:2] <- c("E2","M2")
+  Wetland_EFs_subset <- Wetland_EFs[,c("E2_Atlantic","M2_Atlantic","PFO","PNF","L1","L2","R1","R2","R3","R4")]
+  colnames(Wetland_EFs_subset)[1:2] <- c("E2","M2")
   
   ################################################################################
   #load in and process the Wetland_fraction_r1 output to convert from wetland
@@ -211,7 +211,7 @@ SOCCR_Wetlands <- function(output_directory,
     #for a later sanity check
     all_frac <- subset_data
     if(Use_SOCCR1){
-      SOCCR1_flux <- subset_data*Wetland_EFs["SOCCR1",SOCCR_wetland_types[1]]
+      SOCCR1_flux <- subset_data*Wetland_EFs_subset["SOCCR1",SOCCR_wetland_types[1]]
     }
     if(Use_SOCCR2){
       if(nrow(watershed)==1){
@@ -232,7 +232,7 @@ SOCCR_Wetlands <- function(output_directory,
       #for a later sanity check
       all_frac <- all_frac+subset_data
       if(Use_SOCCR1){
-        SOCCR1_flux <- c(SOCCR1_flux,subset_data*Wetland_EFs["SOCCR1",SOCCR_wetland_types[i]]) 
+        SOCCR1_flux <- c(SOCCR1_flux,subset_data*Wetland_EFs_subset["SOCCR1",SOCCR_wetland_types[i]]) 
       }
       if(Use_SOCCR2){
         if(nrow(watershed)==1){
@@ -258,7 +258,7 @@ SOCCR_Wetlands <- function(output_directory,
     }else{
       all_frac <- subset_data
     }
-    Freshwater_flux <- subset_data*Wetland_EFs["SOCCR1",Freshwater_wetland_types[1]]
+    Freshwater_flux <- subset_data*Wetland_EFs_subset["SOCCR1",Freshwater_wetland_types[1]]
     
     for(i in 2:length(Freshwater_wetland_types)){
       subset_files <- NWI_files[grep(Freshwater_wetland_types[i],NWI_files)]
@@ -266,13 +266,13 @@ SOCCR_Wetlands <- function(output_directory,
       subset_data <- max(subset_data)
       all_frac <- all_frac+subset_data
       names(subset_data) <- Freshwater_wetland_types[i]
-      Freshwater_flux <- c(Freshwater_flux,subset_data*Wetland_EFs["SOCCR1",Freshwater_wetland_types[i]])
+      Freshwater_flux <- c(Freshwater_flux,subset_data*Wetland_EFs_subset["SOCCR1",Freshwater_wetland_types[i]])
     }
   }
   
   # Check that the fractions are always between 0 and 1
-  max_frac <- unlist(global(all_frac,max))*100
-  min_frac <- unlist(global(all_frac,min))*100
+  max_frac <- unlist(global(all_frac,max,na.rm=T))*100
+  min_frac <- unlist(global(all_frac,min,na.rm=T))*100
   if(max_frac>100.1){
     stop(paste0("some pixels have over 100% wetland coverage.  Range is ",min_frac,"% to ",max_frac,"%"))
   }
@@ -281,7 +281,10 @@ SOCCR_Wetlands <- function(output_directory,
   
   if(Use_SOCCR1){
     SOCCR1_flux <- crop(SOCCR1_flux,ext(domain))
-    writeCDF(sum(SOCCR1_flux),
+    SOCCR1_flux <- mask(SOCCR1_flux,domain)
+    cover <- extract(SOCCR1_flux,domain,weights=T,exact=T,cells=T)
+    SOCCR1_flux[cover[,'cell']] <- SOCCR1_flux[cover[,'cell']]*cover[,'weight']
+    writeCDF(sum(SOCCR1_flux,na.rm=T),
              file.path(output_directory,'SOCCR1.nc'),
              force_v4=TRUE,
              varname='methane_emissions',
@@ -292,7 +295,12 @@ SOCCR_Wetlands <- function(output_directory,
   }
   if(Use_SOCCR2){
     SOCCR2_flux <- crop(SOCCR2_flux,ext(domain))
-    writeCDF(sum(SOCCR2_flux),
+    SOCCR2_flux <- mask(SOCCR2_flux,domain)
+    if(!Use_SOCCR1){
+      cover <- extract(SOCCR2_flux,domain,weights=T,exact=T,cells=T)
+    }
+    SOCCR2_flux[cover[,'cell']] <- SOCCR2_flux[cover[,'cell']]*cover[,'weight']
+    writeCDF(sum(SOCCR2_flux,na.rm=T),
              file.path(output_directory,'SOCCR2.nc'),
              force_v4=TRUE,
              varname='methane_emissions',
@@ -303,7 +311,12 @@ SOCCR_Wetlands <- function(output_directory,
   }
   if(Include_freshwater){
     Freshwater_flux <- crop(Freshwater_flux,ext(domain))
-    writeCDF(sum(Freshwater_flux),
+    Freshwater_flux <- mask(Freshwater_flux,domain)
+    if(!(Use_SOCCR1 | Use_SOCCR2)){
+      cover <- extract(Freshwater_flux,domain,weights=T,exact=T,cells=T)
+    }
+    Freshwater_flux[cover[,'cell']] <- Freshwater_flux[cover[,'cell']]*cover[,'weight']
+    writeCDF(sum(Freshwater_flux,na.rm=T),
              file.path(output_directory,'Freshwater.nc'),
              force_v4=TRUE,
              varname='methane_emissions',
@@ -321,16 +334,16 @@ SOCCR_Wetlands <- function(output_directory,
     zlim_min <- -3
     zlim_max <- 0
     if(Use_SOCCR1){
-      SOCCR1_flux <- sum(SOCCR1_flux)
-      zlim_max <- max(zlim_max,as.numeric(global(SOCCR1_flux,max)))
+      SOCCR1_flux <- sum(SOCCR1_flux,na.rm=T)
+      zlim_max <- max(zlim_max,as.numeric(global(SOCCR1_flux,max,na.rm=T)))
     }
     if(Use_SOCCR2){
-      SOCCR2_flux <- sum(SOCCR2_flux)
-      zlim_max <- max(zlim_max,as.numeric(global(SOCCR2_flux,max)))
+      SOCCR2_flux <- sum(SOCCR2_flux,na.rm=T)
+      zlim_max <- max(zlim_max,as.numeric(global(SOCCR2_flux,max,na.rm=T)))
     }
     if(Include_freshwater){
-      Freshwater_flux <- sum(Freshwater_flux)
-      zlim_max <- max(zlim_max,as.numeric(global(Freshwater_flux,max)))
+      Freshwater_flux <- sum(Freshwater_flux,na.rm=T)
+      zlim_max <- max(zlim_max,as.numeric(global(Freshwater_flux,max,na.rm=T)))
     }
     
     
@@ -354,5 +367,5 @@ SOCCR_Wetlands <- function(output_directory,
                title = paste0("Freshwater CH4\nSaturated colorscale low end"))
     }
   }
-  cat("Finished wastewater sector: SOCCR_Wetlands in",difftime(Sys.time(),starttime,units = "min"),"minutes\n")
+  cat("Finished wastewater sector: SOCCR_Wetlands in",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
 }
