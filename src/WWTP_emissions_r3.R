@@ -311,6 +311,7 @@ Wastewater <- function(DMR_file,
                        Wastewater_Municipal_method,
                        Wastewater_Municipal_file,
                        domain,
+                       domain_template,
                        ghgrp_facility_info,
                        inventory_year,
                        state_name_list,
@@ -325,6 +326,7 @@ Wastewater <- function(DMR_file,
                        focus_city_tigerlines,
                        plot_directory,
                        verbose){
+  
   
   starttime <- Sys.time()
   cat("Starting wastewater sector: Wastewater\n")
@@ -383,29 +385,38 @@ Wastewater <- function(DMR_file,
   # Take total emissions for each category from the 2021 EPA report (values for 2019 in kt)
   central_EPA_emiss <- GHGI_national_wastewater_nonseptic*1e9/(16.043*365*24*60*60)   #kt/y to mol/s
   
-  cat("Finished loading in municipal treatment plant data at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
+  cat("Finished loading in municipal treatment plant data at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
   ################################################################################
   #write a small helper function.  Creates a raster of emissions, cropped to the
   #domain, converted to proper units, and saved as 2 csvs.
   rasterize_plus <- function(input,outputname){
-    input_crop <- project(input,domain)
+    input_crop <- project(input,crs(domain))
     input_crop <- crop(input_crop,domain)
     input_crop_filt <- subset(input_crop,!is.na(input_crop$emiss))
-    rast <- rasterize(input_crop_filt, domain, "emiss", fun=sum)
     
+    if(nrow(input_crop_filt)>0){
+      rast <- rasterize(input_crop_filt, domain_template, "emiss", fun=sum)
+    }else{
+      rast <- domain_template
+    }
+
     # Calculate flux in nmol/m2/s
     rast_flux <- rast*1e9/(cellSize(rast,unit="m"))  
     rast_flux[is.na(rast_flux)]<-0
     
+    rast_flux <- mask(rast_flux,domain)
+    
     if(verbose){
-      input_crop_filt_df <- as.data.frame(input_crop_filt)
-      name_index <- grep("facility_name",colnames(input_crop_filt_df),ignore.case = T)
-      write.csv(input_crop_filt, paste0(output_directory,'/',outputname,"_all.csv"),row.names = F)
-      output <- data.frame(input_crop_filt_df[name_index],
-                           geom(input_crop_filt)[,"x"],geom(input_crop_filt)[,"y"],
-                           input_crop_filt_df$emiss)
-      colnames(output) <- c('Site_Name','Longitude','Latitude','Emission_mol_per_s')
-      write.csv(output,paste0(output_directory,'/',outputname,'.csv'),row.names=FALSE)
+      if(nrow(input_crop_filt)>0){
+        input_crop_filt_df <- as.data.frame(input_crop_filt)
+        name_index <- grep("facility_name",colnames(input_crop_filt_df),ignore.case = T)
+        write.csv(input_crop_filt, paste0(output_directory,'/',outputname,"_all.csv"),row.names = F)
+        output <- data.frame(input_crop_filt_df[name_index],
+                             geom(input_crop_filt)[,"x"],geom(input_crop_filt)[,"y"],
+                             input_crop_filt_df$emiss)
+        colnames(output) <- c('Site_Name','Longitude','Latitude','Emission_mol_per_s')
+        write.csv(output,paste0(output_directory,'/',outputname,'.csv'),row.names=FALSE)
+      }
     }
     assign(x = outputname,rast_flux,envir = parent.env(environment()))
   }
@@ -459,7 +470,7 @@ Wastewater <- function(DMR_file,
     exp(-4.1+(1.2^2)/2)
     exp(-3.4+(1^2)/2)
   }
-  cat("Finished calculating municipal treatment plant emissions at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
+  cat("Finished calculating municipal treatment plant emissions at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
   ################################################################################
   #Now septic systems.  First load in output from NLCD_fractions_by_state
   
@@ -505,7 +516,7 @@ Wastewater <- function(DMR_file,
                                as.numeric(global(state_flux*cellSize(state_flux,unit="km"),sum,na.rm=T)))
       
       # Combine across states
-      septic_flux <- mosaic(septic_flux,state_flux,fun=sum)
+      septic_flux <- sum(septic_flux,state_flux,na.rm=T)
     }
     
     
@@ -529,19 +540,27 @@ Wastewater <- function(DMR_file,
       # Combine across states
       septic_flux2 <- mosaic(septic_flux2,state_flux,fun=sum)
     }
-    cat("Finished processing septic for",Wastewater_State_info[A,1],"at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
+    cat("Finished processing septic for",Wastewater_State_info[A,1],"at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
   }
   
   if(Wastewater_national_septic){
     # Now multiply by total EPA emissions and convert to flux (per area)
     septic_flux <- septic_flux*1e9*1E-6  # Calculate flux in nmol/m2/s
     septic_flux[is.na(septic_flux)]<-0
+    
+    septic_flux <- mask(septic_flux,domain)
+    cover <- extract(septic_flux,domain,weights=T,exact=T,cells=T)
+    septic_flux[cover[,'cell']] <- septic_flux[cover[,'cell']]*cover[,'weight']
   }
   
   if(Wastewater_state_septic){
     # Now converting the totals to flux (per area)
     septic_flux2 <- septic_flux2*1e9*1E-6  # Calculate flux in nmol/m2/s
     septic_flux2[is.na(septic_flux2)]<-0
+    
+    septic_flux2 <- mask(septic_flux2,domain)
+    cover <- extract(septic_flux2,domain,weights=T,exact=T,cells=T)
+    septic_flux2[cover[,'cell']] <- septic_flux2[cover[,'cell']]*cover[,'weight']
   }
   
   if(Wastewater_state_septic & Wastewater_national_septic){
@@ -558,7 +577,7 @@ Wastewater <- function(DMR_file,
       write.csv(Wastewater_State_info, file.path(output_directory,"WWTP_septic_method_comparison.csv"),row.names = F)
     }
   }
-  cat("Finished calculating septic emissions at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
+  cat("Finished calculating septic emissions at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
   ################################################################################
   #Download the relevant emissions data using the API
   #(https://www.epa.gov/enviro/envirofacts-data-service-api) and combine the
@@ -566,7 +585,10 @@ Wastewater <- function(DMR_file,
   
   #download the relevant industrial wastewater - sector data
   #(https://www.epa.gov/enviro/greenhouse-gas-model).  
-  ghgrp_data <- fromJSON("https://data.epa.gov/efservice/II_SUBPART_LEVEL_INFORMATION/JSON")
+  
+  data_URL <- "https://data.epa.gov/efservice/II_SUBPART_LEVEL_INFORMATION/JSON"
+  ghgrp_data <- Trycatch_downloader(data_URL,output_location=NULL,method="API",
+                                    error_message = paste0("Greenhouse Gas Reporting Program data could not be downloaded using API link: ",data_URL))
   colnames(ghgrp_data) <- c("facility_id","year","facility_name","ghg_quantity","ghg_name")
   ################################################################################
   #Merge with location-like data
@@ -591,9 +613,11 @@ Wastewater <- function(DMR_file,
   ghgrp_crop$emiss <- ghgrp_crop$ghg_quantity*1e6/(16.043*365*24*60*60) #MT CH4/yr to mol/s
   
   # Now rasterise
-  ghgrp_rast <- rasterize(ghgrp_crop, domain, "emiss", fun=sum)
+  ghgrp_rast <- rasterize(ghgrp_crop, domain_template, "emiss", fun=sum)
   ghgrp_flux <- ghgrp_rast*1e9/(cellSize(ghgrp_rast,unit="m"))  # Calculate flux in nmol/m2/s
   ghgrp_flux[is.na(ghgrp_flux)]<-0
+  
+  ghgrp_flux <- mask(ghgrp_flux,domain)
   
   if(verbose){
     if(nrow(ghgrp_crop)>0){
@@ -608,7 +632,7 @@ Wastewater <- function(DMR_file,
       write.csv(ghgrp_crop_output, file.path(output_directory,"WWTP_industrial.csv"),row.names = F)
     }
   }
-  cat("Finished calculating industrial treatment plant emissions at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
+  cat("Finished calculating industrial treatment plant emissions at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
   ################################################################################
   # Write the rasters
   
@@ -692,15 +716,15 @@ Wastewater <- function(DMR_file,
     if(Wastewater_state_septic){
       not_log_plot(septic_flux2,filename="Wastewater_dom_septic_bystate",
                    "Domestic Wastewater - Septic\n estimated state septic distributed using \ndeveloped open space/low intensity land cover",
-                   as.numeric(global(min(septic_flux,septic_flux2),min)),
-                   as.numeric(global(max(septic_flux,septic_flux2),max)))
+                   as.numeric(global(min(septic_flux,septic_flux2,na.rm=T),min,na.rm=T)),
+                   as.numeric(global(max(septic_flux,septic_flux2,na.rm=T),max,na.rm=T)))
     }
     
     if(Wastewater_national_septic){
       not_log_plot(septic_flux,filename="Wastewater_dom_septic_national",
                    "Domestic Wastewater - Septic\n national EPA septic distributed using \ndeveloped open space/low intensity land cover",
-                   as.numeric(global(min(septic_flux,septic_flux2),min)),
-                   as.numeric(global(max(septic_flux,septic_flux2),max)))
+                   as.numeric(global(min(septic_flux,septic_flux2,na.rm=T),min,na.rm=T)),
+                   as.numeric(global(max(septic_flux,septic_flux2,na.rm=T),max,na.rm=T)))
     }
     
     log_plot(ghgrp_flux,filename="Wastewater_ind",
@@ -715,26 +739,30 @@ Wastewater <- function(DMR_file,
     if(Wastewater_use_CWNS){
       if(Wastewater_Municipal_Method_Moore_linear){
         #set 0 to NA so the minimum ignores 0 (log plot, so 0 = -inf)
-        WWTP_CWNS_Moore_Linear_municipal[WWTP_CWNS_Moore_Linear_municipal==0] <- NA
-        WWTP_min <- min(WWTP_min,as.numeric(global(WWTP_CWNS_Moore_Linear_municipal,min,na.rm=T)))
-        WWTP_max <- max(WWTP_max,as.numeric(global(WWTP_CWNS_Moore_Linear_municipal,max,na.rm=T)))
+        temp <- WWTP_CWNS_Moore_Linear_municipal
+        temp[temp==0] <- NA
+        WWTP_min <- min(WWTP_min,as.numeric(global(temp,min,na.rm=T)))
+        WWTP_max <- max(WWTP_max,as.numeric(global(temp,max,na.rm=T)))
       }
       if(Wastewater_Municipal_Method_GHGI){
-        WWTP_CWNS_GHGI_municipal[WWTP_CWNS_GHGI_municipal==0] <- NA
-        WWTP_min <- min(WWTP_min,as.numeric(global(WWTP_CWNS_GHGI_municipal,min,na.rm=T)))
-        WWTP_max <- max(WWTP_max,as.numeric(global(WWTP_CWNS_GHGI_municipal,max,na.rm=T)))
+        temp <- WWTP_CWNS_GHGI_municipal
+        temp[temp==0] <- NA
+        WWTP_min <- min(WWTP_min,as.numeric(global(temp,min,na.rm=T)))
+        WWTP_max <- max(WWTP_max,as.numeric(global(temp,max,na.rm=T)))
       }
     }
     if(Wastewater_use_DMR){
       if(Wastewater_Municipal_Method_Moore_linear){
-        WWTP_DMR_Moore_Linear_municipal[WWTP_DMR_Moore_Linear_municipal==0] <- NA
-        WWTP_min <- min(WWTP_min,as.numeric(global(WWTP_DMR_Moore_Linear_municipal,min,na.rm=T)))
-        WWTP_max <- max(WWTP_max,as.numeric(global(WWTP_DMR_Moore_Linear_municipal,max,na.rm=T)))
+        temp <- WWTP_DMR_Moore_Linear_municipal
+        temp[temp==0] <- NA
+        WWTP_min <- min(WWTP_min,as.numeric(global(temp,min,na.rm=T)))
+        WWTP_max <- max(WWTP_max,as.numeric(global(temp,max,na.rm=T)))
       }
       if(Wastewater_Municipal_Method_GHGI){
-        WWTP_DMR_GHGI_municipal[WWTP_DMR_GHGI_municipal==0] <- NA
-        WWTP_min <- min(WWTP_min,as.numeric(global(WWTP_DMR_GHGI_municipal,min,na.rm=T)))
-        WWTP_max <- max(WWTP_max,as.numeric(global(WWTP_DMR_GHGI_municipal,max,na.rm=T)))
+        temp <- WWTP_DMR_GHGI_municipal
+        temp[temp==0] <- NA
+        WWTP_min <- min(WWTP_min,as.numeric(global(temp,min,na.rm=T)))
+        WWTP_max <- max(WWTP_max,as.numeric(global(temp,max,na.rm=T)))
       }
     }
     
@@ -846,5 +874,5 @@ Wastewater <- function(DMR_file,
       }
     }
   }
-  cat("Finished wastewater sector: Wastewater in",difftime(Sys.time(),starttime,units = "min"),"minutes\n")
+  cat("Finished wastewater sector: Wastewater in",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
 }
