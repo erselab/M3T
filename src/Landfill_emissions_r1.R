@@ -142,6 +142,7 @@
 
 Municipal_solid_waste <- function(LMOP_file,
                                   domain,
+                                  domain_template,
                                   state_name_list,
                                   output_directory,
                                   inventory_year,
@@ -165,9 +166,13 @@ Municipal_solid_waste <- function(LMOP_file,
   #data for each possible sector separately as emissions are split by sector
   #(i.e., gas capture for electricity is subpart D, flaring is C, and landfill
   #emissions HH - all of which can occur at the same landfill)
-  ghgrp_landfill_only_emissions <- fromJSON("https://data.epa.gov/efservice/HH_SUBPART_LEVEL_INFORMATION/JSON")
+  data_URL <- "https://data.epa.gov/efservice/HH_SUBPART_LEVEL_INFORMATION/JSON"
+  ghgrp_landfill_only_emissions <- Trycatch_downloader(URL = data_URL,method = "API",
+                                                       error_message = paste0("Greenhouse Gas Reporting Program data could not be downloaded using API link: ",data_URL))
   # ghgrp_landfill_emissions2 <- fromJSON("https://data.epa.gov/dmapservice/ghg.hh_subpart_level_information/json")
-  ghgrp_combustion_emissions <- fromJSON("https://data.epa.gov/efservice/C_SUBPART_LEVEL_INFORMATION/json")
+  data_URL <- "https://data.epa.gov/efservice/C_SUBPART_LEVEL_INFORMATION/json"
+  ghgrp_combustion_emissions <- Trycatch_downloader(URL = data_URL,method = "API",
+                                                    error_message = paste0("Greenhouse Gas Reporting Program data could not be downloaded using API link: ",data_URL))
   # ghgrp_electricity_emissions <- fromJSON("https://data.epa.gov/efservice/D_SUBPART_LEVEL_INFORMATION/json")
   # ghgrp_industrial_landfill_emissions <- fromJSON("https://data.epa.gov/efservice/tt_subpart_ghg_info/json")
   
@@ -224,7 +229,7 @@ Municipal_solid_waste <- function(LMOP_file,
   #combine the datasets by ID, and year
   ghgrp_all_data <- merge(ghgrp_facility_info,ghgrp_landfill_emissions,
                           by=c("facility_id","year"), all=F)
-
+  
   #keep only data for the year of interest
   ghgrp <- ghgrp_all_data[ghgrp_all_data$year==inventory_year,]
   
@@ -244,7 +249,7 @@ Municipal_solid_waste <- function(LMOP_file,
   if(length(nonreporting_landfill_data)>0){
     nonreporting_landfill_data=do.call(rbind, nonreporting_landfill_data)
   }
-
+  
   #add this most recent data to the GHGRP dataset
   ghgrp <- rbind(nonreporting_landfill_data,ghgrp)
   
@@ -253,7 +258,7 @@ Municipal_solid_waste <- function(LMOP_file,
                                                             2,FUN = function(x){as.numeric(x)})
   
   #delete all tempfiles and clean up working environment
-  rm(ghgrp_all_data,ghgrp_facility_info,
+  rm(ghgrp_all_data,
      nonreporting_landfill_data,nonreporting_facilities,nonreporting_landfills)
   ################################################################################
   #Now convert to spatial and load/convert LMOP.  Assign GHGI_national -
@@ -275,7 +280,7 @@ Municipal_solid_waste <- function(LMOP_file,
   # facilities in this approach.  
   LMOP <- read_xlsx(LMOP_file,sheet="LMOP Database",col_names = T)
   LMOP_non_ghgrp <- LMOP[!(LMOP$`GHGRP ID` %in% ghgrp_landfill_emissions$facility_id[ghgrp_landfill_emissions$year==inventory_year]),]
-
+  
   #This has some nans in, remove those
   LMOP_filt <- subset(LMOP_non_ghgrp,!is.na(Latitude))
   LMOP_filt <- vect(LMOP_filt,geom=c("Longitude","Latitude"))
@@ -293,35 +298,42 @@ Municipal_solid_waste <- function(LMOP_file,
   avg_ghgrp <- ghgrp_national/nrow(ghgrp)
   # Assign the avg emissions to LMOP landfills
   LMOP_crop$emiss <- avg_non_ghgrp*1e9/(16.043*365*24*60*60)   #Gg CH4/yr to mol/s of CH4
-  
   ################################################################################
   # Now rasterise and save
   
-  ghgrp_rast <- rasterize(ghgrp_crop, domain, "emiss", fun=sum)
+  ghgrp_rast <- rasterize(ghgrp_crop, domain_template, "emiss", fun=sum)
   ghgrp_flux <- ghgrp_rast*1e9/(cellSize(ghgrp_rast,unit="m"))  # Calculate flux, mol/s to nmol/m2/s
   ghgrp_flux[is.na(ghgrp_flux)]<-0
+  ghgrp_flux <- mask(ghgrp_flux,domain)
   
-  LMOP_rast <- rasterize(LMOP_crop, domain, field="emiss", fun=sum)
+  LMOP_rast <- rasterize(LMOP_crop, domain_template, field="emiss", fun=sum)
   LMOP_flux <- LMOP_rast*1e9/(cellSize(LMOP_rast,unit="m"))  # Calculate flux, mol/s to nmol/m2/s
   LMOP_flux[is.na(LMOP_flux)]<-0
+  LMOP_flux <- mask(LMOP_flux,domain)
   
   if(verbose){
-    #sort both by name
-    ghgrp_crop <- ghgrp_crop[order(ghgrp_crop$facility_name.x),]
-    LMOP_crop <- LMOP_crop[order(LMOP_crop$`Landfill Name`),]
-    
-    # Save point sources as csv files - first just the raw dataframe
-    write.csv(ghgrp_crop, file.path(output_directory,'MSW_GHGRP_all.csv'))
-    write.csv(LMOP_crop, file.path(output_directory,"MSW_LMOP_all.csv"))
-    
-    # Now just the names, coordinates and emissions
-    ghgrp_crop_output <- data.frame(ghgrp_crop$facility_name.x,crds(ghgrp_crop),ghgrp_crop$emiss)
-    names(ghgrp_crop_output) <- c('Site_Name','Longitude','Latitude','Emission_mol_per_s')
-    write.csv(ghgrp_crop_output,file.path(output_directory,'MSW_GHGRP.csv'),row.names=FALSE)
-    
-    LMOP_crop_output <- data.frame(LMOP_crop$`Landfill Name`,crds(LMOP_crop),LMOP_crop$emiss)
-    names(LMOP_crop_output) <- c('Site_Name','Longitude','Latitude','Emission_mol_per_s')
-    write.csv(LMOP_crop_output,file.path(output_directory,'MSW_LMOP.csv'),row.names=FALSE)
+    if(nrow(ghgrp_crop)>0){
+      #sort both by name
+      ghgrp_crop <- ghgrp_crop[order(ghgrp_crop$facility_name.x),]
+      
+      # Save point sources as csv files - first just the raw dataframe
+      write.csv(ghgrp_crop, file.path(output_directory,'MSW_GHGRP_all.csv'))
+      
+      # Now just the names, coordinates and emissions
+      ghgrp_crop_output <- data.frame(ghgrp_crop$facility_name.x,crds(ghgrp_crop),ghgrp_crop$emiss)
+      names(ghgrp_crop_output) <- c('Site_Name','Longitude','Latitude','Emission_mol_per_s')
+      write.csv(ghgrp_crop_output,file.path(output_directory,'MSW_GHGRP.csv'),row.names=FALSE)
+    }
+    if(nrow(LMOP_crop)>0){
+      LMOP_crop <- LMOP_crop[order(LMOP_crop$`Landfill Name`),]
+      
+      write.csv(LMOP_crop, file.path(output_directory,"MSW_LMOP_all.csv"))
+      
+      
+      LMOP_crop_output <- data.frame(LMOP_crop$`Landfill Name`,crds(LMOP_crop),LMOP_crop$emiss)
+      names(LMOP_crop_output) <- c('Site_Name','Longitude','Latitude','Emission_mol_per_s')
+      write.csv(LMOP_crop_output,file.path(output_directory,'MSW_LMOP.csv'),row.names=FALSE)
+    }
   }
   
   # Now write the rasters as netcdf files
@@ -348,7 +360,7 @@ Municipal_solid_waste <- function(LMOP_file,
   
   if(verbose){
     zlim_min=1.0
-    zlim_max <- log10(max(global(ghgrp_flux,max),global(LMOP_flux,max)))
+    zlim_max <- log10(max(global(ghgrp_flux,max,na.rm=T),global(LMOP_flux,max,na.rm=T)))
     log_plot(ghgrp_flux,filename="MSW_GHGRP",
              "Municipal Solid Waste -\n GHGRP reporters",
              zlim_min=zlim_min,zlim_max=zlim_max)
@@ -356,10 +368,10 @@ Municipal_solid_waste <- function(LMOP_file,
              "Municipal Solid Waste -\n (GHGI - GHGRP) distributed using \nLandfill Methane Outreach Program",
              zlim_min=zlim_min,zlim_max=zlim_max)
     
-    Summed_solid_waste <- ghgrp_flux+LMOP_flux
+    Summed_solid_waste <- sum(c(ghgrp_flux,LMOP_flux),na.rm=T)
     log_plot(Summed_solid_waste,
              "Municipal Solid Waste -\n GHGRP reporters + (GHGI - GHGRP) distributed using \nLandfill Methane Outreach Program")
   }
-  cat("Finished landfill sector: Municipal_solid_waste in",difftime(Sys.time(),starttime,units = "min"),"minutes\n")
+  cat("Finished landfill sector: Municipal_solid_waste in",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
 }
 
