@@ -359,6 +359,7 @@
 #     - domain total
 
 NG_distribution <- function(domain,
+                            domain_template,
                             state_name_list,
                             output_directory,
                             inventory_year,
@@ -420,7 +421,9 @@ NG_distribution <- function(domain,
     
     #download the relevant LDC-sector data
     #(https://www.epa.gov/enviro/greenhouse-gas-model).  
-    ghgrp_w_only_emissions <- fromJSON("https://data.epa.gov/efservice/ef_w_emissions_source_ghg/JSON")
+    data_URL <- "https://data.epa.gov/efservice/ef_w_emissions_source_ghg/JSON"
+    ghgrp_w_only_emissions <- Trycatch_downloader(URL = data_URL,method = "API",
+                                                  error_message = paste0("Greenhouse Gas Reporting Program data could not be downloaded using API link: ",data_URL))
     
     #because we're getting sub-facility level information for transmission
     #compressor, first need to aggregate.  Subsetting to only the year of interest
@@ -493,42 +496,18 @@ NG_distribution <- function(domain,
     ################################################################################
     #do some webscraping to add a few additional variables for GHGRP facilities
     
+    #the url is build from the GHGRP ID, the desired year, and a common url.
+    #This file contains more information about the facility that isn't in the
+    #downloaded file.
+    data_URL <- paste0("https://ghgdata.epa.gov/ghgp/service/html/",inventory_year,"?id=",GHGRP_csv$facility_id,"&et=undefined")
     download_dest <- tempfile(fileext = ".html")
     GHGRP_csv[,c("Miles_of_Mains","N_of_above_grade_T-D_transfer_stations","N_of_above_grade_non_T-D_MR_stations",
                  "N_of_below_grade_T-D_transfer_stations","N_of_below_grade_non_T-D_MR_stations")] <- 0
     #save to the temp file destination.  Add several new variables to GHGRP_csv
     
     for(A in 1:nrow(GHGRP_csv)){
-      counter = 0
-      repeat{
-        counter=counter+1
-        info=tryCatch(
-          #the url is build from the GHGRP ID, the desired year, and a common url.
-          #This file contains more information about the facility that isn't in the
-          #downloaded file.
-          download.file(paste0("https://ghgdata.epa.gov/ghgp/service/html/",inventory_year,"?id=",GHGRP_csv$facility_id[A],"&et=undefined"),
-                        destfile=download_dest,quiet = T),
-          warning = function(w) {
-            Sys.sleep(1)
-            NA
-          },
-          error = function(e) {
-            Sys.sleep(1)
-            NA
-          }
-        )
-        if(!is.na(info)) {
-          break
-        }
-        if(counter>=10){
-          stop("Failed to download ",GHGRP_csv$facility_name.x[A]," data from\n",
-               paste0("https://ghgdata.epa.gov/ghgp/service/html/",inventory_year,"?id=",GHGRP_csv$facility_id[A],"&et=undefined\n"),
-               "The links used may no longer be accurate.  Check the GHGRP FLIGHT website.")
-        }
-      }
-      #try to download the url, and retry up to 10x with 1s between runs as the link
-      #seems to fail on occasion.
-      #from https://stackoverflow.com/a/60880960
+      Trycatch_downloader(URL = data_URL[A],method = "FTP",output_location = download_dest,
+                          error_message = paste0("Greenhouse Gas Reporting Program data could not be webscraped from webpage: ",data_URL[A]))
       
       HTML_data <- readChar(download_dest,file.info(download_dest)$size)
       #Now read in the whole html as text
@@ -601,7 +580,7 @@ NG_distribution <- function(domain,
                                               GHGRP_csv$'N_of_below_grade_non_T-D_MR_stations')/
       GHGRP_csv$Miles_of_Mains
     
-    rm(A,B,text_loc,answer,download_dest,sub_answer,HTML_data,text,info,counter)
+    rm(A,B,text_loc,answer,download_dest,sub_answer,HTML_data,text)
     ##############################################################################
     #have to calculate before aggregating/merging via sum since it applies an
     #average term
@@ -707,7 +686,7 @@ NG_distribution <- function(domain,
     all_merge_clean$GHGRP_MnR_above <- all_merge_clean$PHMSA_MMILES_TOTAL*above_grade_MnR$stations_per_mile[state_indx]
     all_merge_clean$GHGRP_MnR_below <- all_merge_clean$PHMSA_MMILES_TOTAL*below_grade_MnR$stations_per_mile[state_indx]
     
-    cat("\nFinished downloading and merging all input data at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
+    cat("\nFinished downloading and merging all input data at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
   }else{
     ############################################################################
     #load in the output of NG_distribution_by_LDC_prep.R.  Note that is a
@@ -961,7 +940,7 @@ NG_distribution <- function(domain,
                                            all_merge_clean$EIA_Commercial_Total_Customers/
                                            (all_merge_clean$EIA_Residential_Total_Customers + all_merge_clean$EIA_Commercial_Total_Customers))
   
-  cat("Finished calculating emissions and distributing to residential/commercial portions at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
+  cat("Finished calculating emissions and distributing to residential/commercial portions at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
   ################################################################################
   #Load in ACES/Vulcan 
   
@@ -983,11 +962,9 @@ NG_distribution <- function(domain,
   # doesn't matter as we'll only use fractions
   if(Use_ACES){
     aces_res <- rast(paste0(ACES_directory,"/Sectoral/",ACES_year,'_Annual_ACES_Residential.nc'))
-    aces_res <- flip(aces_res)
     crs(aces_res) <- "+proj=lcc +lat_0=40 +lon_0=-97 +lat_1=33 +lat_2=45 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
     
     aces_com <- rast(paste0(ACES_directory,"/Sectoral/",ACES_year,'_Annual_ACES_Commercial.nc'))
-    aces_com <- flip(aces_com)
     crs(aces_com) <- "+proj=lcc +lat_0=40 +lon_0=-97 +lat_1=33 +lat_2=45 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
   }
   if(Use_Vulcan){
@@ -1002,8 +979,11 @@ NG_distribution <- function(domain,
     if(Use_ACES){
       # tempdata <- aces_res
       # values(tempdata) <- 0
+      
+      #mask to only keep those LDCs that are at least partly within the domain
+      all_merge_LCC <- mask(all_merge_clean,domain)
       #convert to the proper crs
-      all_merge_LCC <- project(all_merge_clean,aces_res)
+      all_merge_LCC <- project(all_merge_LCC,aces_res)
       
       # all_merge_LCC <- all_merge_LCC[2,]
       # tempdata <- crop(tempdata,all_merge_LCC)
@@ -1046,7 +1026,8 @@ NG_distribution <- function(domain,
       disaggregation(aces_com,com_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
     }
     if(Use_Vulcan){
-      all_merge_LCC <- project(all_merge_clean,vu_res)
+      all_merge_LCC <- mask(all_merge_clean,domain)
+      all_merge_LCC <- project(all_merge_LCC,vu_res)
       
       if(LDC_count==1){
         cover_all <- list(extract(vu_res,all_merge_LCC,weights=T,exact=T,cells=T))
@@ -1061,7 +1042,7 @@ NG_distribution <- function(domain,
       disaggregation(vu_res,res_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
       disaggregation(vu_com,com_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
     }
-    cat("\rFinished disaggregating emissions to pixels from the LDC scale at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
+    cat("\rFinished disaggregating emissions to pixels from the LDC scale at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
   }
   
   ################################################################################
@@ -1117,8 +1098,8 @@ NG_distribution <- function(domain,
       disaggregation(vu_res,res_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all,out_envir=environment())
       disaggregation(vu_com,com_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all,out_envir=environment())
     }
+    cat("\rFinished disaggregating emissions to pixels from the state scale at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
   }
-  cat("\rFinished disaggregating emissions to pixels from the state scale at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
   ################################################################################
   #Repeat when aggregated to the domain total.
   
@@ -1144,7 +1125,7 @@ NG_distribution <- function(domain,
       disaggregation(vu_res,res_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
       disaggregation(vu_com,com_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
     }
-    cat("\rFinished disaggregating emissions to pixels from the domain scale at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
+    cat("\rFinished disaggregating emissions to pixels from the domain scale at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
   }
   ################################################################################
   #write a function to save, dependent on whether or not we use XESMF
@@ -1168,23 +1149,25 @@ NG_distribution <- function(domain,
   }else{
     #project with terra
     save_data <- function(input){
-      input_name <- deparse(substitute(input))
-      disaggregation_level <- substring(text = input_name,regexpr("by",input_name),
-                                        regexpr("\\[",input_name)-1)
+      input_name <- gsub("\\[\\[total\\]\\]","",deparse(substitute(input)))
+      disaggregation_level <- tail(strsplit(input_name,"_")[[1]],1)
       inventory_name <- strsplit(input_name,"_")[[1]][1]
       
       #project to a grid with the exact right resolution, extent and origin.
-      #First put domain in ACES/Vulcan res, then crop/mask input to it, add a
+      #First put domain in ACES/Vulcan crs, then crop/mask input to it, add a
       #few pixels worth of buffer (at the domain resolution) filled with 0's so
       #the average doesn't consider these NA values to ignore in calculations
       #(drastically impacts avg).  Then finally reproject via average.
       domain_reproj <- project(domain,crs(input))
-      input=crop(aces_res_ch4_byLDC$post_meter_ER_total_res,domain_reproj,snap="out")
-      input=mask(input,as.polygons(domain_reproj),touches=F,updatevalue=0)
-      input=extend(input,fill=0,
-                  ext(input)+(res(domain_reproj)*5))
-      input=project(input,domain,method="average")
+      input=crop(input,domain_reproj,snap="out")
       
+      input=mask(input,domain_reproj,touches=T,updatevalue=0)
+      cover <- extract(input,domain_reproj,weights=T,exact=T,cells=T)
+      input[cover[,'cell']] <- input[cover[,'cell']]*cover[,'weight']
+      input=extend(input,fill=0,
+                  ext(input)+(res(project(domain_template,crs(input)))*5))
+      input=project(input,domain_template,method="average")
+
       #convert from mol/km2s to nmol/m2s
       input <- input*1000
       
@@ -1297,59 +1280,62 @@ NG_distribution <- function(domain,
   ################################################################################
   # Some sanity checks
   
-  res_data_objects <- as.list(ls(pattern=glob2rx("*_res_ch4*")))
-  #get the length, convert from a list of the names to the actual rasters
-  res_data_length <- length(res_data_objects)
-  res_data_list <- sapply(res_data_objects,get,envir=environment())
-  #get the domain total for each raster, put into an organized df
-  res_data <- as.data.frame(matrix(sapply(res_data_list,global,sum),
-                                   ncol=res_data_length))
-  #properly name it's dimensions
-  names(res_data) <- gsub("res_ch4","by",unlist(res_data_objects))
-  rownames(res_data) <- names(res_data_list[,1])
+  #if only running byLDC for the LDCs within the domain, this can't be used
+  #anymore.  At least not for byLDC
   
-  com_data_objects <- as.list(ls(pattern=glob2rx("*_com_ch4*")))
-  com_data_length <- length(com_data_objects)
-  com_data_list <- sapply(com_data_objects,get,envir=environment())
-  com_data <- as.data.frame(matrix(sapply(com_data_list,global,sum),
-                                   ncol=com_data_length))
-  names(com_data) <- gsub("com_ch4","by",unlist(com_data_objects))
-  rownames(com_data) <- names(com_data_list[,1])
-  
-  ch4_totals_df <- rbind(res_data,com_data)
-  
-  #original data that was distributed in the rasters.  The totals should still
-  #match.
-  if(NG_distribution_by_LDC){
-    input_totals_LDC <- as.data.frame(all_merge_clean[,grep(glob2rx("*_ER*"),names(all_merge_clean))])
-    input_totals_LDC <- colSums(input_totals_LDC)
-    ch4_totals_df <- data.frame(ch4_totals_df,
-                                "byLDC_input"=input_totals_LDC[rownames(ch4_totals_df)])
-  }
-  if(NG_distribution_by_state){
-    input_totals_state <- all_merge_state[,grep(glob2rx("*_ER*"),colnames(all_merge_state))]
-    input_totals_state <- colSums(input_totals_state)
-    ch4_totals_df <- data.frame(ch4_totals_df,
-                                "bystate_input"=input_totals_state[rownames(ch4_totals_df)])
-  }
-  if(NG_distribution_by_domain){
-    input_totals_domain <- all_merge_domain[grep(glob2rx("*_ER*"),names(all_merge_domain))]
-    ch4_totals_df <- data.frame(ch4_totals_df,
-                                "bydomain_input"=input_totals_domain[rownames(ch4_totals_df)])
-  }
-  
-  
-  ch4_totals_df <- apply(ch4_totals_df,2,FUN=function(x){as.numeric(x)})
-  ch4_totals_df[is.na(ch4_totals_df)] <- 0
-  
-  percent_change <- abs(ch4_totals_df - ch4_totals_df[,1])/ch4_totals_df[,1]
-  if(!all(percent_change<0.0001,na.rm=T)){
-    #Check if all values are within 0.01 percent of the first column (i.e.,
-    #all are ~identical other than minor rounding)
-    View(ch4_totals_df)
-    stop("Something has gone wrong - the total across the domain when disaggregated by LDC vs by state vs by domain or by using ACES vs Vulcan disagree by more than rounding error (0.01%)")
-  }
-  
+  # res_data_objects <- as.list(ls(pattern=glob2rx("*_res_ch4*")))
+  # #get the length, convert from a list of the names to the actual rasters
+  # res_data_length <- length(res_data_objects)
+  # res_data_list <- sapply(res_data_objects,get,envir=environment())
+  # #get the domain total for each raster, put into an organized df
+  # res_data <- as.data.frame(matrix(sapply(res_data_list,global,sum),
+  #                                  ncol=res_data_length))
+  # #properly name it's dimensions
+  # names(res_data) <- gsub("res_ch4","by",unlist(res_data_objects))
+  # rownames(res_data) <- names(res_data_list[,1])
+  # 
+  # com_data_objects <- as.list(ls(pattern=glob2rx("*_com_ch4*")))
+  # com_data_length <- length(com_data_objects)
+  # com_data_list <- sapply(com_data_objects,get,envir=environment())
+  # com_data <- as.data.frame(matrix(sapply(com_data_list,global,sum),
+  #                                  ncol=com_data_length))
+  # names(com_data) <- gsub("com_ch4","by",unlist(com_data_objects))
+  # rownames(com_data) <- names(com_data_list[,1])
+  # 
+  # ch4_totals_df <- rbind(res_data,com_data)
+  # 
+  # #original data that was distributed in the rasters.  The totals should still
+  # #match.
+  # if(NG_distribution_by_LDC){
+  #   input_totals_LDC <- as.data.frame(all_merge_clean[,grep(glob2rx("*_ER*"),names(all_merge_clean))])
+  #   input_totals_LDC <- colSums(input_totals_LDC)
+  #   ch4_totals_df <- data.frame(ch4_totals_df,
+  #                               "byLDC_input"=input_totals_LDC[rownames(ch4_totals_df)])
+  # }
+  # if(NG_distribution_by_state){
+  #   input_totals_state <- all_merge_state[,grep(glob2rx("*_ER*"),colnames(all_merge_state))]
+  #   input_totals_state <- colSums(input_totals_state)
+  #   ch4_totals_df <- data.frame(ch4_totals_df,
+  #                               "bystate_input"=input_totals_state[rownames(ch4_totals_df)])
+  # }
+  # if(NG_distribution_by_domain){
+  #   input_totals_domain <- all_merge_domain[grep(glob2rx("*_ER*"),names(all_merge_domain))]
+  #   ch4_totals_df <- data.frame(ch4_totals_df,
+  #                               "bydomain_input"=input_totals_domain[rownames(ch4_totals_df)])
+  # }
+  # 
+  # 
+  # ch4_totals_df <- apply(ch4_totals_df,2,FUN=function(x){as.numeric(x)})
+  # ch4_totals_df[is.na(ch4_totals_df)] <- 0
+  # 
+  # percent_change <- abs(ch4_totals_df - ch4_totals_df[,1])/ch4_totals_df[,1]
+  # if(!all(percent_change<0.0001,na.rm=T)){
+  #   #Check if all values are within 0.01 percent of the first column (i.e.,
+  #   #all are ~identical other than minor rounding)
+  #   View(ch4_totals_df)
+  #   stop("Something has gone wrong - the total across the domain when disaggregated by LDC vs by state vs by domain or by using ACES vs Vulcan disagree by more than rounding error (0.01%)")
+  # }
+  # 
   ################################################################################
   #Save visuals
   
@@ -1359,20 +1345,20 @@ NG_distribution <- function(domain,
     #shorthand for sub-sector
     
     wrapper_plot_plus <- function(input_data,total){
-      combined_data <- rast(sapply(input_data,
-                                   FUN=function(x){project(get(x,
-                                                               envir=environment())[[total]]*1000,domain)}))
-      combined_range=global(combined_data,range)
-      zmin <- min(combined_range[,1])
-      zmax <- max(combined_range[,2])
+      combined_data <- rast(input_data)
+      combined_range=global(combined_data,range,na.rm=T)
+      zmin <- min(combined_range[,1],na.rm=T)
+      zmax <- max(combined_range[,2],na.rm=T)
+      
+      input_data <- strsplit(basename(input_data),"_")
       
       #grab some text for the plot title
-      disaggregation_level <- sapply(strsplit(unlist(input_data),"by"),"[[",2)
-      inventory_name <- sapply(strsplit(unlist(input_data),"_"),"[[",1)
-      sector_short <- sapply(strsplit(unlist(input_data),"_"),"[[",2)[1]
+      disaggregation_level <- gsub("by","",sapply(input_data,"[[",length(input_data[[1]])-1))
+      inventory_name <- gsub(".nc","",sapply(input_data,"[[",length(input_data[[1]])))
+      sector_short <- sapply(input_data,"[[",length(input_data[[1]])-2)
       sector_long <- gsub("res","residential",
                           gsub("com","commercial",sector_short))
-      
+
       if(grepl("mains",total)){
         subsector_name <- "mains pipelines"
         subsector_short <- "mains_pipelines"
@@ -1388,13 +1374,13 @@ NG_distribution <- function(domain,
       }else if(grepl("upset",total)){
         subsector_name <- "upsets and maintenance"
         subsector_short <- "upsets"
-      }else if(grepl("post_meter",total)){
+      }else if(grepl("post",total)){
         subsector_name <- "post-meter residential leakage and usage"
         subsector_short <- "post_meter"
       }
       
       inventory_name["aces"==inventory_name] <- "ACES"
-      inventory_name["vu"==inventory_name] <- "Vulcan"
+      inventory_name["vulcan"==inventory_name] <- "Vulcan"
       
       disaggregation_name <- gsub("LDC","local distribution company",disaggregation_level)
       
@@ -1412,13 +1398,14 @@ NG_distribution <- function(domain,
     }
     
     
-    
-    for(total in res_totals){
-      wrapper_plot_plus(res_data_objects,total)
+    for(total in sapply(strsplit(res_totals,"_"),"[[",1)){
+      wrapper_plot_plus(list.files(output_directory,pattern=paste0("NG_dist_",total,".*res.*"),full.names = T),
+                        total)
     }
     
-    for(total in com_totals){
-      wrapper_plot_plus(com_data_objects,total)
+    for(total in sapply(strsplit(com_totals,"_"),"[[",1)){
+      wrapper_plot_plus(list.files(output_directory,pattern=paste0("NG_dist_",total,".*com.*"),full.names = T),
+                        total)
     }
     
     
@@ -1440,22 +1427,22 @@ NG_distribution <- function(domain,
         Summed_NG_dist_ACES_byLDC <- rast(list.files(output_directory,
                                                      pattern="NG_dist_.+_byLDC_aces",
                                                      full.names = T))
-        Summed_NG_dist_ACES_byLDC <- sum(Summed_NG_dist_ACES_byLDC)
-        zmax <- max(zmax,as.numeric(global(Summed_NG_dist_ACES_byLDC,max)))
+        Summed_NG_dist_ACES_byLDC <- sum(Summed_NG_dist_ACES_byLDC,na.rm=T)
+        zmax <- max(zmax,as.numeric(global(Summed_NG_dist_ACES_byLDC,max,na.rm=T)))
       }
       if(NG_distribution_by_state){
         Summed_NG_dist_ACES_bystate <- rast(list.files(output_directory,
                                                        pattern="NG_dist_.+_bystate_aces",
                                                        full.names = T))
-        Summed_NG_dist_ACES_bystate <- sum(Summed_NG_dist_ACES_bystate)
-        zmax <- max(zmax,as.numeric(global(Summed_NG_dist_ACES_bystate,max)))
+        Summed_NG_dist_ACES_bystate <- sum(Summed_NG_dist_ACES_bystate,na.rm=T)
+        zmax <- max(zmax,as.numeric(global(Summed_NG_dist_ACES_bystate,max,na.rm=T)))
       }
       if(NG_distribution_by_domain){
         Summed_NG_dist_ACES_bydomain <- rast(list.files(output_directory,
                                                         pattern="NG_dist_.+_bydomain_aces",
                                                         full.names = T))
-        Summed_NG_dist_ACES_bydomain <- sum(Summed_NG_dist_ACES_bydomain)
-        zmax <- max(zmax,as.numeric(global(Summed_NG_dist_ACES_bydomain,max)))
+        Summed_NG_dist_ACES_bydomain <- sum(Summed_NG_dist_ACES_bydomain,na.rm=T)
+        zmax <- max(zmax,as.numeric(global(Summed_NG_dist_ACES_bydomain,max,na.rm=T)))
       }
     }
     if(Use_Vulcan){
@@ -1463,22 +1450,22 @@ NG_distribution <- function(domain,
         Summed_NG_dist_vulcan_byLDC <- rast(list.files(output_directory,
                                                        pattern="NG_dist_.+_byLDC_vulcan",
                                                        full.names = T))
-        Summed_NG_dist_vulcan_byLDC <- sum(Summed_NG_dist_vulcan_byLDC)
-        zmax <- max(zmax,as.numeric(global(Summed_NG_dist_vulcan_byLDC,max)))
+        Summed_NG_dist_vulcan_byLDC <- sum(Summed_NG_dist_vulcan_byLDC,na.rm=T)
+        zmax <- max(zmax,as.numeric(global(Summed_NG_dist_vulcan_byLDC,max,na.rm=T)))
       }
       if(NG_distribution_by_state){
         Summed_NG_dist_vulcan_bystate <- rast(list.files(output_directory,
                                                          pattern="NG_dist_.+_bystate_vulcan",
                                                          full.names = T))
-        Summed_NG_dist_vulcan_bystate <- sum(Summed_NG_dist_vulcan_bystate)
-        zmax <- max(zmax,as.numeric(global(Summed_NG_dist_vulcan_bystate,max)))
+        Summed_NG_dist_vulcan_bystate <- sum(Summed_NG_dist_vulcan_bystate,na.rm=T)
+        zmax <- max(zmax,as.numeric(global(Summed_NG_dist_vulcan_bystate,max,na.rm=T)))
       }
       if(NG_distribution_by_domain){
         Summed_NG_dist_vulcan_bydomain <- rast(list.files(output_directory,
                                                           pattern="NG_dist_.+_bydomain_vulcan",
                                                           full.names = T))
-        Summed_NG_dist_vulcan_bydomain <- sum(Summed_NG_dist_vulcan_bydomain)
-        zmax <- max(zmax,as.numeric(global(Summed_NG_dist_vulcan_bydomain,max)))
+        Summed_NG_dist_vulcan_bydomain <- sum(Summed_NG_dist_vulcan_bydomain,na.rm=T)
+        zmax <- max(zmax,as.numeric(global(Summed_NG_dist_vulcan_bydomain,max,na.rm=T)))
       }
     }
     
@@ -1522,5 +1509,5 @@ NG_distribution <- function(domain,
     
   }
   
-  cat("Finished natural gas distribution sector: NG_distribution_emissions in",difftime(Sys.time(),starttime,units = "min"),"minutes\n")
+  cat("Finished natural gas distribution sector: NG_distribution_emissions in",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
 }
