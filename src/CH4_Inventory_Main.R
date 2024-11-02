@@ -20,8 +20,9 @@
 #'  \url{https://www.census.gov/programs-surveys/geography/guidance/geo-areas/urban-rural.html}
 #'  for the 2020 census and at
 #'  \url{https://www2.census.gov/geo/pdfs/maps-data/maps/reference/2010UAUC_List.pdf}
-#'  for the 2010 census.  Years rely on the naming scheme of the most recent
-#'  census, so e.g., 2018 would rely on the 2010 names.
+#'  for the 2010 census.  The list and wall map are most useful.  Years rely on 
+#'  the naming scheme of the most recent census, so e.g., 2018 would rely on the
+#'  2010 names.
 #'
 #'  Each numeric must exactly match the code given to the urban area, also
 #'  detailed in the above documents.
@@ -96,9 +97,9 @@
 #                                 verbose=TRUE){
 code_directory="~/../../Kristian/Desktop/methane_inventory/src/"
 
-input_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Raw_data_rewrite/"
-output_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Processed_rewrite/"
-plot_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Figures_rewrite/"
+input_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Raw_data_CONUS/"
+output_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Processed_CONUS/"
+plot_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Figures_CONUS/"
 #if desired.  Must either be UACE code entered as numeric or exact text match
 #entered as character. Too many cities have similar/identical names otherwise.
 #Can be > 1 city. These can be found here (see "List of 2020 Census Urban
@@ -107,13 +108,32 @@ plot_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Figures_re
 #for 2020 - 2020 and here
 #(https://www2.census.gov/geo/pdfs/maps-data/maps/reference/2010UAUC_List.pdf)
 #for 2010 - 2019
-focus_city="Philadelphia, PA--NJ--DE--MD"
+# focus_city="Philadelphia, PA--NJ--DE--MD"
 
 inventory_year=2019
-domain=as.data.frame(cbind(c(-76.65,-73.65),
-                           c(38.97,40.97)))
-domain_res=0.01
-domain_crs="epsg:4326" #lat/long
+#domain can be 4 corners, a vector/raster file to load, state name/acronym/FIPS,
+#or urban area name/FIPS.
+
+# domain=as.data.frame(cbind(c(-125,-65),
+#                            c(24,50)))
+domain=as.data.frame(cbind(c(-2.5E6,2.5E6),
+                           c(-1.7E6,1.5E6)))
+# domain=as.data.frame(cbind(c(-76.65,-73.65),
+#                            c(38.97,40.97)))
+# domain=as.data.frame(cbind(c(-50,-45),
+#                            c(38.97,40.97)))
+# domain <- vect("~/../Desktop/testshape/testshape.shp")
+# domain <- "DE"
+# domain <- "nonsense_not_real"
+# domain <- "Delaware"
+# domain <- "039"
+# domain <- "10"
+# domain <- "Long Neck, DE"
+# domain <- "51202"
+# domain_res=0.01 #deg
+domain_res=1000 #m
+domain_crs <- "+proj=lcc +lat_1=33 +lat_2=45 +lat_0=40 +lon_0=-97 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs" #Lambert Conic Conformal, same as Vulcan/ACES
+# domain_crs="epsg:4326" #lat/long
 ACES_directory="G:/My Drive/Shepson Group Drive/General Inventories and Shapefiles/Inventories/ACES_v2.0"
 vulcan_directory="G:/My Drive/Shepson Group Drive/General Inventories and Shapefiles/Inventories/Vulcan_v3.0"
 verbose=TRUE
@@ -127,8 +147,10 @@ testmode_vulcan <- F
 
 
 #just rerunning the domain to check the output is unchanged after some testing edits
-output_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Processed_test2/"
-plot_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Figures_test2/"
+# output_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Processed_test2/"
+# plot_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Figures_test2/"
+# output_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Processed_test/"
+# plot_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Figures_test/"
 
 
 
@@ -262,6 +284,23 @@ main_config()
 error_text <- ""
 error_found <- FALSE
 
+# temp <- rast(matrix(1:25, nrow=5, ncol=5))
+# 
+# #these are inputs that won't work
+# if(try(crs(temp)=domain_crs)){
+#   error_found <- TRUE
+#   error_text <- paste0(error_text,"\n\nMust set both Process_stationary_combustion and Process_natural_gas_distribution to FALSE or set Use_ACES and/or Use_Vulcan to TRUE to disaggregate stationary combustion and natural gas distribution data")
+# }
+# 
+# if((!Use_ACES & !Use_Vulcan) & (Process_stationary_combustion | Process_natural_gas_distribution)){
+#   error_found <- TRUE
+#   error_text <- paste0(error_text,"\n\nMust set both Process_stationary_combustion and Process_natural_gas_distribution to FALSE or set Use_ACES and/or Use_Vulcan to TRUE to disaggregate stationary combustion and natural gas distribution data")
+# }
+# rm(temp)
+#examples - crs must be valid, domain must be in CONUS, inventory year >2010, res >= 0.01, set res to be interpreted using input crs, all directories valid
+
+
+
 #each of the below is just a combination of config options that is unusable
 #(e.g., all activity data choices for a sector set to F).  Add to error text so
 #all config errors can be presented at once.
@@ -341,31 +380,81 @@ if(error_found){
 
 #check with Israel, need to add checks for data types throughout too
 
+rm(error_found,error_text)
 ################################################################################
-#create the domain and set it to all NaN
-if(testmode){
-  domain_res <- domain_res*10
-  inventory_year <- 2016
+#save the config and input data from this point to a text file for reference
+#with the output
+
+sink(file = file.path(output_directory,"Config_settings.txt"),type='output')
+
+#loop through all objects in the environment, except functions, and save them to
+#the file.
+for(object in setdiff(ls(envir = environment()),ls.str(mode = "function"))){
+  print(paste(object,"="),quote = FALSE)
+  temp_data <- get(object)
+  #only include row names if they exist, not just row numbers (confusing to
+  #read)
+  if(class(temp_data)=="data.frame"){
+    if(rownames(temp_data)[1]=="1"){
+      print(temp_data,quote = FALSE,row.names=F,width=300)
+    }else{
+      print(temp_data,quote = FALSE,width=300)
+    }
+  }else{
+    print(temp_data,quote = FALSE,width=300)
+  }
+  #add some blank lines between entries for easier reading
+  print("",quote = FALSE)
+  print("",quote = FALSE)
 }
-if(length(domain_res)==1){
-  domain_res <- rep(domain_res,2)
+sink()
+
+
+################################################################################
+#writing a function to simplify the code a bit.  Just a trycatch for downloading
+#data that pauses for a second if the download fails, then tries again (5x
+#before giving up).  Includes user update and can either handle a file URL (FTP
+#mode) or a JSON (API mode).
+
+#try to download the url, and retry up to 5x with 1s between tries. Based on
+#https://stackoverflow.com/a/60880960
+
+Trycatch_downloader <- function(URL,output_location=NULL,method,error_message){
+  counter = 0
+  repeat{
+    counter=counter+1
+    info=tryCatch(
+      #the url is build from the GHGRP ID, the desired year, and a common url.
+      #This file contains more information about the facility that isn't in the
+      #downloaded file.
+      if(method=="FTP"){
+        download.file(URL,destfile=output_location,quiet = T,method="curl")
+      }else if(method=="API"){
+        fromJSON(URL)
+      }else if(method=="vect"){
+        vect(URL)
+      },
+      warning = function(w) {
+        Sys.sleep(2)
+        NA
+      },
+      error = function(e) {
+        Sys.sleep(2)
+        NA
+      }
+    )
+    if(!all(is.na(info)) | length(info)>1){
+      if(method!="FTP"){
+        return(info)
+      }
+      break
+    }
+    if(counter>=10){
+      stop(error_message)
+    }
+  }
 }
 
-if(class(domain)=="SpatRaster"){
-  values(domain) <- NaN
-}else if(class(domain)=="data.frame"){
-  domain <- rast(nrows=diff(range(domain[,2]))/domain_res[2], 
-                 ncols=diff(range(domain[,1]))/domain_res[1],
-                 xmin=min(domain[,1]), xmax=max(domain[,1]),
-                 ymin=min(domain[,2]), ymax=max(domain[,2]), 
-                 crs=domain_crs)
-  rm(domain_res,domain_crs)
-}
-if(testmode_vulcan){
-  domain <- project(domain,"+proj=lcc +lat_1=33 +lat_2=45 +lat_0=40 +lon_0=-97 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs") #Lambert Conic Conformal, same as Vulcan/ACES
-}else if(testmode){
-  domain <- project(domain,"epsg:4087") #Equidistant Cylindrical - nothing we use has this, significantly different spatially, good test option
-}
 ################################################################################
 #load in Census tigerlines necessary for several functions
 
@@ -385,7 +474,8 @@ if(!all(file.exists(Census_filenames))){
   download_location <- tempfile(fileext = ".zip")
   #download each to a temp file then unzip to the input directory
   for(A in 1:length(Census_FTP_URLs)){
-    download.file(Census_FTP_URLs[A],destfile = download_location,quiet = T)
+    Trycatch_downloader(URL = Census_FTP_URLs[A],output_location = download_location,method = "FTP",
+                        error_message = paste("Census tigerlines could not be downloaded using link:",Census_FTP_URLs[A]))
     unzip(download_location,exdir=file.path(input_directory,c("State_Tigerlines","Urban_Tigerlines","County_Tigerlines")[A]))
   }
   #delete the temp file
@@ -399,25 +489,14 @@ Urban_Tigerlines <- vect(Census_filenames[2])
 County_Tigerlines <- vect(Census_filenames[3])
 
 #project to match the domain (crs)
-State_Tigerlines <- project(State_Tigerlines,domain)
-Urban_Tigerlines <- project(Urban_Tigerlines,domain)
-County_Tigerlines <- project(County_Tigerlines,domain)
-
-#subset to just those relevant for the domain (speedier).  For state it's any
-#state that touches the domain at all.  For county, it's only those within the
-#states (i.e., not just touching the states, crop vs mask for vectors).
-State_Tigerlines <- mask(State_Tigerlines,mask=as.polygons(domain))
-Urban_Tigerlines <- mask(Urban_Tigerlines,mask=State_Tigerlines)
-County_Tigerlines <- crop(County_Tigerlines,State_Tigerlines)
-
-#sort by state abbreviation
-State_Tigerlines <- State_Tigerlines[order(State_Tigerlines$STUSPS),]
-
-#save the states in the domain for use in some functions
-state_name_list <- State_Tigerlines$STUSPS
+State_Tigerlines <- project(State_Tigerlines,domain_crs)
+Urban_Tigerlines <- project(Urban_Tigerlines,domain_crs)
+County_Tigerlines <- project(County_Tigerlines,domain_crs)
 
 #grab the urban area tigerlines for just the focus city
-if(class(focus_city)=="numeric"){
+if(!exists("focus_city")){
+  focus_city_tigerlines <- "none"
+}else if(class(focus_city)=="numeric"){
   #can't use $ for urban tigerlines as column name is UACE10 for 2010 Census,
   #UACE20 for 2020 Census
   focus_city_tigerlines <- terra::subset(Urban_Tigerlines,as.numeric(unlist(Urban_Tigerlines[[1]])) %in% focus_city)
@@ -428,6 +507,105 @@ if(class(focus_city)=="numeric"){
 }
 
 
+rm(UAC_year,Census_filenames)
+################################################################################
+#create the domain
+
+if(testmode){
+  domain_res <- domain_res*10
+  inventory_year <- 2016
+}
+if(length(domain_res)==1){
+  domain_res <- rep(domain_res,2)
+}
+
+
+if(class(domain)=="data.frame"){
+  # domain=data.frame("lon"=c(-76.65,-73.65),
+  #                   "lat"=c(38.97,40.97))
+  
+  domain <- rast(nrows=diff(range(domain[,2]))/domain_res[2], 
+                 ncols=diff(range(domain[,1]))/domain_res[1],
+                 xmin=min(domain[,1]), xmax=max(domain[,1]),
+                 ymin=min(domain[,2]), ymax=max(domain[,2]),
+                 vals=1)
+  domain <- as.polygons(ext(domain),crs=domain_crs)
+}else if(class(domain)=="character"){
+  # domain <- "DE"
+  # domain <- "Delaware"
+  # domain <- "10"
+  # domain <- "Long Neck, DE"
+  # domain <- "51202"
+  
+  if(is.na(suppressWarnings(as.numeric(domain)))){
+    #text is actually text
+    if(nchar(domain)==2){
+      #2 letters = state abbreviation
+      State_Tigerlines <- State_Tigerlines[State_Tigerlines$STUSPS==domain,]
+      domain <- State_Tigerlines[State_Tigerlines$STUSPS==domain,]
+    }else if(domain %in% State_Tigerlines$NAME){
+      #full name of state
+      State_Tigerlines <- State_Tigerlines[State_Tigerlines$NAME==domain,]
+      domain <- State_Tigerlines[State_Tigerlines$NAME==domain,]
+    }else if(domain %in% unlist(values(Urban_Tigerlines[,3]))){
+      #full name of an urban area
+      domain <- Urban_Tigerlines[unlist(values(Urban_Tigerlines[,3]))==domain,]
+    }
+  }else{
+    #text is actually a number
+    if(nchar(domain)==2){
+      #State FIPS
+      State_Tigerlines <- State_Tigerlines[State_Tigerlines$STATEFP==domain,]
+      domain <- State_Tigerlines[State_Tigerlines$STATEFP==domain,]
+    }else if(nchar(domain)==5){
+      #urban area code
+      domain <- Urban_Tigerlines[Urban_Tigerlines$UACE10==domain,]
+    }else{
+      domain <- try(vect(domain),silent=T)
+    }
+  }
+}
+
+if(class(domain)!="SpatVector"){
+  stop("domain is not set to a state abbreviation, state full name, state FIPS code, urban area abbreviation, urban area full name, urban area census code, data.frame with the corners of a box, or a SpatVector file with the desired polygon.")
+}
+
+
+# if(class(domain)=="SpatVector"){
+#   temp <- rast(ext(domain)*1.1,resolution=domain_res,crs=domain_crs,vals=1)
+#   cover <- extract(temp,domain,weights=T,exact=T,cells=T)
+#   values(temp) <- NA
+#   temp[cover[,'cell']] <- cover[,'weight']
+#   domain <- temp
+#   
+#   rm(temp,cover)
+# }
+
+domain_template <- rast(domain,resolution=domain_res,crs=domain_crs,vals=NA)
+
+
+if(testmode_vulcan){
+  domain <- project(domain,"+proj=lcc +lat_1=33 +lat_2=45 +lat_0=40 +lon_0=-97 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs") #Lambert Conic Conformal, same as Vulcan/ACES
+}else if(testmode){
+  domain <- project(domain,"epsg:4087") #Equidistant Cylindrical - nothing we use has this, significantly different spatially, good test option
+}
+
+################################################################################
+# Now crop/mask the tigerlines to the domain
+
+#subset to just those relevant for the domain.  For state it's any
+#state that touches the domain at all.  For county, it's only those within the
+#states (i.e., not just touching the states, crop vs mask for vectors).
+State_Tigerlines <- mask(State_Tigerlines,mask=domain)
+Urban_Tigerlines <- mask(Urban_Tigerlines,mask=domain)
+County_Tigerlines <- crop(County_Tigerlines,State_Tigerlines)
+
+#sort by state abbreviation
+State_Tigerlines <- State_Tigerlines[order(State_Tigerlines$STUSPS),]
+
+#save the states in the domain for use in some functions
+state_name_list <- State_Tigerlines$STUSPS
+
 #if there's only 1 state, there's no point in processing by domain and by state
 #as they're identical.
 if(length(state_name_list)==1){
@@ -435,8 +613,6 @@ if(length(state_name_list)==1){
   NG_distribution_by_domain <- FALSE
 }
 
-
-rm(UAC_year,Census_filenames,focus_city)
 ################################################################################
 #Download the facility details (e.g., location) for GHGRP facilities using the
 #API.  Will be needed for several sectors.
@@ -449,7 +625,8 @@ data_URL <- "https://data.epa.gov/efservice/PUB_DIM_FACILITY/JSON"
 # year/states of interest.  Cannot filter to year as previous year's data is
 # used in some functions.  Cannot filter to state as distribution needs to
 # correct some states as they list headquarters rather than area of operation.
-ghgrp_facility_info <- fromJSON(data_URL)
+ghgrp_facility_info <- Trycatch_downloader(URL = data_URL,method = "API",
+                                           error_message = paste0("Greenhouse Gas Reporting Program data could not be downloaded using API link: ",data_URL))
 
 rm(data_URL)
 # }
@@ -459,9 +636,8 @@ rm(data_URL)
 #one check now that we have the state list - ensure that the septic input
 #census data is for the states in the domain and only them.
 if(Process_wastewater & !(all(Wastewater_State_info$State %in% state_name_list) & all(state_name_list %in% Wastewater_State_info$State))){
-  stop("\n\nMust set Wastewater_State_info in the config for the states in the domain, and only the states in the domain - which are: ",state_name_list)
+  stop("\nMust set Wastewater_State_info in the config for the states in the domain, and only the states in the domain - which are:\n",paste(state_name_list,collapse=", "))
 }
-
 
 ################################################################################
 #Actually run the functions now, based on the config file
@@ -496,6 +672,7 @@ if(Process_landfills){
   Municipal_solid_waste(LMOP_file=file.path(input_directory,
                                             "lmopdata(Mar_24)_landfill_only.xlsx"),
                         domain=domain,
+                        domain_template=domain_template,
                         state_name_list=state_name_list,
                         output_directory=output_directory,
                         inventory_year=inventory_year,
@@ -523,6 +700,7 @@ if(Process_natural_gas_distribution){
   # rm(code_directory)
   # filter_vulcan()
   NG_distribution(domain=domain,
+                  domain_template=domain_template,
                   state_name_list=state_name_list,
                   output_directory=output_directory,
                   inventory_year=inventory_year,
@@ -572,6 +750,7 @@ if(Process_natural_gas_transmission){
                GHGI_Pipeline=GHGI_Pipeline,
                HIFLD_compressor_file=file.path(input_directory,'Natural_Gas_Compressor_Stations.csv'),
                domain=domain,
+               domain_template=domain_template,
                ghgrp_facility_info=ghgrp_facility_info,
                state_name_list=state_name_list,
                output_directory=output_directory,
@@ -597,8 +776,8 @@ if(Process_stationary_combustion){
   # main_config()
   # rm(code_directory)
   # Stationary_combustion(NEI_file=file.path("~/../Desktop/nei.xlsx"),
-  Stationary_combustion(NEI_file=file.path(input_directory,"NEI_2017.xlsx"),
-                        domain=domain,
+  Stationary_combustion(domain=domain,
+                        domain_template=domain_template,
                         state_name_list=state_name_list,
                         output_directory=output_directory,
                         inventory_year=inventory_year,
@@ -648,6 +827,7 @@ if(Process_wastewater){
              Wastewater_Municipal_method=Wastewater_Municipal_method,
              Wastewater_Municipal_file=Wastewater_Municipal_file,
              domain=domain,
+             domain_template=domain_template,
              ghgrp_facility_info=ghgrp_facility_info,
              state_name_list=state_name_list,
              inventory_year=inventory_year,
@@ -678,6 +858,7 @@ if(Process_wetlands_and_inland_waters){
     Disaggregate_Wetcharts(input_directory=input_directory,
                            output_directory=output_directory,
                            domain=domain,
+                           domain_template=domain_template,
                            verbose=verbose,
                            inventory_year=inventory_year,
                            plot_directory=plot_directory,
@@ -733,6 +914,7 @@ if(Incorporate_remaining_sectors_from_gridded_EPA){
                input_directory=input_directory,
                output_directory=output_directory,
                domain=domain,
+               domain_template=domain_template,
                verbose=verbose)
 }
 if(Combine_sectors){
