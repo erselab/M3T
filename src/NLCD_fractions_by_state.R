@@ -67,6 +67,8 @@ NLCD_open_and_low_int <- function(NLCD_file,
                                   State_Tigerlines,
                                   state_name_list,
                                   output_directory){
+  
+  
   starttime <- Sys.time()
   cat("Starting wastewater sector: NLCD_open_and_low_int\n")
   ################################################################################
@@ -100,6 +102,7 @@ NLCD_open_and_low_int <- function(NLCD_file,
     state_sub_poly <- subset(NLCD_states_trans, NLCD_states_trans$STUSPS==state_name_list[A])
     NLCD_suburban_subset <- crop(NLCD_suburban,state_sub_poly,snap='out')
     NLCD_suburban_subset <- mask(NLCD_suburban_subset,state_sub_poly,touches=F)
+    NLCD_suburban_subset[is.na(NLCD_suburban_subset)] <- 0
     
     #calculate total septic-relevant area per state.  State total, not just the
     #fraction of the state in the domain
@@ -107,12 +110,10 @@ NLCD_open_and_low_int <- function(NLCD_file,
     area_df <- rbind(area_df,NLCD_subset_area)
     rownames(area_df)[A] <- state_name_list[A]
     
-    #set NA values outside the state to 0 and add a few pixels worth of buffer
-    #(at the domain resolution) filled with 0's.  Average would otherwise ignore
-    #these NA values in calculations.
-    NLCD_suburban_subset[is.na(NLCD_suburban_subset)] <- 0
+    #Add a few pixels worth of buffer (at the domain resolution) filled with
+    #0's.  Average would otherwise ignore these NA values in calculations.
     NLCD_suburban_subset <- extend(NLCD_suburban_subset,fill=0,
-                                   ext(NLCD_suburban_subset)+(res(project(domain,crs(NLCD_suburban)))*5))
+                                   ext(NLCD_suburban_subset)+(res(project(domain_template,crs(NLCD_suburban)))*5))
     
     writeRaster(NLCD_suburban_subset,subset_tmpfile)
     NLCD_suburban_subset <- rast(subset_tmpfile)
@@ -120,7 +121,7 @@ NLCD_open_and_low_int <- function(NLCD_file,
     #project to the exact domain (resolution, origin, extent, etc.) using an
     #average.  Represents the fractional coverage of wetlands in each pixel (0 -
     #1).
-    NLCD_suburban_reprojected <- project(NLCD_suburban_subset,domain,method="average")
+    NLCD_suburban_reprojected <- project(NLCD_suburban_subset,domain_template,method="average")
     
     #save
     if(XESMF){
@@ -133,10 +134,10 @@ NLCD_open_and_low_int <- function(NLCD_file,
                overwrite=T)
     }
     unlink(subset_tmpfile)
-    cat("Finished processing",state_name_list[A],"landcover at",difftime(Sys.time(),starttime,units = "min"),"minutes since start\n")
+    cat("Finished processing",state_name_list[A],"landcover at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
   }
   colnames(area_df) <- c("open_or_low_int_area")
   #save state-level totals
   write.csv(area_df,file.path(output_directory,'NLCD_state_total_areas.csv'))
-  cat("Finished wastewater sector: NLCD_open_and_low_int in",difftime(Sys.time(),starttime,units = "min"),"minutes\n")
+  cat("Finished wastewater sector: NLCD_open_and_low_int in",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
 }
