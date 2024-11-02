@@ -76,6 +76,7 @@ Prepare_GEPA <- function(inventory_year,
                          input_directory,
                          output_directory,
                          domain,
+                         domain_template,
                          verbose){
   
   starttime <- Sys.time()
@@ -109,7 +110,7 @@ Prepare_GEPA <- function(inventory_year,
   GEPA <- GEPA*(1e9*100^2)/(6.022141e+23)
   
   #aggregate/disaggregate to a similar resolution
-  domain_trans <- project(domain,crs(GEPA))
+  domain_trans <- project(domain_template,crs(GEPA))
   domain_res <- res(domain_trans)
   if(any(domain_res<res(GEPA))){
     # domain_GEPA <- aggregate(domain,round(res(GEPA)/domain_res,3))
@@ -117,21 +118,28 @@ Prepare_GEPA <- function(inventory_year,
     # GEPA <- disagg(GEPA,round(res(GEPA)/domain_res,3),"nearest")
     
     #crop to the domain + buffer first to speed up process
-    GEPA <- crop(GEPA,ext(domain_trans)*1.1)
+    GEPA <- crop(GEPA,ext(domain_trans)*1.1,snap="out")
     GEPA <- disagg(GEPA,round(res(GEPA)/domain_res,3),"near")
     #reproject to exact domain now.  Here using nearest neighbor to prevent only
     #1 row/column of higher res pixels on the border of each GEPA pixel from
     #being interpolated.
-    GEPA <- project(GEPA,domain,method="near")
+    GEPA <- project(GEPA,domain_template,method="near")
+    GEPA <- mask(GEPA,domain)
+    cover <- extract(GEPA[[1]],domain,weights=T,exact=T,cells=T)
+    GEPA[cover[,'cell']] <- GEPA[cover[,'cell']]*cover[,'weight']
   }else if(any(domain_res>res(GEPA))){
     GEPA <- crop(GEPA,domain_trans,snap="out")
-
+    GEPA <- mask(GEPA,domain_trans,touches=T,updatevalue=0)
+    cover <- extract(GEPA,domain_trans,weights=T,exact=T,cells=T)
+    GEPA[cover[,'cell']] <- GEPA[cover[,'cell']]*cover[,'weight']
+    GEPA=extend(GEPA,fill=0,
+                 ext(GEPA)+(res(project(domain_template,crs(GEPA)))*5))
+    
     #reproject to exact domain now using an average to effectively aggregate
     #while reprojecting.
-    GEPA <- project(GEPA,domain,method="average")
+    GEPA <- project(GEPA,domain_template,method="average")
   }
-  
-  
+
   GEPA_non_thermo_sectors <- c("emi_ch4_5B1_Composting",
                                "emi_ch4_3A_Enteric_Fermentation",
                                "emi_ch4_3B_Manure_Management",
@@ -194,8 +202,8 @@ Prepare_GEPA <- function(inventory_year,
   #Plots
   
   if(verbose){
-    zlim_min <- min(global(GEPA_landfill,min),global(GEPA_non_thermo,min),global(GEPA_thermo,min))
-    zlim_max <- max(global(GEPA_landfill,max),global(GEPA_non_thermo,max),global(GEPA_thermo,max))
+    zlim_min <- min(global(GEPA_landfill,min,na.rm=T),global(GEPA_non_thermo,min,na.rm=T),global(GEPA_thermo,min,na.rm=T))
+    zlim_max <- max(global(GEPA_landfill,max,na.rm=T),global(GEPA_non_thermo,max,na.rm=T),global(GEPA_thermo,max,na.rm=T))
     not_log_plot(GEPA_landfill,filename="GEPA_industrial_landfills",
                  "Gridded EPA Inventory -\nIndustrial landfills",
                  zlim_min=zlim_min,zlim_max=zlim_max)
@@ -206,10 +214,10 @@ Prepare_GEPA <- function(inventory_year,
                  "Gridded EPA Inventory -\nNon-thermogenic Sectors",
                  zlim_min=zlim_min,zlim_max=zlim_max)
     
-    Summed_GEPA <- GEPA_landfill+GEPA_non_thermo+GEPA_thermo
+    Summed_GEPA <- sum(GEPA_landfill,GEPA_non_thermo,GEPA_thermo,na.rm=T)
     not_log_plot(Summed_GEPA,
              "Gridded EPA Inventory -\nAll sectors pulled directly from the GEPA")
   }
-  cat("Finished pulling remaining sectors from gridded EPA inventory: Prepare_GEPA in",difftime(Sys.time(),starttime,units = "min"),"minutes\n")
+  cat("Finished pulling remaining sectors from gridded EPA inventory: Prepare_GEPA in",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
 }
 
