@@ -335,15 +335,21 @@ SOCCR_Wetlands <- function(output_directory,
     zlim_max <- 0
     if(Use_SOCCR1){
       SOCCR1_flux <- sum(SOCCR1_flux,na.rm=T)
-      zlim_max <- max(zlim_max,as.numeric(global(SOCCR1_flux,max,na.rm=T)))
+      if(!all(is.na(values(SOCCR1_flux)))){
+        zlim_max <- max(zlim_max,as.numeric(global(SOCCR1_flux,max,na.rm=T)))
+      }
     }
     if(Use_SOCCR2){
       SOCCR2_flux <- sum(SOCCR2_flux,na.rm=T)
-      zlim_max <- max(zlim_max,as.numeric(global(SOCCR2_flux,max,na.rm=T)))
+      if(!all(is.na(values(SOCCR2_flux)))){
+        zlim_max <- max(zlim_max,as.numeric(global(SOCCR2_flux,max,na.rm=T)))
+      }
     }
     if(Include_freshwater){
       Freshwater_flux <- sum(Freshwater_flux,na.rm=T)
-      zlim_max <- max(zlim_max,as.numeric(global(Freshwater_flux,max,na.rm=T)))
+      if(!all(is.na(values(Freshwater_flux)))){
+        zlim_max <- max(zlim_max,as.numeric(global(Freshwater_flux,max,na.rm=T)))
+      }
     }
     
     
@@ -352,19 +358,28 @@ SOCCR_Wetlands <- function(output_directory,
       log_plot(input = SOCCR1_flux,
                zlim_min = zlim_min, zlim_max = zlim_max,
                filename = 'SOCCR1',
-               title = paste0("SOCCR1 CH4\nSaturated colorscale low end"))
+               title = paste0("SOCCR1 CH4\nSaturated colorscale low end"),
+               plot_directory=plot_directory,
+               domain=domain,County_Tigerlines=County_Tigerlines,
+               State_Tigerlines=State_Tigerlines)
     }
     if(Use_SOCCR2){
       log_plot(input = SOCCR2_flux,
                zlim_min = zlim_min, zlim_max = zlim_max,
                filename = 'SOCCR2',
-               title = paste0("SOCCR2 CH4\nSaturated colorscale low end"))
+               title = paste0("SOCCR2 CH4\nSaturated colorscale low end"),
+               plot_directory=plot_directory,
+               domain=domain,County_Tigerlines=County_Tigerlines,
+               State_Tigerlines=State_Tigerlines)
     }
     if(Include_freshwater){
       log_plot(input = Freshwater_flux,
                zlim_min = zlim_min, zlim_max = zlim_max,
                filename = 'Freshwater',
-               title = paste0("Freshwater CH4\nSaturated colorscale low end"))
+               title = paste0("Freshwater CH4\nSaturated colorscale low end"),
+               plot_directory=plot_directory,
+               domain=domain,County_Tigerlines=County_Tigerlines,
+               State_Tigerlines=State_Tigerlines)
     }
   }
   cat("Finished wastewater sector: SOCCR_Wetlands in",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
