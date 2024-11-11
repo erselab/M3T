@@ -64,6 +64,8 @@
 
 NLCD_open_and_low_int <- function(NLCD_file,
                                   domain,
+                                  domain_template,
+                                  XESMF,
                                   State_Tigerlines,
                                   state_name_list,
                                   output_directory){
