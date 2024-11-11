@@ -361,9 +361,11 @@
 NG_distribution <- function(domain,
                             domain_template,
                             state_name_list,
+                            input_directory,
                             output_directory,
                             inventory_year,
                             verbose,
+                            XESMF,
                             ghgrp_facility_info,
                             HIFLD_file,
                             EIA_file,
@@ -402,7 +404,13 @@ NG_distribution <- function(domain,
     
     # Load the EIA company-level data for 2019 - this may have been edited to add a
     # dummy 'OTHER' entry
-    EIA_csv <- read_xlsx(EIA_file,skip=1,col_names = T)
+    # EIA_csv <- read_xlsx(EIA_file,skip=1,col_names = T)
+    EIA_csv <- suppressMessages(read_xlsx(EIA_file,col_names = T))
+    #older versions had 2 rows of headers, need to skip the broader one to run
+    #properly in that case.
+    if(colnames(EIA_csv)[1]=="...1"){
+      EIA_csv <- read_xlsx(EIA_file,col_names = T,skip=1)
+    }
     # Load the PHMSA data for 2019 - this file may have had company ID's edited to
     # be consistent with EIA for the states that we will use
     PHMSA_csv <- read_xlsx(PHMSA_file,skip=2,col_names = T)
@@ -421,7 +429,8 @@ NG_distribution <- function(domain,
     
     #download the relevant LDC-sector data
     #(https://www.epa.gov/enviro/greenhouse-gas-model).  
-    data_URL <- "https://data.epa.gov/efservice/ef_w_emissions_source_ghg/JSON"
+    # data_URL <- "https://data.epa.gov/efservice/ef_w_emissions_source_ghg/JSON"
+    data_URL <- "https://data.epa.gov/dmapservice/ghg.ef_w_emissions_source_ghg/json"
     ghgrp_w_only_emissions <- Trycatch_downloader(URL = data_URL,method = "API",
                                                   error_message = paste0("Greenhouse Gas Reporting Program data could not be downloaded using API link: ",data_URL))
     
@@ -969,164 +978,10 @@ NG_distribution <- function(domain,
   }
   if(Use_Vulcan){
     vu_res <- rast(paste0(vulcan_directory,"/Sectoral/","Vulcan_v3_US_annual_1km_residential_mn.nc4"), subds='carbon_emissions', lyrs=vulcan_band)
-    vu_com <- rast(paste0(vulcan_directory,"/Sectoral/",'Vulcan_v3_US_annual_1km_commercial_mn.nc4'), subds='carbon_emissions', lyrs=vulcan_band)
+    vu_com <- rast(paste0(vulcan_directory,"/Sectoral/",'Vulcan_v3_US_annual_1km_commercial_filt.nc'), subds='carbon_emissions', lyrs=vulcan_band)
+    # vu_com <- rast(paste0(vulcan_directory,"/Sectoral/",'Vulcan_v3_US_annual_1km_commercial_mn.nc4'), subds='carbon_emissions', lyrs=vulcan_band)
   }
   
-  ################################################################################
-  #use ACES/Vulcan to redistribute residential/commercial emissions at the LDC
-  #level
-  if(NG_distribution_by_LDC){
-    if(Use_ACES){
-      # tempdata <- aces_res
-      # values(tempdata) <- 0
-      
-      #mask to only keep those LDCs that are at least partly within the domain
-      all_merge_LCC <- mask(all_merge_clean,domain)
-      #convert to the proper crs
-      all_merge_LCC <- project(all_merge_LCC,aces_res)
-      
-      # all_merge_LCC <- all_merge_LCC[2,]
-      # tempdata <- crop(tempdata,all_merge_LCC)
-      # tempdata2 <- tempdata
-      # tempdata3 <- tempdata
-      # start <- Sys.time()
-      # test1=cells(tempdata,all_merge_LCC,exact=T,touches=T)
-      # tempdata[test1[,'cell']] <- test1[,"weights"]
-      # end1 <- Sys.time()
-      # 
-      # 
-      # test2=extract(tempdata,all_merge_LCC,weights=T,exact=T,cells=T)
-      # tempdata2[test2[,'cell']] <- test2[,"weight"]
-      # end2 <- Sys.time()
-      # 
-      # test3 <- cells(tempdata3,all_merge_LCC,exact=F,touches=T)
-      # test3 <- cells(tempdata3[test3[,'cell'],drop=F],all_merge_LCC,exact=T,touches=T)
-      # tempdata3[test3[,'cell']] <- test3[,"weights"]
-      # end3 <- Sys.time()
-      
-      # LDC_count <- nrow(all_merge_LCC)
-      # all_merge_LCC$count <- 1:nrow(all_merge_LCC)
-      # cover_all <- all_merge_LCC %>% 
-      #   split(f=all_merge_LCC$HIFLD_SVCTERID) %>%
-      #   lapply(function(x){cells(aces_res,x,weights=T,exact=T);cat("\rProcessing",x$count,"of",LDC_count,"LDCs            ")})
-      # 
-      # aces_res_temp <- crop(aces_res,ext(project(State_Tigerlines,aces_res))*1.2) - untested impact
-      # 
-      LDC_count <- nrow(all_merge_LCC)
-      if(LDC_count==1){
-        cover_all <- list(extract(aces_res,all_merge_LCC,weights=T,exact=T,cells=T))
-      }else{
-        all_merge_LCC$count <- 1:nrow(all_merge_LCC)
-        cover_all <- all_merge_LCC %>% 
-        split(f=all_merge_LCC$HIFLD_SVCTERID) %>%
-        lapply(function(x){cat("\rProcessing",x$count,"of",LDC_count,"LDCs using ACES                                   ");extract(aces_res,x,weights=T,exact=T,cells=T)})
-      }
-      
-      disaggregation(aces_res,res_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
-      disaggregation(aces_com,com_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
-    }
-    if(Use_Vulcan){
-      all_merge_LCC <- mask(all_merge_clean,domain)
-      all_merge_LCC <- project(all_merge_LCC,vu_res)
-      
-      if(LDC_count==1){
-        cover_all <- list(extract(vu_res,all_merge_LCC,weights=T,exact=T,cells=T))
-      }else{
-        LDC_count <- nrow(all_merge_LCC)
-        all_merge_LCC$count <- 1:nrow(all_merge_LCC)
-        cover_all <- all_merge_LCC %>% 
-          split(f=all_merge_LCC$HIFLD_SVCTERID) %>%
-          lapply(function(x){cat("\rProcessing",x$count,"of",LDC_count,"LDCs using vulcan                                  ");extract(vu_res,x,weights=T,exact=T,cells=T)})
-      }
-      
-      disaggregation(vu_res,res_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
-      disaggregation(vu_com,com_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
-    }
-    cat("\rFinished disaggregating emissions to pixels from the LDC scale at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
-  }
-  
-  ################################################################################
-  ## Now aggregate emissions at the state level and repeat
-  # Side note - splitting into residential/commercial emissions at the company
-  # level, then aggregating (as we do here) is probably more logical than
-  # aggregating total emissions at the state level, then splitting into
-  # residential/commercial This is obvious if you think of a situation where one
-  # company dominates emissions, but another dominates consumers. In that case the
-  # residential/commercial split should closely match that of the high emitting
-  # company, not the high consumer company.
-  
-  if(NG_distribution_by_state){
-    if(NG_distribution_by_LDC){
-      all_merge_state <- aggregate(as.data.frame(all_merge_clean[,!(names(all_merge_clean) %in% c('HIFLD_SVCTERID', 'EIA_Company', 'EIA_Company_Name', 'PHMSA_State'))]),
-                                   list(PHMSA_State=all_merge_clean$PHMSA_State),
-                                   sum,na.rm=T)
-      # Merge the geometries
-      all_merge_state_poly <- merge(State_Tigerlines, all_merge_state, by.y='PHMSA_State', by.x='STUSPS')
-      names(all_merge_state_poly) <- gsub("STUSPS","PHMSA_State",names(all_merge_state_poly))
-    }else{
-      all_merge_state_poly <- all_merge_clean
-      all_merge_state <- as.data.frame(all_merge_clean)
-    }
-    
-    
-    if(Use_ACES){
-      #convert state scale version to the proper crs
-      all_merge_LCC_state <- project(all_merge_state_poly,aces_res)
-      
-      if(length(state_name_list)==1){
-        cover_all <- list(extract(aces_res,all_merge_LCC_state,weights=T,exact=T,cells=T))
-      }else{
-        cover_all <- all_merge_LCC_state %>% 
-          split(f=all_merge_LCC_state$STATEFP) %>%
-          lapply(function(x){extract(aces_res,x,weights=T,exact=T,cells=T)})
-      }
-      
-      disaggregation(aces_res,res_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all,out_envir=environment())
-      disaggregation(aces_com,com_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all,out_envir=environment())
-    }
-    if(Use_Vulcan){
-      all_merge_LCC_state <- project(all_merge_state_poly,vu_res)
-      
-      if(length(state_name_list)==1){
-        cover_all <- list(extract(vu_res,all_merge_LCC_state,weights=T,exact=T,cells=T))
-      }else{
-        cover_all <- all_merge_LCC_state %>% 
-          split(f=all_merge_LCC_state$STATEFP) %>%
-          lapply(function(x){extract(vu_res,x,weights=T,exact=T,cells=T)})
-      }
-      
-      disaggregation(vu_res,res_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all,out_envir=environment())
-      disaggregation(vu_com,com_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all,out_envir=environment())
-    }
-    cat("\rFinished disaggregating emissions to pixels from the state scale at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
-  }
-  ################################################################################
-  #Repeat when aggregated to the domain total.
-  
-  if(NG_distribution_by_domain){
-    all_merge_domain <- suppressWarnings(apply(as.data.frame(all_merge_clean),2,as.numeric))
-    all_merge_domain <- colSums(all_merge_domain)
-    
-    all_merge_domain_poly <- aggregate(State_Tigerlines)
-    values(all_merge_domain_poly) <- t(all_merge_domain)
-    
-    if(Use_ACES){
-      #convert domain scale version to the proper crs
-      all_merge_LCC_domain <- project(all_merge_domain_poly,aces_res)
-      cover_all <- list(extract(aces_res,all_merge_LCC_domain,weights=T,exact=T,cells=T))
-      
-      disaggregation(aces_res,res_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
-      disaggregation(aces_com,com_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
-    }
-    if(Use_Vulcan){
-      all_merge_LCC_domain <- project(all_merge_domain_poly,vu_res)
-      cover_all <- list(extract(vu_res,all_merge_LCC_domain,weights=T,exact=T,cells=T))
-      
-      disaggregation(vu_res,res_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
-      disaggregation(vu_com,com_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
-    }
-    cat("\rFinished disaggregating emissions to pixels from the domain scale at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
-  }
   ################################################################################
   #write a function to save, dependent on whether or not we use XESMF
   if(XESMF){
@@ -1165,9 +1020,9 @@ NG_distribution <- function(domain,
       cover <- extract(input,domain_reproj,weights=T,exact=T,cells=T)
       input[cover[,'cell']] <- input[cover[,'cell']]*cover[,'weight']
       input=extend(input,fill=0,
-                  ext(input)+(res(project(domain_template,crs(input)))*5))
+                   ext(input)+(res(project(domain_template,crs(input)))*5))
       input=project(input,domain_template,method="average")
-
+      
       #convert from mol/km2s to nmol/m2s
       input <- input*1000
       
@@ -1218,65 +1073,267 @@ NG_distribution <- function(domain,
                                ' totals using ',inventory_name,' ',sector_name,' CO2 emissions'),
                missval=-9999,
                overwrite=TRUE)
+      # writeCDF(input,
+      #          paste0(output_directory,'/',"NG_dist_",sub("_ER_total","",total),
+      #                 "_",disaggregation_level,"_",inventory_name,"_State_Division_",A,'.nc'),
+      #          force_v4=TRUE,
+      #          varname='methane_emissions',
+      #          unit='nmol/m2/s',
+      #          longname=paste0('Methane emissions from natural gas distribution ',subsector_name,
+      #                          ', spatially allocated from ',disaggregation_name,
+      #                          ' totals using ',inventory_name,' ',sector_name,' CO2 emissions'),
+      #          missval=-9999,
+      #          overwrite=TRUE)
     }
   }
-  ################################################################################
-  #Save the output
-  
-  # Now save the rasters for each subsector
-  for(total in res_totals){
+  # ################################################################################
+  # #put everything below into a loop IF there are many states to speed up
+  # #processing and avoid memory errors
+  # 
+  # State_subsets <- unique(State_Tigerlines$DIVISION)
+  # if(length(state_name_list)<10){
+  #   all_merge_clean$DIVISION <- 1
+  #   State_subsets=1
+  # }
+  # for(A in 1:length(State_subsets)){
+    # all_merge_subset <- all_merge_clean[all_merge_clean$DIVISION==A,]
+    
+    
+    all_merge_subset <- all_merge_clean
+    rm(all_merge_clean)
+    ################################################################################
+    #use ACES/Vulcan to redistribute residential/commercial emissions at the LDC
+    #level
     if(NG_distribution_by_LDC){
       if(Use_ACES){
-        save_data(aces_res_ch4_byLDC[[total]])
+        # tempdata <- aces_res
+        # values(tempdata) <- 0
+        
+        #mask to only keep those LDCs that are at least partly within the domain
+        all_merge_LCC <- mask(all_merge_subset,domain)
+        #convert to the proper crs
+        all_merge_LCC <- project(all_merge_LCC,aces_res)
+        
+        # all_merge_LCC <- all_merge_LCC[2,]
+        # tempdata <- crop(tempdata,all_merge_LCC)
+        # tempdata2 <- tempdata
+        # tempdata3 <- tempdata
+        # start <- Sys.time()
+        # test1=cells(tempdata,all_merge_LCC,exact=T,touches=T)
+        # tempdata[test1[,'cell']] <- test1[,"weights"]
+        # end1 <- Sys.time()
+        # 
+        # 
+        # test2=extract(tempdata,all_merge_LCC,weights=T,exact=T,cells=T)
+        # tempdata2[test2[,'cell']] <- test2[,"weight"]
+        # end2 <- Sys.time()
+        # 
+        # test3 <- cells(tempdata3,all_merge_LCC,exact=F,touches=T)
+        # test3 <- cells(tempdata3[test3[,'cell'],drop=F],all_merge_LCC,exact=T,touches=T)
+        # tempdata3[test3[,'cell']] <- test3[,"weights"]
+        # end3 <- Sys.time()
+        
+        # LDC_count <- nrow(all_merge_LCC)
+        # all_merge_LCC$count <- 1:nrow(all_merge_LCC)
+        # cover_all <- all_merge_LCC %>% 
+        #   split(f=all_merge_LCC$HIFLD_SVCTERID) %>%
+        #   lapply(function(x){cells(aces_res,x,weights=T,exact=T);cat("\rProcessing",x$count,"of",LDC_count,"LDCs            ")})
+        # 
+        # aces_res_temp <- crop(aces_res,ext(project(State_Tigerlines,aces_res))*1.2) - untested impact
+        # 
+        LDC_count <- nrow(all_merge_LCC)
+        if(LDC_count==1){
+          cover_all <- list(extract(aces_res,all_merge_LCC,weights=T,exact=T,cells=T))
+        }else{
+          all_merge_LCC$count <- 1:nrow(all_merge_LCC)
+          cover_all <- all_merge_LCC %>% 
+            split(f=all_merge_LCC$HIFLD_SVCTERID) %>%
+            lapply(function(x){cat("\rProcessing",x$count,"of",LDC_count,"LDCs using ACES                                   ");extract(aces_res,x,weights=T,exact=T,cells=T)})
+        }
+        
+        disaggregation(aces_res,res_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
+        disaggregation(aces_com,com_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
       }
       if(Use_Vulcan){
-        save_data(vu_res_ch4_byLDC[[total]])
+        all_merge_LCC <- mask(all_merge_subset,domain)
+        all_merge_LCC <- project(all_merge_LCC,vu_res)
+        
+        if(LDC_count==1){
+          cover_all <- list(extract(vu_res,all_merge_LCC,weights=T,exact=T,cells=T))
+        }else{
+          LDC_count <- nrow(all_merge_LCC)
+          all_merge_LCC$count <- 1:nrow(all_merge_LCC)
+          cover_all <- all_merge_LCC %>% 
+            split(f=all_merge_LCC$HIFLD_SVCTERID) %>%
+            lapply(function(x){cat("\rProcessing",x$count,"of",LDC_count,"LDCs using vulcan                                  ");extract(vu_res,x,weights=T,exact=T,cells=T)})
+        }
+        
+        disaggregation(vu_res,res_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
+        disaggregation(vu_com,com_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
       }
+      cat("\rFinished disaggregating emissions to pixels from the LDC scale at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
     }
+    
+    ################################################################################
+    ## Now aggregate emissions at the state level and repeat
+    # Side note - splitting into residential/commercial emissions at the company
+    # level, then aggregating (as we do here) is probably more logical than
+    # aggregating total emissions at the state level, then splitting into
+    # residential/commercial This is obvious if you think of a situation where one
+    # company dominates emissions, but another dominates consumers. In that case the
+    # residential/commercial split should closely match that of the high emitting
+    # company, not the high consumer company.
+    
     if(NG_distribution_by_state){
+      if(NG_distribution_by_LDC){
+        all_merge_state <- aggregate(as.data.frame(all_merge_subset[,!(names(all_merge_subset) %in% c('HIFLD_SVCTERID', 'EIA_Company', 'EIA_Company_Name', 'PHMSA_State'))]),
+                                     list(PHMSA_State=all_merge_subset$PHMSA_State),
+                                     sum,na.rm=T)
+        # Merge the geometries
+        all_merge_state_poly <- merge(State_Tigerlines, all_merge_state, by.y='PHMSA_State', by.x='STUSPS')
+        names(all_merge_state_poly) <- gsub("STUSPS","PHMSA_State",names(all_merge_state_poly))
+      }else{
+        all_merge_state_poly <- all_merge_subset
+        all_merge_state <- as.data.frame(all_merge_subset)
+      }
+      
+      
       if(Use_ACES){
-        save_data(aces_res_ch4_bystate[[total]])
+        #convert state scale version to the proper crs
+        all_merge_LCC_state <- project(all_merge_state_poly,aces_res)
+        
+        if(length(state_name_list)==1){
+          cover_all <- list(extract(aces_res,all_merge_LCC_state,weights=T,exact=T,cells=T))
+        }else{
+          cover_all <- all_merge_LCC_state %>% 
+            split(f=all_merge_LCC_state$STATEFP) %>%
+            lapply(function(x){extract(aces_res,x,weights=T,exact=T,cells=T)})
+        }
+        
+        disaggregation(aces_res,res_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all,out_envir=environment())
+        disaggregation(aces_com,com_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all,out_envir=environment())
       }
       if(Use_Vulcan){
-        save_data(vu_res_ch4_bystate[[total]])
+        all_merge_LCC_state <- project(all_merge_state_poly,vu_res)
+        
+        if(length(state_name_list)==1){
+          cover_all <- list(extract(vu_res,all_merge_LCC_state,weights=T,exact=T,cells=T))
+        }else{
+          cover_all <- all_merge_LCC_state %>% 
+            split(f=all_merge_LCC_state$STATEFP) %>%
+            lapply(function(x){extract(vu_res,x,weights=T,exact=T,cells=T)})
+        }
+        
+        disaggregation(vu_res,res_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all,out_envir=environment())
+        disaggregation(vu_com,com_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all,out_envir=environment())
       }
+      cat("\rFinished disaggregating emissions to pixels from the state scale at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
     }
+    ################################################################################
+    #Repeat when aggregated to the domain total.
+    
     if(NG_distribution_by_domain){
+      all_merge_domain <- suppressWarnings(apply(as.data.frame(all_merge_subset),2,as.numeric))
+      all_merge_domain <- colSums(all_merge_domain)
+      
+      all_merge_domain_poly <- aggregate(State_Tigerlines)
+      values(all_merge_domain_poly) <- t(all_merge_domain)
+      
       if(Use_ACES){
-        save_data(aces_res_ch4_bydomain[[total]])
+        #convert domain scale version to the proper crs
+        all_merge_LCC_domain <- project(all_merge_domain_poly,aces_res)
+        cover_all <- list(extract(aces_res,all_merge_LCC_domain,weights=T,exact=T,cells=T))
+        
+        disaggregation(aces_res,res_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
+        disaggregation(aces_com,com_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
       }
       if(Use_Vulcan){
-        save_data(vu_res_ch4_bydomain[[total]])
+        all_merge_LCC_domain <- project(all_merge_domain_poly,vu_res)
+        cover_all <- list(extract(vu_res,all_merge_LCC_domain,weights=T,exact=T,cells=T))
+        
+        disaggregation(vu_res,res_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
+        disaggregation(vu_com,com_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
+      }
+      cat("\rFinished disaggregating emissions to pixels from the domain scale at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
+    }
+    ################################################################################
+    #Save the output
+    
+    # Now save the rasters for each subsector
+    for(total in res_totals){
+      if(NG_distribution_by_LDC){
+        if(Use_ACES){
+          save_data(aces_res_ch4_byLDC[[total]])
+        }
+        if(Use_Vulcan){
+          save_data(vu_res_ch4_byLDC[[total]])
+        }
+      }
+      if(NG_distribution_by_state){
+        if(Use_ACES){
+          save_data(aces_res_ch4_bystate[[total]])
+        }
+        if(Use_Vulcan){
+          save_data(vu_res_ch4_bystate[[total]])
+        }
+      }
+      if(NG_distribution_by_domain){
+        if(Use_ACES){
+          save_data(aces_res_ch4_bydomain[[total]])
+        }
+        if(Use_Vulcan){
+          save_data(vu_res_ch4_bydomain[[total]])
+        }
       }
     }
-  }
-  
-  for(total in com_totals){
-    if(NG_distribution_by_LDC){
-      if(Use_ACES){
-        save_data(aces_com_ch4_byLDC[[total]])
+    
+    for(total in com_totals){
+      if(NG_distribution_by_LDC){
+        if(Use_ACES){
+          save_data(aces_com_ch4_byLDC[[total]])
+        }
+        if(Use_Vulcan){
+          save_data(vu_com_ch4_byLDC[[total]])
+        }
       }
-      if(Use_Vulcan){
-        save_data(vu_com_ch4_byLDC[[total]])
+      if(NG_distribution_by_state){
+        if(Use_ACES){
+          save_data(aces_com_ch4_bystate[[total]])
+        }
+        if(Use_Vulcan){
+          save_data(vu_com_ch4_bystate[[total]])
+        }
+      }
+      if(NG_distribution_by_domain){
+        if(Use_ACES){
+          save_data(aces_com_ch4_bydomain[[total]])
+        }
+        if(Use_Vulcan){
+          save_data(vu_com_ch4_bydomain[[total]])
+        }
       }
     }
-    if(NG_distribution_by_state){
-      if(Use_ACES){
-        save_data(aces_com_ch4_bystate[[total]])
-      }
-      if(Use_Vulcan){
-        save_data(vu_com_ch4_bystate[[total]])
-      }
-    }
-    if(NG_distribution_by_domain){
-      if(Use_ACES){
-        save_data(aces_com_ch4_bydomain[[total]])
-      }
-      if(Use_Vulcan){
-        save_data(vu_com_ch4_bydomain[[total]])
-      }
-    }
-  }
+    rm(all_merge_LCC,LDC_count,cover_all,all_merge_state,all_merge_state_poly,
+       all_merge_LCC_state,all_merge_domain,all_merge_domain_poly,all_merge_LCC_domain)
+  # }
+  # ################################################################################
+  # #combine the division-wide runs for each case, if needed.
+  # if(A>1){
+  #   list.files(X,full.names=T)
+  #   rast()
+  #   sum()
+  #   writeCDF(input,
+  #            paste0(output_directory,'/',"NG_dist_",sub("_ER_total","",total),
+  #                   "_",disaggregation_level,"_",inventory_name,"_State_Division_",A,'.nc'),
+  #            force_v4=TRUE,
+  #            varname='methane_emissions',
+  #            unit='nmol/m2/s',
+  #            longname=paste0('Methane emissions from natural gas distribution ',subsector_name,
+  #                            ', spatially allocated from ',disaggregation_name,
+  #                            ' totals using ',inventory_name,' ',sector_name,' CO2 emissions'),
+  #            missval=-9999,
+  #            overwrite=TRUE)
+  # }
   ################################################################################
   # Some sanity checks
   
@@ -1393,7 +1450,9 @@ NG_distribution <- function(domain,
                      paste0('Methane emissions from natural gas distribution\n',subsector_name,
                             ', spatially allocated from\n',disaggregation_name,
                             ' totals using\n',inventory_name,' ',sector_long,' CO2 emissions')[A],
-                     zlim_min = zmin,zlim_max = zmax)
+                     zlim_min = zmin,zlim_max = zmax,plot_directory=plot_directory,
+                     domain=domain,County_Tigerlines=County_Tigerlines,
+                     State_Tigerlines=State_Tigerlines)
       }
     }
     
@@ -1428,21 +1487,27 @@ NG_distribution <- function(domain,
                                                      pattern="NG_dist_.+_byLDC_aces",
                                                      full.names = T))
         Summed_NG_dist_ACES_byLDC <- sum(Summed_NG_dist_ACES_byLDC,na.rm=T)
-        zmax <- max(zmax,as.numeric(global(Summed_NG_dist_ACES_byLDC,max,na.rm=T)))
+        if(!all(is.na(values(Summed_NG_dist_ACES_byLDC)))){
+          zmax <- max(zmax,as.numeric(global(Summed_NG_dist_ACES_byLDC,max,na.rm=T)))
+        }
       }
       if(NG_distribution_by_state){
         Summed_NG_dist_ACES_bystate <- rast(list.files(output_directory,
                                                        pattern="NG_dist_.+_bystate_aces",
                                                        full.names = T))
         Summed_NG_dist_ACES_bystate <- sum(Summed_NG_dist_ACES_bystate,na.rm=T)
-        zmax <- max(zmax,as.numeric(global(Summed_NG_dist_ACES_bystate,max,na.rm=T)))
+        if(!all(is.na(values(Summed_NG_dist_ACES_bystate)))){
+          zmax <- max(zmax,as.numeric(global(Summed_NG_dist_ACES_bystate,max,na.rm=T)))
+        }
       }
       if(NG_distribution_by_domain){
         Summed_NG_dist_ACES_bydomain <- rast(list.files(output_directory,
                                                         pattern="NG_dist_.+_bydomain_aces",
                                                         full.names = T))
         Summed_NG_dist_ACES_bydomain <- sum(Summed_NG_dist_ACES_bydomain,na.rm=T)
-        zmax <- max(zmax,as.numeric(global(Summed_NG_dist_ACES_bydomain,max,na.rm=T)))
+        if(!all(is.na(values(Summed_NG_dist_ACES_bydomain)))){
+          zmax <- max(zmax,as.numeric(global(Summed_NG_dist_ACES_bydomain,max,na.rm=T)))
+        }
       }
     }
     if(Use_Vulcan){
@@ -1451,21 +1516,27 @@ NG_distribution <- function(domain,
                                                        pattern="NG_dist_.+_byLDC_vulcan",
                                                        full.names = T))
         Summed_NG_dist_vulcan_byLDC <- sum(Summed_NG_dist_vulcan_byLDC,na.rm=T)
-        zmax <- max(zmax,as.numeric(global(Summed_NG_dist_vulcan_byLDC,max,na.rm=T)))
+        if(!all(is.na(values(Summed_NG_dist_vulcan_byLDC)))){
+          zmax <- max(zmax,as.numeric(global(Summed_NG_dist_vulcan_byLDC,max,na.rm=T)))
+        }
       }
       if(NG_distribution_by_state){
         Summed_NG_dist_vulcan_bystate <- rast(list.files(output_directory,
                                                          pattern="NG_dist_.+_bystate_vulcan",
                                                          full.names = T))
         Summed_NG_dist_vulcan_bystate <- sum(Summed_NG_dist_vulcan_bystate,na.rm=T)
-        zmax <- max(zmax,as.numeric(global(Summed_NG_dist_vulcan_bystate,max,na.rm=T)))
+        if(!all(is.na(values(Summed_NG_dist_vulcan_bystate)))){
+          zmax <- max(zmax,as.numeric(global(Summed_NG_dist_vulcan_bystate,max,na.rm=T)))
+        }
       }
       if(NG_distribution_by_domain){
         Summed_NG_dist_vulcan_bydomain <- rast(list.files(output_directory,
                                                           pattern="NG_dist_.+_bydomain_vulcan",
                                                           full.names = T))
         Summed_NG_dist_vulcan_bydomain <- sum(Summed_NG_dist_vulcan_bydomain,na.rm=T)
-        zmax <- max(zmax,as.numeric(global(Summed_NG_dist_vulcan_bydomain,max,na.rm=T)))
+        if(!all(is.na(values(Summed_NG_dist_vulcan_bydomain)))){
+          zmax <- max(zmax,as.numeric(global(Summed_NG_dist_vulcan_bydomain,max,na.rm=T)))
+        }
       }
     }
     
@@ -1475,34 +1546,46 @@ NG_distribution <- function(domain,
       if(NG_distribution_by_LDC){
         not_log_plot(Summed_NG_dist_ACES_byLDC,
                      "Natural Gas Distribution emissions\nPHMSA, EIA, and GHGRP activity data combined with GHGI and published\nemission factors at the company level and distributed using aces residential\nand commercial sectoral CO2 emissions",
-                     zlim_min=zmin,zlim_max=zmax)
+                     zlim_min=zmin,zlim_max=zmax,plot_directory=plot_directory,
+                     domain=domain,County_Tigerlines=County_Tigerlines,
+                     State_Tigerlines=State_Tigerlines)
       }
       if(NG_distribution_by_state){
         not_log_plot(Summed_NG_dist_ACES_bystate,
                      "Natural Gas Distribution emissions\nPHMSA, EIA, and GHGRP activity data combined with GHGI and published\nemission factors state-summed and distributed using aces residential\nand commercial sectoral CO2 emissions",
-                     zlim_min=zmin,zlim_max=zmax)
+                     zlim_min=zmin,zlim_max=zmax,plot_directory=plot_directory,
+                     domain=domain,County_Tigerlines=County_Tigerlines,
+                     State_Tigerlines=State_Tigerlines)
       }
       if(NG_distribution_by_domain){
         not_log_plot(Summed_NG_dist_ACES_bydomain,
                      "Natural Gas Distribution emissions\nPHMSA, EIA, and GHGRP activity data combined with GHGI and published\nemission factors domain-summed and distributed using aces residential\nand commercial sectoral CO2 emissions",
-                     zlim_min=zmin,zlim_max=zmax)
+                     zlim_min=zmin,zlim_max=zmax,plot_directory=plot_directory,
+                     domain=domain,County_Tigerlines=County_Tigerlines,
+                     State_Tigerlines=State_Tigerlines)
       }
     }
     if(Use_Vulcan){
       if(NG_distribution_by_LDC){
         not_log_plot(Summed_NG_dist_vulcan_byLDC,
                      "Natural Gas Distribution emissions\nPHMSA, EIA, and GHGRP activity data combined with GHGI and published\nemission factors at the company level and distributed using Vulcan residential\nand commercial sectoral CO2 emissions",
-                     zlim_min=zmin,zlim_max=zmax)
+                     zlim_min=zmin,zlim_max=zmax,plot_directory=plot_directory,
+                     domain=domain,County_Tigerlines=County_Tigerlines,
+                     State_Tigerlines=State_Tigerlines)
       }
       if(NG_distribution_by_state){
         not_log_plot(Summed_NG_dist_vulcan_bystate,
                      "Natural Gas Distribution emissions\nPHMSA, EIA, and GHGRP activity data combined with GHGI and published\nemission factors state-summed and distributed using Vulcan residential\nand commercial sectoral CO2 emissions",
-                     zlim_min=zmin,zlim_max=zmax)
+                     zlim_min=zmin,zlim_max=zmax,plot_directory=plot_directory,
+                     domain=domain,County_Tigerlines=County_Tigerlines,
+                     State_Tigerlines=State_Tigerlines)
       }
       if(NG_distribution_by_domain){
         not_log_plot(Summed_NG_dist_vulcan_bydomain,
                      "Natural Gas Distribution emissions\nPHMSA, EIA, and GHGRP activity data combined with GHGI and published\nemission factors domain-summed and distributed using Vulcan residential\nand commercial sectoral CO2 emissions",
-                     zlim_min=zmin,zlim_max=zmax)
+                     zlim_min=zmin,zlim_max=zmax,plot_directory=plot_directory,
+                     domain=domain,County_Tigerlines=County_Tigerlines,
+                     State_Tigerlines=State_Tigerlines)
       }
     }
     
