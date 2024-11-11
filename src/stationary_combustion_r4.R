@@ -251,6 +251,7 @@ Stationary_combustion <- function(domain,
                                   output_directory,
                                   inventory_year,
                                   verbose,
+                                  XESMF,
                                   County_Tigerlines,
                                   Use_ACES,
                                   Use_Vulcan,
@@ -385,10 +386,12 @@ Stationary_combustion <- function(domain,
   ################################################################################
   #Now load in the NEI data
   
-  data_URL <- "https://data.epa.gov/efservice/nei.county_sector_summary/pollutant_code=CO/JSON"
+  # data_URL <- "https://data.epa.gov/efservice/nei.county_sector_summary/pollutant_code=CO/JSON"
+  data_URL <- "https://data.epa.gov/dmapservice/nei.county_sector_summary/pollutant_code/equals/CO/json"
   NEI_data_orig <- Trycatch_downloader(data_URL,output_location=NULL,method="API",
                                       error_message=paste0("\nNational Emissions Inventory could not be downloaded using API link: ",data_URL))
-  data_URL <- "https://data.epa.gov/efservice/nei.sectors/json"
+  # data_URL <- "https://data.epa.gov/efservice/nei.sectors/json"
+  data_URL <- "https://data.epa.gov/dmapservice/nei.sectors/json"
   NEI_sector_codes <- Trycatch_downloader(data_URL,output_location=NULL,method="API",
                                        error_message=paste0("\nNational Emissions Inventory sector code data not be downloaded using API link: ",data_URL))
   
@@ -397,12 +400,12 @@ Stationary_combustion <- function(domain,
   
   #actually use whichever is closest to the inventory_year, update the user if
   #this isn't actually the inventory_year
-  # NEI_year <- unique(NEI_data_orig$inventory_year)[which.min(abs(unique(NEI_data_orig$inventory_year)-inventory_year))]
-  # if(inventory_year!=NEI_year){
-  #   cat(paste0("NEI is every 3 years and does not have an inventory for ",inventory_year,".  Using ",NEI_year," as the nearest available data."))
-  # }
-  # NEI_data_orig <- NEI_data_orig[NEI_data_orig$inventory_year==NEI_year,]
-  NEI_data_orig <- NEI_data_orig[NEI_data_orig$inventory_year==2017,]
+  NEI_year <- unique(NEI_data_orig$inventory_year)[which.min(abs(unique(NEI_data_orig$inventory_year)-inventory_year))]
+  if(inventory_year!=NEI_year){
+    cat(paste0("NEI is every 3 years and does not have an inventory for ",inventory_year,".  Using ",NEI_year," as the nearest available data."))
+  }
+  NEI_data_orig <- NEI_data_orig[NEI_data_orig$inventory_year==NEI_year,]
+  # NEI_data_orig <- NEI_data_orig[NEI_data_orig$inventory_year==2017,]
   
   
   #Rewrite the sector codes from numeric to text descriptions.  Method from
@@ -1083,7 +1086,9 @@ Stationary_combustion <- function(domain,
                           " - ",fuel_name,"\n ",disaggregation_level,
                           " totals distributed using NEI CO emissions\n and ",
                           inventory_name," ",tolower(sector_long)," CO2 emissions")[A],
-                   zlim_min = zmin,zlim_max = log10(zmax))
+                   zlim_min = zmin,zlim_max = log10(zmax),plot_directory=plot_directory,
+                   domain=domain,County_Tigerlines=County_Tigerlines,
+                   State_Tigerlines=State_Tigerlines)
         }
       }else{
         for(A in 1:nlyr(combined_data)){
@@ -1094,7 +1099,9 @@ Stationary_combustion <- function(domain,
                               " - ",fuel_name,"\n ",disaggregation_level,
                               " totals distributed using NEI CO emissions\n and ",
                               inventory_name," ",tolower(sector_long)," CO2 emissions")[A],
-                       zlim_min = zmin,zlim_max = zmax)
+                       zlim_min = zmin,zlim_max = zmax,plot_directory=plot_directory,
+                       domain=domain,County_Tigerlines=County_Tigerlines,
+                       State_Tigerlines=State_Tigerlines)
         }
       }
     }
@@ -1137,26 +1144,34 @@ Stationary_combustion <- function(domain,
                                                                         pattern="stat_comb_[[:alnum:]]+_[coal|gas|petr]+_bystate_aces",
                                                                         full.names = T))
         Summed_stationary_combustion_FF_ACES_bystate <- sum(Summed_stationary_combustion_FF_ACES_bystate,na.rm=T)
-        stat_comb_FF_max <- max(stat_comb_FF_max,as.numeric(log10(global(Summed_stationary_combustion_FF_ACES_bystate,max,na.rm=T))))
+        if(!all(is.na(values(Summed_stationary_combustion_FF_ACES_bystate)))){
+          stat_comb_FF_max <- max(stat_comb_FF_max,as.numeric(log10(global(Summed_stationary_combustion_FF_ACES_bystate,max,na.rm=T))))
+        }
         
         Summed_stationary_combustion_wood_ACES_bystate <- rast(list.files(output_directory,
                                                                           pattern="stat_comb_[[:alnum:]]+_wood_bystate_aces",
                                                                           full.names = T))
         Summed_stationary_combustion_wood_ACES_bystate <- sum(Summed_stationary_combustion_wood_ACES_bystate,na.rm=T)
-        stat_comb_wood_max <- max(stat_comb_wood_max,as.numeric(log10(global(Summed_stationary_combustion_wood_ACES_bystate,max,na.rm=T))))
+        if(!all(is.na(values(Summed_stationary_combustion_wood_ACES_bystate)))){
+          stat_comb_wood_max <- max(stat_comb_wood_max,as.numeric(log10(global(Summed_stationary_combustion_wood_ACES_bystate,max,na.rm=T))))
+        }
       }
       if(stationary_combustion_by_domain){
         Summed_stationary_combustion_FF_ACES_bydomain <- rast(list.files(output_directory,
                                                                          pattern="stat_comb_[[:alnum:]]+_[coal|gas|petr]+_bydomain_aces",
                                                                          full.names = T))
         Summed_stationary_combustion_FF_ACES_bydomain <- sum(Summed_stationary_combustion_FF_ACES_bydomain,na.rm=T)
-        stat_comb_FF_max <- max(stat_comb_FF_max,as.numeric(log10(global(Summed_stationary_combustion_FF_ACES_bydomain,max,na.rm=T))))
+        if(!all(is.na(values(Summed_stationary_combustion_FF_ACES_bydomain)))){
+          stat_comb_FF_max <- max(stat_comb_FF_max,as.numeric(log10(global(Summed_stationary_combustion_FF_ACES_bydomain,max,na.rm=T))))
+        }
         
         Summed_stationary_combustion_wood_ACES_bydomain <- rast(list.files(output_directory,
                                                                            pattern="stat_comb_[[:alnum:]]+_wood_bydomain_aces",
                                                                            full.names = T))
         Summed_stationary_combustion_wood_ACES_bydomain <- sum(Summed_stationary_combustion_wood_ACES_bydomain,na.rm=T)
-        stat_comb_wood_max <- max(stat_comb_wood_max,as.numeric(log10(global(Summed_stationary_combustion_wood_ACES_bydomain,max,na.rm=T))))
+        if(!all(is.na(values(Summed_stationary_combustion_wood_ACES_bydomain)))){
+          stat_comb_wood_max <- max(stat_comb_wood_max,as.numeric(log10(global(Summed_stationary_combustion_wood_ACES_bydomain,max,na.rm=T))))
+        }
       }
     }
     if(Use_Vulcan){
@@ -1165,26 +1180,34 @@ Stationary_combustion <- function(domain,
                                                                           pattern="stat_comb_[[:alnum:]]+_[coal|gas|petr]+_bystate_vulcan",
                                                                           full.names = T))
         Summed_stationary_combustion_FF_Vulcan_bystate <- sum(Summed_stationary_combustion_FF_Vulcan_bystate,na.rm=T)
-        stat_comb_FF_max <- max(stat_comb_FF_max,as.numeric(log10(global(Summed_stationary_combustion_FF_Vulcan_bystate,max,na.rm=T))))
+        if(!all(is.na(values(Summed_stationary_combustion_FF_Vulcan_bystate)))){
+          stat_comb_FF_max <- max(stat_comb_FF_max,as.numeric(log10(global(Summed_stationary_combustion_FF_Vulcan_bystate,max,na.rm=T))))
+        }
         
         Summed_stationary_combustion_wood_Vulcan_bystate <- rast(list.files(output_directory,
                                                                             pattern="stat_comb_[[:alnum:]]+_wood_bystate_vulcan",
                                                                             full.names = T))
         Summed_stationary_combustion_wood_Vulcan_bystate <- sum(Summed_stationary_combustion_wood_Vulcan_bystate,na.rm=T)
-        stat_comb_wood_max <- max(stat_comb_wood_max,as.numeric(log10(global(Summed_stationary_combustion_wood_Vulcan_bystate,max,na.rm=T))))
+        if(!all(is.na(values(Summed_stationary_combustion_wood_Vulcan_bystate)))){
+          stat_comb_wood_max <- max(stat_comb_wood_max,as.numeric(log10(global(Summed_stationary_combustion_wood_Vulcan_bystate,max,na.rm=T))))
+        }
       }
       if(stationary_combustion_by_domain){
         Summed_stationary_combustion_FF_Vulcan_bydomain <- rast(list.files(output_directory,
                                                                            pattern="stat_comb_[[:alnum:]]+_[coal|gas|petr]+_bydomain_vulcan",
                                                                            full.names = T))
         Summed_stationary_combustion_FF_Vulcan_bydomain <- sum(Summed_stationary_combustion_FF_Vulcan_bydomain,na.rm=T)
-        stat_comb_FF_max <- max(stat_comb_FF_max,as.numeric(log10(global(Summed_stationary_combustion_FF_Vulcan_bydomain,max,na.rm=T))))
+        if(!all(is.na(values(Summed_stationary_combustion_FF_Vulcan_bydomain)))){
+          stat_comb_FF_max <- max(stat_comb_FF_max,as.numeric(log10(global(Summed_stationary_combustion_FF_Vulcan_bydomain,max,na.rm=T))))
+        }
         
         Summed_stationary_combustion_wood_Vulcan_bydomain <- rast(list.files(output_directory,
                                                                              pattern="stat_comb_[[:alnum:]]+_wood_bydomain_vulcan",
                                                                              full.names = T))
         Summed_stationary_combustion_wood_Vulcan_bydomain <- sum(Summed_stationary_combustion_wood_Vulcan_bydomain,na.rm=T)
-        stat_comb_wood_max <- max(stat_comb_wood_max,as.numeric(log10(global(Summed_stationary_combustion_wood_Vulcan_bydomain,max,na.rm=T))))
+        if(!all(is.na(values(Summed_stationary_combustion_wood_Vulcan_bydomain)))){
+          stat_comb_wood_max <- max(stat_comb_wood_max,as.numeric(log10(global(Summed_stationary_combustion_wood_Vulcan_bydomain,max,na.rm=T))))
+        }
       }
     }
     
@@ -1194,36 +1217,60 @@ Stationary_combustion <- function(domain,
       if(stationary_combustion_by_state){
         log_plot(Summed_stationary_combustion_FF_ACES_bystate,
                  "Stationary Combustion FF Sector\nSEDS state data scaled to match GHGI national data distributed\nto the county level via NEI, then distributed using ACES\nsectoral CO2 emissions",
-                 zlim_min=stat_comb_min,zlim_max=stat_comb_FF_max)
+                 zlim_min=stat_comb_min,zlim_max=stat_comb_FF_max,
+                 plot_directory=plot_directory,
+                 domain=domain,County_Tigerlines=County_Tigerlines,
+                 State_Tigerlines=State_Tigerlines)
         log_plot(Summed_stationary_combustion_wood_ACES_bystate,
                  "Stationary Combustion Wood Sector\nSEDS state data scaled to match GHGI national data distributed\nto the county level via NEI, then distributed using ACES\nsectoral CO2 emissions",
-                 zlim_min=stat_comb_min,zlim_max=stat_comb_wood_max)
+                 zlim_min=stat_comb_min,zlim_max=stat_comb_wood_max,
+                 plot_directory=plot_directory,
+                 domain=domain,County_Tigerlines=County_Tigerlines,
+                 State_Tigerlines=State_Tigerlines)
       }
       if(stationary_combustion_by_domain){
         log_plot(Summed_stationary_combustion_FF_ACES_bydomain,
                  "Stationary Combustion FF Sector\nSEDS domain-summed data scaled to match GHGI national data distributed\nto the county level via NEI, then distributed using ACES\nsectoral CO2 emissions",
-                 zlim_min=stat_comb_min,zlim_max=stat_comb_FF_max)
+                 zlim_min=stat_comb_min,zlim_max=stat_comb_FF_max,
+                 plot_directory=plot_directory,
+                 domain=domain,County_Tigerlines=County_Tigerlines,
+                 State_Tigerlines=State_Tigerlines)
         log_plot(Summed_stationary_combustion_wood_ACES_bydomain,
                  "Stationary Combustion Wood Sector\nSEDS domain-summed data scaled to match GHGI national data distributed\nto the county level via NEI, then distributed using ACES\nsectoral CO2 emissions",
-                 zlim_min=stat_comb_min,zlim_max=stat_comb_wood_max)
+                 zlim_min=stat_comb_min,zlim_max=stat_comb_wood_max,
+                 plot_directory=plot_directory,
+                 domain=domain,County_Tigerlines=County_Tigerlines,
+                 State_Tigerlines=State_Tigerlines)
       }
     }
     if(Use_Vulcan){
       if(stationary_combustion_by_state){
         log_plot(Summed_stationary_combustion_FF_Vulcan_bystate,
                  "Stationary Combustion FF Sector\nSEDS state data scaled to match GHGI national data distributed\nto the county level via NEI, then distributed using Vulcan\nsectoral CO2 emissions",
-                 zlim_min=stat_comb_min,zlim_max=stat_comb_FF_max)
+                 zlim_min=stat_comb_min,zlim_max=stat_comb_FF_max,
+                 plot_directory=plot_directory,
+                 domain=domain,County_Tigerlines=County_Tigerlines,
+                 State_Tigerlines=State_Tigerlines)
         log_plot(Summed_stationary_combustion_wood_Vulcan_bystate,
                  "Stationary Combustion Wood Sector\nSEDS state data scaled to match GHGI national data distributed\nto the county level via NEI, then distributed using Vulcan\nsectoral CO2 emissions",
-                 zlim_min=stat_comb_min,zlim_max=stat_comb_wood_max)
+                 zlim_min=stat_comb_min,zlim_max=stat_comb_wood_max,
+                 plot_directory=plot_directory,
+                 domain=domain,County_Tigerlines=County_Tigerlines,
+                 State_Tigerlines=State_Tigerlines)
       }
       if(stationary_combustion_by_domain){
         log_plot(Summed_stationary_combustion_FF_Vulcan_bydomain,
                  "Stationary Combustion FF Sector\nSEDS domain-summed data scaled to match GHGI national data distributed\nto the county level via NEI, then distributed using Vulcan\nsectoral CO2 emissions",
-                 zlim_min=stat_comb_min,zlim_max=stat_comb_FF_max)
+                 zlim_min=stat_comb_min,zlim_max=stat_comb_FF_max,
+                 plot_directory=plot_directory,
+                 domain=domain,County_Tigerlines=County_Tigerlines,
+                 State_Tigerlines=State_Tigerlines)
         log_plot(Summed_stationary_combustion_wood_Vulcan_bydomain,
                  "Stationary Combustion Wood Sector\nSEDS domain-summed data scaled to match GHGI national data distributed\nto the county level via NEI, then distributed using Vulcan\nsectoral CO2 emissions",
-                 zlim_min=stat_comb_min,zlim_max=stat_comb_wood_max)
+                 zlim_min=stat_comb_min,zlim_max=stat_comb_wood_max,
+                 plot_directory=plot_directory,
+                 domain=domain,County_Tigerlines=County_Tigerlines,
+                 State_Tigerlines=State_Tigerlines)
       }
     }
   }
