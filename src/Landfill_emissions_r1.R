@@ -166,11 +166,12 @@ Municipal_solid_waste <- function(LMOP_file,
   #data for each possible sector separately as emissions are split by sector
   #(i.e., gas capture for electricity is subpart D, flaring is C, and landfill
   #emissions HH - all of which can occur at the same landfill)
-  data_URL <- "https://data.epa.gov/efservice/HH_SUBPART_LEVEL_INFORMATION/JSON"
+  # data_URL <- "https://data.epa.gov/efservice/HH_SUBPART_LEVEL_INFORMATION/JSON"
+  data_URL <- "https://data.epa.gov/dmapservice/ghg.hh_subpart_level_information/json"
   ghgrp_landfill_only_emissions <- Trycatch_downloader(URL = data_URL,method = "API",
                                                        error_message = paste0("Greenhouse Gas Reporting Program data could not be downloaded using API link: ",data_URL))
-  # ghgrp_landfill_emissions2 <- fromJSON("https://data.epa.gov/dmapservice/ghg.hh_subpart_level_information/json")
-  data_URL <- "https://data.epa.gov/efservice/C_SUBPART_LEVEL_INFORMATION/json"
+  # data_URL <- "https://data.epa.gov/efservice/C_SUBPART_LEVEL_INFORMATION/json"
+  data_URL <- "https://data.epa.gov/dmapservice/ghg.c_subpart_level_information/json"
   ghgrp_combustion_emissions <- Trycatch_downloader(URL = data_URL,method = "API",
                                                     error_message = paste0("Greenhouse Gas Reporting Program data could not be downloaded using API link: ",data_URL))
   # ghgrp_electricity_emissions <- fromJSON("https://data.epa.gov/efservice/D_SUBPART_LEVEL_INFORMATION/json")
@@ -359,18 +360,27 @@ Municipal_solid_waste <- function(LMOP_file,
   #Finally, load up some functions and plot up this output nicely
   
   if(verbose){
-    zlim_min=1.0
+    ghgrp_flux[ghgrp_flux==0] <- NA
+    LMOP_flux[LMOP_flux==0] <- NA
+    zlim_min <- log10(max(global(ghgrp_flux,min,na.rm=T),global(LMOP_flux,min,na.rm=T)))
     zlim_max <- log10(max(global(ghgrp_flux,max,na.rm=T),global(LMOP_flux,max,na.rm=T)))
     log_plot(ghgrp_flux,filename="MSW_GHGRP",
              "Municipal Solid Waste -\n GHGRP reporters",
-             zlim_min=zlim_min,zlim_max=zlim_max)
+             zlim_min=zlim_min,zlim_max=zlim_max,plot_directory=plot_directory,
+             domain=domain,County_Tigerlines=County_Tigerlines,
+             State_Tigerlines=State_Tigerlines)
     log_plot(LMOP_flux,filename="MSW_LMOP",
              "Municipal Solid Waste -\n (GHGI - GHGRP) distributed using \nLandfill Methane Outreach Program",
-             zlim_min=zlim_min,zlim_max=zlim_max)
+             zlim_min=zlim_min,zlim_max=zlim_max,plot_directory=plot_directory,
+             domain=domain,County_Tigerlines=County_Tigerlines,
+             State_Tigerlines=State_Tigerlines)
     
     Summed_solid_waste <- sum(c(ghgrp_flux,LMOP_flux),na.rm=T)
     log_plot(Summed_solid_waste,
-             "Municipal Solid Waste -\n GHGRP reporters + (GHGI - GHGRP) distributed using \nLandfill Methane Outreach Program")
+             "Municipal Solid Waste -\n GHGRP reporters + (GHGI - GHGRP) distributed using \nLandfill Methane Outreach Program",
+             plot_directory=plot_directory,
+             domain=domain,County_Tigerlines=County_Tigerlines,
+             State_Tigerlines=State_Tigerlines)
   }
   cat("Finished landfill sector: Municipal_solid_waste in",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
 }
