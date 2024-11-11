@@ -66,7 +66,8 @@ prep_plot_data <- function(input){
 
 #plot for log scale
 log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
-                     filename){
+                     filename,plot_directory,domain,County_Tigerlines,
+                     State_Tigerlines,Urban_Tigerlines){
   
   plot_type="continuous"
   
@@ -206,7 +207,8 @@ log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
 
 #plot for linear scale - mostly identical
 not_log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
-                         filename){
+                         filename,plot_directory,domain,County_Tigerlines,
+                         State_Tigerlines,Urban_Tigerlines){
   
   plot_type="continuous"
   
