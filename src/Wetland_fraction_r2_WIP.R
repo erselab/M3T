@@ -75,6 +75,7 @@
 NWI_Wetland_fraction <- function(input_directory,
                                  output_directory,
                                  domain,
+                                 domain_template,
                                  state_name_list,
                                  Use_SOCCR1,
                                  Use_SOCCR2,
@@ -111,69 +112,83 @@ NWI_Wetland_fraction <- function(input_directory,
     #need for naming - substitute only works if it's pulled from elsewhere.  Once
     #created within the function, it will be ~= get.
     input_name <- substitute(input)
-    
-    cat("Starting",input_name,"for",state_name_list[i],"at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
-    # if(paste0(state_name_list[i],'_',input_name,".tiff") %in% Processed_NWI_files){
-    #   #if already processed, stop the function without error
-    #   return(NULL)
-    # }
-    #identify any invalid polygons (errors such as too few vertices or
-    #self-intersection).  Has to be done in multiple steps or it doesn't seem to
-    #work.
-    invalid_polygons <- !is.valid(input)
-    if(any(invalid_polygons)){
-      valid_polygons <- input[!invalid_polygons]
-      invalid_polygons <- input[invalid_polygons]
-      invalid_polygons <- makeValid(invalid_polygons)
-      if(all(is.valid(invalid_polygons))){
-        #if successful, just recombine
-        validated_input <- vect(c(valid_polygons,invalid_polygons))
-      }else{
-        stop('failed to fix some polygons')
-      }
+    if(paste0(state_name_list[i],'_',input_name,'.tiff') %in% Processed_NWI_files){
+      cat(input_name,"already processed for",state_name_list[i],"\n")
     }else{
-      validated_input <- input
+      cat("Starting",input_name,"for",state_name_list[i],"at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
+      # if(paste0(state_name_list[i],'_',input_name,".tiff") %in% Processed_NWI_files){
+      #   #if already processed, stop the function without error
+      #   return(NULL)
+      # }
+      #identify any invalid polygons (errors such as too few vertices or
+      #self-intersection).  Has to be done in multiple steps or it doesn't seem to
+      #work.
+      invalid_polygons <- !is.valid(input)
+      if(any(invalid_polygons)){
+        valid_polygons <- input[!invalid_polygons]
+        invalid_polygons <- input[invalid_polygons]
+        invalid_polygons <- makeValid(invalid_polygons)
+        if(all(is.valid(invalid_polygons))){
+          #if successful, just recombine
+          validated_input <- vect(c(valid_polygons,invalid_polygons))
+        }else{
+          stop('failed to fix some polygons')
+        }
+      }else{
+        validated_input <- input
+      }
+      
+      # #Aggregate to dissolve polygons that are inside others and convert to 1
+      # #overall polygon instead.  Avoids excessive rounding error when combining
+      # #extract results from many polygons.
+      # validated_input <- aggregate(validated_input)
+      
+      #below is less than 7E-18 delta compared to for loop equivalent.  But it takes
+      #~10 seconds compared to 2.6 minutes (for WV R4, 14,853 geometries)
+      
+      #calculate fractional coverage and save these weights to a raster.  Sum across
+      #all polygons for a given raster cell (they all represent the same wetland
+      #type after all)
+      cover <- extract(state_template,validated_input,weights=T,exact=T,cells=T)
+      cover <- aggregate(cover$weight,by=list(cover$cell),FUN=sum)
+      colnames(cover) <- c("cell","weight")
+      output_rast=state_template
+      output_rast[cover[,'cell']] <- cover[,'weight']
+      output_rast[is.na(output_rast)] <- 0
+      
+      #extend to the domain + some buffer, crop out any other excess and save
+      output_rast <- extend(output_rast,ext(domain)+res(domain_template)*5,fill=0)
+      output_rast <- crop(output_rast,ext(domain)+res(domain_template)*5)
+      writeRaster(output_rast,
+                  paste0(NWI_output_directory,state_name_list[i],'_',input_name,'.tiff'),
+                  overwrite=T)
     }
-    
-    # #Aggregate to dissolve polygons that are inside others and convert to 1
-    # #overall polygon instead.  Avoids excessive rounding error when combining
-    # #extract results from many polygons.
-    # validated_input <- aggregate(validated_input)
-
-    #below is less than 7E-18 delta compared to for loop equivalent.  But it takes
-    #~10 seconds compared to 2.6 minutes (for WV R4, 14,853 geometries)
-    
-    #calculate fractional coverage and save these weights to a raster.  Sum across
-    #all polygons for a given raster cell (they all represent the same wetland
-    #type after all)
-    cover <- extract(state_template,validated_input,weights=T,exact=T,cells=T)
-    cover <- aggregate(cover$weight,by=list(cover$cell),FUN=sum)
-    colnames(cover) <- c("cell","weight")
-    output_rast=state_template
-    output_rast[cover[,'cell']] <- cover[,'weight']
-    output_rast[is.na(output_rast)] <- 0
-
-    #extend to the domain + some buffer, crop out any other excess and save
-    output_rast <- extend(output_rast,ext(domain)+res(domain_template)*5,fill=0)
-    output_rast <- crop(output_rast,ext(domain)+res(domain_template)*5)
-    writeRaster(output_rast,
-                paste0(NWI_output_directory,state_name_list[i],'_',input_name,'.tiff'),
-                overwrite=T)
   }
   ################################################################################
   #load in the wetlands files
   
   input_directory_data <- list.files(NWI_input_directory)
   Downloaded_NWI_files <- paste0(state_name_list,"_Wetlands_Geopackage.gpkg") %in% input_directory_data
+  Downloaded_NWI_files[state_name_list=="MN"] <- "MN_geodatabase_wetlands" %in% input_directory_data
   # Downloaded_NWI_files <- paste0(state_name_list,"_shapefile_wetlands") %in% input_directory_data
-  ## Processed_NWI_files <- list.files(NWI_output_directory,pattern=".tiff")
-  
+  Processed_NWI_files <- list.files(NWI_output_directory,pattern=".tiff")
+
   for(i in 1:length(state_name_list)){
     cat("Starting processing for",state_name_list[i],"at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
 
+    # if(state_name_list[i] %in% Processed_NWI_files){
+    #   #if already processed, move on to the next state.
+    #   cat("Already processed\n")
+    #   next
+    # }
+    
     #filename on the NWI website
     # NWI_filename <- paste0(state_name_list[i],"_shapefile_wetlands.zip")
-    NWI_filename <- paste0(state_name_list[i],"_geopackage_wetlands.zip")
+    if(state_name_list[i]=="MN"){
+      NWI_filename <- "MN_geodatabase_wetlands.zip"
+    }else{
+      NWI_filename <- paste0(state_name_list[i],"_geopackage_wetlands.zip")
+    }
     if(!Downloaded_NWI_files[i]){
       data_URL <- paste0(NWI_url,NWI_filename)
       NWI_full_filename <- file.path(NWI_input_directory,NWI_filename)
@@ -195,34 +210,25 @@ NWI_Wetland_fraction <- function(input_directory,
     # NWI_filename <- gsub(".zip","",NWI_filename)
     
     #The filename switches here from state gpkg wetlands to state wetalnds gpkg
-    NWI_full_filename <- file.path(NWI_input_directory,paste0(state_name_list[i],"_Wetlands_Geopackage.gpkg"))
-    file_layers <- vector_layers(NWI_full_filename)
-    
-    file_layers <- file_layers[!grepl("Historic",file_layers)]
-    file_layers <- file_layers[!grepl("Metadata",file_layers)]
-    file_layers <- file_layers[grepl("Wetlands",file_layers)]
-    
-    #load and subset to just the "attribute" variable that provides the wetland
-    #type and subtype (we won't need other variables).  Combine the multiple
-    #files via rbind if needed
-    if(length(file_layers)>1){
-      wetlands <- vect(wetland_files,layer=file_layers[1])
+    if(state_name_list[i]=="MN"){
+      NWI_full_filename <- file.path(NWI_input_directory,"MN_geodatabase_wetlands.gdb")
+      wetlands <- vect(NWI_full_filename,layer="MN_wetlands")
       wetlands <- wetlands[,"ATTRIBUTE"]
-      for(A in 2:length(wetland_files)){
-        additional_wetlands <- vect(wetland_files,layer=file_layers[A])
-        additional_wetlands <- additional_wetlands[,"ATTRIBUTE"]
-        wetlands <- rbind(wetlands,additional_wetlands)
-      }
     }else{
+      NWI_full_filename <- file.path(NWI_input_directory,paste0(state_name_list[i],"_Wetlands_Geopackage.gpkg"))
+      file_layers <- vector_layers(NWI_full_filename)
+      
+      file_layers <- file_layers[!grepl("Historic",file_layers)]
+      file_layers <- file_layers[!grepl("Metadata",file_layers)]
+      file_layers <- file_layers[grepl("Wetlands",file_layers)]
+      
+      #load and subset to just the "attribute" variable that provides the wetland
+      #type and subtype (we won't need other variables).  Combine the multiple
+      #files via rbind if needed
       wetlands <- vect(NWI_full_filename,layer=file_layers)
       wetlands <- wetlands[,"ATTRIBUTE"]
     }
     
-    # # if(paste0(state_name_list[i],"_PNF.tiff") %in% Processed_NWI_files){
-    # #   #if already processed (PNF is last in the list), move on to the next state.
-    # #   cat("Already processed\n")
-    # #   next
-    # # }else{
     #   #progressively remove files to isolate just the relevant wetland files. some
     #   #have historic files, there's metadata, shape outline files, some states have
     #   #other types (e.g. MO riparian), etc.
