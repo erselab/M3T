@@ -378,7 +378,7 @@ Disaggregate_Wetcharts <- function(
       NLCD_Downscaled_Averaged_wetcharts <- lapply(NLCD_Downscaled_Averaged_wetcharts,FUN=function(x){mask(project(x,domain_template,method="near"),domain)})
       
       cover <- extract(NLCD_Downscaled_Averaged_wetcharts[[1]][[1]],
-                       domain,
+                       project(domain,NLCD_Downscaled_Averaged_wetcharts[[1]]),
                        weights=T,exact=T,cells=T)
       for(A in 1:length(NLCD_Downscaled_Averaged_wetcharts)){
         NLCD_Downscaled_Averaged_wetcharts[[A]][cover[,'cell']] <- NLCD_Downscaled_Averaged_wetcharts[[A]][cover[,'cell']]*cover[,'weight']
@@ -388,7 +388,7 @@ Disaggregate_Wetcharts <- function(
       NALCMS_Downscaled_Averaged_wetcharts <- lapply(NALCMS_Downscaled_Averaged_wetcharts,FUN=function(x){disagg(x,round(res(x)/domain_res,3),"near")})
       NALCMS_Downscaled_Averaged_wetcharts <- lapply(NALCMS_Downscaled_Averaged_wetcharts,FUN=function(x){mask(project(x,domain_template,method="near"),domain)})
       if(!Use_NLCD){
-        cover <- extract(NALCMS_Downscaled_Averaged_wetcharts[[1]][[1]],domain,weights=T,exact=T,cells=T)
+        cover <- extract(NALCMS_Downscaled_Averaged_wetcharts[[1]][[1]],project(domain,NALCMS_Downscaled_Averaged_wetcharts[[1]]),weights=T,exact=T,cells=T)
       }
       for(A in 1:length(NALCMS_Downscaled_Averaged_wetcharts)){
         NALCMS_Downscaled_Averaged_wetcharts[[A]][cover[,'cell']] <- NALCMS_Downscaled_Averaged_wetcharts[[A]][cover[,'cell']]*cover[,'weight']
@@ -396,13 +396,13 @@ Disaggregate_Wetcharts <- function(
     }
   }else if(any(domain_res>res(Downscaled_Averaged_wetcharts[[1]]))){
     if(Use_NLCD){
-      domain_reproj <- project(domain,crs(NLCD_Downscaled_Averaged_wetcharts))
+      domain_reproj <- project(domain,crs(NLCD_Downscaled_Averaged_wetcharts[[1]]))
 
       #reproject to exact domain now using an average to effectively aggregate
       #while reprojecting.
       NLCD_Downscaled_Averaged_wetcharts <- lapply(NLCD_Downscaled_Averaged_wetcharts,FUN=function(x){mask(crop(x,domain_reproj,snap="out"),domain_reproj,touches=T,updatevalue=0)})
       cover <- extract(NLCD_Downscaled_Averaged_wetcharts[[1]][[1]],
-                       domain,
+                       project(domain,NLCD_Downscaled_Averaged_wetcharts[[1]]),
                        weights=T,exact=T,cells=T)
       for(A in 1:length(NLCD_Downscaled_Averaged_wetcharts)){
         NLCD_Downscaled_Averaged_wetcharts[[A]][cover[,'cell']] <- NLCD_Downscaled_Averaged_wetcharts[[A]][cover[,'cell']]*cover[,'weight']
@@ -410,13 +410,13 @@ Disaggregate_Wetcharts <- function(
       NLCD_Downscaled_Averaged_wetcharts <- lapply(NLCD_Downscaled_Averaged_wetcharts,FUN=function(x){project(extend(x,fill=0,ext(x)+(res(project(domain_template,crs(x)))*5)),domain_template,method="average")})
     }
     if(Use_NALCMS){
-      domain_reproj <- project(domain,crs(NALCMS_Downscaled_Averaged_wetcharts))
+      domain_reproj <- project(domain,crs(NALCMS_Downscaled_Averaged_wetcharts[[1]]))
       
       #reproject to exact domain now using an average to effectively aggregate
       #while reprojecting.
       NALCMS_Downscaled_Averaged_wetcharts <- lapply(NALCMS_Downscaled_Averaged_wetcharts,FUN=function(x){mask(crop(x,domain_reproj,snap="out"),domain_reproj,touches=T,updatevalue=0)})
       cover <- extract(NALCMS_Downscaled_Averaged_wetcharts[[1]][[1]],
-                       domain,
+                       project(domain,NALCMS_Downscaled_Averaged_wetcharts[[1]]),
                        weights=T,exact=T,cells=T)
       for(A in 1:length(NALCMS_Downscaled_Averaged_wetcharts)){
         NALCMS_Downscaled_Averaged_wetcharts[[A]][cover[,'cell']] <- NALCMS_Downscaled_Averaged_wetcharts[[A]][cover[,'cell']]*cover[,'weight']
@@ -481,13 +481,17 @@ Disaggregate_Wetcharts <- function(
           log_plot(input = NLCD_Downscaled_Averaged_wetcharts[[B]][[A]],zlim_min = zlim_min,
                    zlim_max = zlim_max,filename = paste0('Wetcharts_NLCD_Downscaled_subset_',B,"_month_",A),
                    title = paste0(month.abb[A]," NLCD downscaled Wetcharts CH4\nSaturated colorscale low end\nmodels ",
-                                  model_list_string))
+                                  model_list_string),plot_directory=plot_directory,
+                   domain=domain,County_Tigerlines=County_Tigerlines,
+                   State_Tigerlines=State_Tigerlines)
         }
         if(Use_NALCMS){
           log_plot(input = NALCMS_Downscaled_Averaged_wetcharts[[B]][[A]],zlim_min = zlim_min,
                    zlim_max = zlim_max,filename = paste0('Wetcharts_NALCMS_Downscaled_subset_',B,"_month_",A),
                    title = paste0(month.abb[A]," NALCMS downscaled Wetcharts CH4\nSaturated colorscale low end\nmodels ",
-                                  model_list_string))
+                                  model_list_string),plot_directory=plot_directory,
+                   domain=domain,County_Tigerlines=County_Tigerlines,
+                   State_Tigerlines=State_Tigerlines)
         }
       }
     }
