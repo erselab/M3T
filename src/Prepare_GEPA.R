@@ -75,6 +75,9 @@
 Prepare_GEPA <- function(inventory_year,
                          input_directory,
                          output_directory,
+                         plot_directory,
+                         County_Tigerlines,
+                         State_Tigerlines,
                          domain,
                          domain_template,
                          verbose){
@@ -128,18 +131,18 @@ Prepare_GEPA <- function(inventory_year,
     cover <- extract(GEPA[[1]],domain,weights=T,exact=T,cells=T)
     GEPA[cover[,'cell']] <- GEPA[cover[,'cell']]*cover[,'weight']
   }else if(any(domain_res>res(GEPA))){
-    GEPA <- crop(GEPA,domain_trans,snap="out")
-    GEPA <- mask(GEPA,domain_trans,touches=T,updatevalue=0)
-    cover <- extract(GEPA,domain_trans,weights=T,exact=T,cells=T)
+    GEPA <- crop(GEPA,project(domain,GEPA),snap="out")
+    GEPA <- mask(GEPA,project(domain,GEPA),touches=T,updatevalue=0)
+    cover <- extract(GEPA,project(domain,GEPA),weights=T,exact=T,cells=T)
     GEPA[cover[,'cell']] <- GEPA[cover[,'cell']]*cover[,'weight']
     GEPA=extend(GEPA,fill=0,
-                 ext(GEPA)+(res(project(domain_template,crs(GEPA)))*5))
+                ext(GEPA)+(res(project(domain_template,crs(GEPA)))*5))
     
     #reproject to exact domain now using an average to effectively aggregate
     #while reprojecting.
     GEPA <- project(GEPA,domain_template,method="average")
   }
-
+  
   GEPA_non_thermo_sectors <- c("emi_ch4_5B1_Composting",
                                "emi_ch4_3A_Enteric_Fermentation",
                                "emi_ch4_3B_Manure_Management",
@@ -206,17 +209,29 @@ Prepare_GEPA <- function(inventory_year,
     zlim_max <- max(global(GEPA_landfill,max,na.rm=T),global(GEPA_non_thermo,max,na.rm=T),global(GEPA_thermo,max,na.rm=T))
     not_log_plot(GEPA_landfill,filename="GEPA_industrial_landfills",
                  "Gridded EPA Inventory -\nIndustrial landfills",
-                 zlim_min=zlim_min,zlim_max=zlim_max)
+                 zlim_min=zlim_min,zlim_max=zlim_max,
+                 plot_directory=plot_directory,
+                 domain=domain,County_Tigerlines=County_Tigerlines,
+                 State_Tigerlines=State_Tigerlines)
     not_log_plot(GEPA_thermo,filename="GEPA_thermogenic",
                  "Gridded EPA Inventory -\nThermogenic Sectors",
-                 zlim_min=zlim_min,zlim_max=zlim_max)
+                 zlim_min=zlim_min,zlim_max=zlim_max,
+                 plot_directory=plot_directory,
+                 domain=domain,County_Tigerlines=County_Tigerlines,
+                 State_Tigerlines=State_Tigerlines)
     not_log_plot(GEPA_non_thermo,filename="GEPA_non_thermogenic",
                  "Gridded EPA Inventory -\nNon-thermogenic Sectors",
-                 zlim_min=zlim_min,zlim_max=zlim_max)
+                 zlim_min=zlim_min,zlim_max=zlim_max,
+                 plot_directory=plot_directory,
+                 domain=domain,County_Tigerlines=County_Tigerlines,
+                 State_Tigerlines=State_Tigerlines)
     
     Summed_GEPA <- sum(GEPA_landfill,GEPA_non_thermo,GEPA_thermo,na.rm=T)
     not_log_plot(Summed_GEPA,
-             "Gridded EPA Inventory -\nAll sectors pulled directly from the GEPA")
+                 "Gridded EPA Inventory -\nAll sectors pulled directly from the GEPA",
+                 plot_directory=plot_directory,
+                 domain=domain,County_Tigerlines=County_Tigerlines,
+                 State_Tigerlines=State_Tigerlines)
   }
   cat("Finished pulling remaining sectors from gridded EPA inventory: Prepare_GEPA in",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
 }
