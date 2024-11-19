@@ -216,16 +216,22 @@ NWI_Wetland_fraction <- function(input_directory,
       wetlands <- wetlands[,"ATTRIBUTE"]
     }else{
       NWI_full_filename <- file.path(NWI_input_directory,paste0(state_name_list[i],"_Wetlands_Geopackage.gpkg"))
-      file_layers <- vector_layers(NWI_full_filename)
       
-      file_layers <- file_layers[!grepl("Historic",file_layers)]
-      file_layers <- file_layers[!grepl("Metadata",file_layers)]
-      file_layers <- file_layers[grepl("Wetlands",file_layers)]
+      #VA has a layer named "VA_Wetlands_Project_Metdata instead of Met A data,
+      #so this failed.  This was needed for the shapefiles version anyway where
+      #some states had multiple layers that needed to be combined, this does not
+      #appear to be the case for geopackage files.
+      
+      # file_layers <- vector_layers(NWI_full_filename)
+      # file_layers <- file_layers[!grepl("Historic",file_layers)]
+      # file_layers <- file_layers[!grepl("Metadata",file_layers)]
+      # file_layers <- file_layers[grepl("Wetlands",file_layers)]
+      # wetlands <- vect(NWI_full_filename,layer=file_layers)
       
       #load and subset to just the "attribute" variable that provides the wetland
       #type and subtype (we won't need other variables).  Combine the multiple
       #files via rbind if needed
-      wetlands <- vect(NWI_full_filename,layer=file_layers)
+      wetlands <- vect(NWI_full_filename,layer=paste0(state_name_list[i],"_Wetlands"))
       wetlands <- wetlands[,"ATTRIBUTE"]
     }
     
