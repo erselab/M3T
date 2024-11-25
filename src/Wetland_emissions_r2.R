@@ -192,12 +192,13 @@ SOCCR_Wetlands <- function(output_directory,
   Freshwater_wetland_types <- c("R1","R2","R3","R4","L1","L2")
 
   if(Use_SOCCR2){
-    subset_data <- rast(NWI_files[1])
-    if(nrow(watershed)!=1){
-      coverage <- watershed[,c("NAW1_EN",Wetland_types[i])] %>% 
-        split(f=watershed$NAW1_EN) %>% 
-        lapply(function(x){extract(subset_data,x,weights=T,exact=T,cells=T)})
-    }
+    # subset_data <- rast(NWI_files[1])
+    # # subset_data <- rast(NWI_files[!duplicated(lapply(strsplit(basename(NWI_files),"_"),"[[",1))])
+    # if(nrow(watershed)!=1){
+    #   coverage <- watershed[,c("NAW1_EN",SOCCR_wetland_types[1])] %>% 
+    #     split(f=watershed$NAW1_EN) %>% 
+    #     lapply(function(x){extract(subset_data,x,weights=T,exact=T,cells=T)})
+    # }
   }
   
   #process separately for each type (different EFs)
@@ -214,12 +215,17 @@ SOCCR_Wetlands <- function(output_directory,
       SOCCR1_flux <- subset_data*Wetland_EFs_subset["SOCCR1",SOCCR_wetland_types[1]]
     }
     if(Use_SOCCR2){
-      if(nrow(watershed)==1){
-        subset_data <- subset_data*as.numeric(values(watershed[,SOCCR_wetland_types[1]]))
-      }else{
-        subset_data[coverage[,'cell'],drop=F] <- watershed[coverage[,'cell']*coverage[,'weight'],SOCCR_wetland_types[1]]
-      }
-      SOCCR2_flux <- subset_data
+      temp <- rasterize(watershed,subset_data,field=SOCCR_wetland_types[1])
+      SOCCR2_flux <- temp*subset_data
+      # if(nrow(watershed)==1){
+      #   subset_data <- subset_data*as.numeric(values(watershed[,SOCCR_wetland_types[1]]))
+      # }else{
+      #   for(A in 1:length(coverage)){
+      #     subset_data[coverage[[A]][,'cell'],drop=F] <- subset_data[coverage[[A]][,'cell'],drop=F]*
+      #       coverage[[A]][,'weight']*as.numeric(values(watershed[watershed$NAW1_EN==watershed$NAW1_EN[A],SOCCR_wetland_types[1]]))
+      #   }
+      # }
+      # SOCCR2_flux <- subset_data
     }
     
     for(i in 2:length(SOCCR_wetland_types)){
@@ -235,12 +241,14 @@ SOCCR_Wetlands <- function(output_directory,
         SOCCR1_flux <- c(SOCCR1_flux,subset_data*Wetland_EFs_subset["SOCCR1",SOCCR_wetland_types[i]]) 
       }
       if(Use_SOCCR2){
-        if(nrow(watershed)==1){
-          subset_data <- subset_data*as.numeric(values(watershed[,SOCCR_wetland_types[i]]))
-        }else{
-          subset_data[coverage[,'cell'],drop=F] <- watershed[coverage[,'cell']*coverage[,'weight'],SOCCR_wetland_types[i]]
-        }
-        SOCCR2_flux <- c(SOCCR2_flux,subset_data)
+        temp <- rasterize(watershed,subset_data,field=SOCCR_wetland_types[i])
+        SOCCR2_flux <- c(SOCCR2_flux,temp*subset_data)
+        # if(nrow(watershed)==1){
+        #   subset_data <- subset_data*as.numeric(values(watershed[,SOCCR_wetland_types[i]]))
+        # }else{
+        #   subset_data[coverage[,'cell'],drop=F] <- watershed[coverage[,'cell']*coverage[,'weight'],SOCCR_wetland_types[i]]
+        # }
+        # SOCCR2_flux <- c(SOCCR2_flux,subset_data)
       }
     }
   }
@@ -282,8 +290,8 @@ SOCCR_Wetlands <- function(output_directory,
   if(Use_SOCCR1){
     SOCCR1_flux <- crop(SOCCR1_flux,ext(domain))
     SOCCR1_flux <- mask(SOCCR1_flux,domain)
-    cover <- extract(SOCCR1_flux,domain,weights=T,exact=T,cells=T)
-    SOCCR1_flux[cover[,'cell']] <- SOCCR1_flux[cover[,'cell']]*cover[,'weight']
+    # cover <- extract(SOCCR1_flux,domain,weights=T,exact=T,cells=T)
+    # SOCCR1_flux[cover[,'cell']] <- SOCCR1_flux[cover[,'cell']]*cover[,'weight']
     writeCDF(sum(SOCCR1_flux,na.rm=T),
              file.path(output_directory,'SOCCR1.nc'),
              force_v4=TRUE,
@@ -296,10 +304,10 @@ SOCCR_Wetlands <- function(output_directory,
   if(Use_SOCCR2){
     SOCCR2_flux <- crop(SOCCR2_flux,ext(domain))
     SOCCR2_flux <- mask(SOCCR2_flux,domain)
-    if(!Use_SOCCR1){
-      cover <- extract(SOCCR2_flux,domain,weights=T,exact=T,cells=T)
-    }
-    SOCCR2_flux[cover[,'cell']] <- SOCCR2_flux[cover[,'cell']]*cover[,'weight']
+    # if(!Use_SOCCR1){
+    #   cover <- extract(SOCCR2_flux,domain,weights=T,exact=T,cells=T)
+    # }
+    # SOCCR2_flux[cover[,'cell']] <- SOCCR2_flux[cover[,'cell']]*cover[,'weight']
     writeCDF(sum(SOCCR2_flux,na.rm=T),
              file.path(output_directory,'SOCCR2.nc'),
              force_v4=TRUE,
@@ -312,10 +320,10 @@ SOCCR_Wetlands <- function(output_directory,
   if(Include_freshwater){
     Freshwater_flux <- crop(Freshwater_flux,ext(domain))
     Freshwater_flux <- mask(Freshwater_flux,domain)
-    if(!(Use_SOCCR1 | Use_SOCCR2)){
-      cover <- extract(Freshwater_flux,domain,weights=T,exact=T,cells=T)
-    }
-    Freshwater_flux[cover[,'cell']] <- Freshwater_flux[cover[,'cell']]*cover[,'weight']
+    # if(!(Use_SOCCR1 | Use_SOCCR2)){
+    #   cover <- extract(Freshwater_flux,domain,weights=T,exact=T,cells=T)
+    # }
+    # Freshwater_flux[cover[,'cell']] <- Freshwater_flux[cover[,'cell']]*cover[,'weight']
     writeCDF(sum(Freshwater_flux,na.rm=T),
              file.path(output_directory,'Freshwater.nc'),
              force_v4=TRUE,
