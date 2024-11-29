@@ -402,7 +402,7 @@ Stationary_combustion <- function(domain,
   #this isn't actually the inventory_year
   NEI_year <- unique(NEI_data_orig$inventory_year)[which.min(abs(unique(NEI_data_orig$inventory_year)-inventory_year))]
   if(inventory_year!=NEI_year){
-    cat(paste0("NEI is every 3 years and does not have an inventory for ",inventory_year,".  Using ",NEI_year," as the nearest available data."))
+    cat(paste0("NEI is every 3 years and does not have an inventory for ",inventory_year,".  Using ",NEI_year," as the nearest available data.\n"))
   }
   NEI_data_orig <- NEI_data_orig[NEI_data_orig$inventory_year==NEI_year,]
   # NEI_data_orig <- NEI_data_orig[NEI_data_orig$inventory_year==2017,]
@@ -686,31 +686,35 @@ Stationary_combustion <- function(domain,
       #unique state-county number, then calculate per-pixel coverage, output = list
       #of spatvectors
       if(length(unique(all_merge_LCC_state$COUNTYFP))==1){
-        cover_all_aces <- list(extract(aces_res,all_merge_LCC_state,weights=T,exact=T,cells=T))
+        cover_all_aces <- list(extract(aces_res,all_merge_LCC_state,weights=T,cells=T))
       }else{
         cover_all_aces <- all_merge_LCC_state %>% 
           split(f=paste0(all_merge_LCC_state$STATEFP,all_merge_LCC_state$COUNTYFP)) %>%
-          lapply(function(x){extract(aces_res,x,weights=T,exact=T,cells=T)})
+          lapply(function(x){extract(aces_res,x,weights=T,cells=T)})
+        cover_all_aces <- cover_all_aces[paste0(all_merge_LCC_state$STATEFP,all_merge_LCC_state$COUNTYFP)]
       }
       disaggregation(aces_res,res_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all_aces,out_envir=environment())
       disaggregation(aces_com,com_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_aces,out_envir=environment())
       disaggregation(aces_ind,ind_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_aces,out_envir=environment())
       disaggregation(aces_elec,elec_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_aces,out_envir=environment())
+      gc()
     }
     if(Use_Vulcan){
       all_merge_LCC_state <- mask(all_merge_state,domain)
       all_merge_LCC_state <- project(all_merge_LCC_state,vu_res)
       if(length(unique(all_merge_LCC_state$COUNTYFP))==1){
-        cover_all_vulcan <- list(extract(vu_res,all_merge_LCC_state,weights=T,exact=T,cells=T))
+        cover_all_vulcan <- list(extract(vu_res,all_merge_LCC_state,weights=T,cells=T))
       }else{
         cover_all_vulcan <- all_merge_LCC_state %>% 
           split(f=paste0(all_merge_LCC_state$STATEFP,all_merge_LCC_state$COUNTYFP)) %>%
-          lapply(function(x){extract(vu_res,x,weights=T,exact=T,cells=T)})
+          lapply(function(x){extract(vu_res,x,weights=T,cells=T)})
+        cover_all_vulcan <- cover_all_vulcan[paste0(all_merge_LCC_state$STATEFP,all_merge_LCC_state$COUNTYFP)]
       }
       disaggregation(vu_res,res_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_vulcan,out_envir=environment())
       disaggregation(vu_com,com_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_vulcan,out_envir=environment())
       disaggregation(vu_ind,ind_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_vulcan,out_envir=environment())
       disaggregation(vu_elec,elec_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_vulcan,out_envir=environment())
+      gc()
     }
     rm(all_merge_LCC_state)
     
@@ -727,36 +731,40 @@ Stationary_combustion <- function(domain,
       #don't recalculate this, only calculate it if we have to
       if(!stationary_combustion_by_state){
         if(length(unique(all_merge_LCC_domain$COUNTYFP))==1){
-          cover_all_aces <- list(extract(aces_res,all_merge_LCC_domain,weights=T,exact=T,cells=T))
+          cover_all_aces <- list(extract(aces_res,all_merge_LCC_domain,weights=T,cells=T))
         }else{
           all_merge_LCC_domain <- project(all_merge_LCC_domain,aces_res)
           cover_all_aces <- all_merge_LCC_domain %>% 
             split(f=paste0(all_merge_LCC_domain$STATEFP,all_merge_LCC_domain$COUNTYFP)) %>%
-            lapply(function(x){extract(aces_res,x,weights=T,exact=T,cells=T)})
+            lapply(function(x){extract(aces_res,x,weights=T,cells=T)})
+          cover_all_aces <- cover_all_aces[paste0(all_merge_LCC_domain$STATEFP,all_merge_LCC_domain$COUNTYFP)]
         }
       }
       disaggregation(aces_res,res_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_aces,out_envir=environment())
       disaggregation(aces_com,com_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_aces,out_envir=environment())
       disaggregation(aces_ind,ind_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_aces,out_envir=environment())
       disaggregation(aces_elec,elec_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_aces,out_envir=environment())
+      gc()
     }
     if(Use_Vulcan){
       all_merge_LCC_domain <- mask(all_merge_domain,domain)
       all_merge_LCC_domain <- project(all_merge_LCC_domain,vu_res)
       if(!stationary_combustion_by_state){
         if(length(unique(all_merge_LCC_domain$COUNTYFP))==1){
-          cover_all_vulcan <- list(extract(vu_res,all_merge_LCC_domain,weights=T,exact=T,cells=T))
+          cover_all_vulcan <- list(extract(vu_res,all_merge_LCC_domain,weights=T,cells=T))
         }else{
           all_merge_LCC_domain <- project(all_merge_state,vu_res)
           cover_all_vulcan <- all_merge_LCC_domain %>% 
             split(f=paste0(all_merge_LCC_domain$STATEFP,all_merge_LCC_domain$COUNTYFP)) %>%
-            lapply(function(x){extract(vu_res,x,weights=T,exact=T,cells=T)})
+            lapply(function(x){extract(vu_res,x,weights=T,cells=T)})
+          cover_all_vulcan <- cover_all_vulcan[paste0(all_merge_LCC_domain$STATEFP,all_merge_LCC_domain$COUNTYFP)]
         }
       }
       disaggregation(vu_res,res_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_vulcan,out_envir=environment())
       disaggregation(vu_com,com_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_vulcan,out_envir=environment())
       disaggregation(vu_ind,ind_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_vulcan,out_envir=environment())
       disaggregation(vu_elec,elec_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_vulcan,out_envir=environment())
+      gc()
     }
     rm(all_merge_LCC_domain)
     
@@ -797,7 +805,7 @@ Stationary_combustion <- function(domain,
       domain_reproj <- project(domain,crs(input))
       input=crop(input,domain_reproj,snap="out")
       input=mask(input,domain_reproj,touches=T,updatevalue=0)
-      cover <- extract(input,domain_reproj,weights=T,exact=T,cells=T)
+      cover <- extract(input,domain_reproj,weights=T,cells=T)
       input[cover[,'cell']] <- input[cover[,'cell']]*cover[,'weight']
       input=extend(input,fill=0,
                    ext(input)+(res(project(domain_template,crs(input)))*5))
