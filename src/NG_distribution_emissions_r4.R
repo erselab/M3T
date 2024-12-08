@@ -1110,7 +1110,7 @@ NG_distribution <- function(domain,
         # values(tempdata) <- 0
         
         #mask to only keep those LDCs that are at least partly within the domain
-        all_merge_LCC <- mask(all_merge_subset,domain)
+        all_merge_LCC <- mask(all_merge_subset,project(domain,all_merge_subset))
         #convert to the proper crs
         all_merge_LCC <- project(all_merge_LCC,aces_res)
         
@@ -1149,25 +1149,25 @@ NG_distribution <- function(domain,
           cover_all <- all_merge_LCC %>% 
             split(f=all_merge_LCC$HIFLD_SVCTERID) %>%
             lapply(function(x){cat("\rProcessing",x$count,"of",LDC_count,"LDCs using ACES                                   ");extract(aces_res,x,weights=T,exact=T,cells=T)})
-          cover_all <- cover_all[all_merge_LCC$STATEFP]
+          cover_all <- cover_all[all_merge_LCC$HIFLD_SVCTERID]
         }
         
         disaggregation(aces_res,res_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
         disaggregation(aces_com,com_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
       }
       if(Use_Vulcan){
-        all_merge_LCC <- mask(all_merge_subset,domain)
+        all_merge_LCC <- mask(all_merge_subset,project(domain,all_merge_subset))
         all_merge_LCC <- project(all_merge_LCC,vu_res)
         
+        LDC_count <- nrow(all_merge_LCC)
         if(LDC_count==1){
           cover_all <- list(extract(vu_res,all_merge_LCC,weights=T,exact=T,cells=T))
         }else{
-          LDC_count <- nrow(all_merge_LCC)
           all_merge_LCC$count <- 1:nrow(all_merge_LCC)
           cover_all <- all_merge_LCC %>% 
             split(f=all_merge_LCC$HIFLD_SVCTERID) %>%
             lapply(function(x){cat("\rProcessing",x$count,"of",LDC_count,"LDCs using vulcan                                  ");extract(vu_res,x,weights=T,exact=T,cells=T)})
-          cover_all <- cover_all[all_merge_LCC$STATEFP]
+          cover_all <- cover_all[all_merge_LCC$HIFLD_SVCTERID]
         }
         
         disaggregation(vu_res,res_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
@@ -1239,7 +1239,7 @@ NG_distribution <- function(domain,
     
     if(NG_distribution_by_domain){
       all_merge_domain <- suppressWarnings(apply(as.data.frame(all_merge_subset),2,as.numeric))
-      all_merge_domain <- colSums(all_merge_domain)
+      all_merge_domain <- colSums(all_merge_domain,na.rm=T)
       
       all_merge_domain_poly <- aggregate(State_Tigerlines)
       values(all_merge_domain_poly) <- t(all_merge_domain)
