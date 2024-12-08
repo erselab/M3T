@@ -390,5 +390,5 @@ SOCCR_Wetlands <- function(output_directory,
                State_Tigerlines=State_Tigerlines)
     }
   }
-  cat("Finished wastewater sector: SOCCR_Wetlands in",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
+  cat("Finished wetland sector: SOCCR_Wetlands in",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
 }
