@@ -209,18 +209,18 @@ Transmission <- function(GHGI_file,
                                       ghgrp_transmission_compressor_emissions$facility_name,
                                       ghgrp_transmission_compressor_emissions$industry_segment),
                               sum,na.rm=T)
+  colnames(processing_CH4) <- c("facility_id","reporting_year","facility_name","industry_segment","ghg_quantity")
   processing_CH4 <- processing_CH4[,c(1:3,5,4)]
   
   #then split into transmission/compression and gas processing (some are both)
-  ghgrp_transmission_compressor_emissions <- processing_CH4[processing_CH4[,5]=="Onshore natural gas transmission compression [98.230(a)(4)]",]
-  processing_CH4 <- processing_CH4[processing_CH4[,5]=="Onshore natural gas processing [98.230(a)(3)]",]
+  ghgrp_transmission_compressor_emissions <- processing_CH4[processing_CH4$industry_segment=="Onshore natural gas transmission compression [98.230(a)(4)]",]
+  processing_CH4 <- processing_CH4[processing_CH4$industry_segment=="Onshore natural gas processing [98.230(a)(3)]",]
   
   #reorganize slightly to match combustion.  Below function won't work right as
-  #it's a competely different table
-  ghgrp_transmission_compressor_emissions <- ghgrp_transmission_compressor_emissions[,c(1,5,3,4,2)]
-  colnames(ghgrp_transmission_compressor_emissions) <- colnames(ghgrp_combustion_emissions)
+  #it's a completely different table
   ghgrp_transmission_compressor_emissions$ghg_gas_name <- "methane"
-  
+  ghgrp_transmission_compressor_emissions <- ghgrp_transmission_compressor_emissions[,colnames(ghgrp_combustion_emissions)]
+
   #simple function to make sure gas names are limited to methane, and column names
   #are consistent
   make_consistent <- function(input){
@@ -253,7 +253,7 @@ Transmission <- function(GHGI_file,
   #for those facilities that are involved in processing, the combustion emissions
   #are not considered part of the transmission/compression total, so remove it
   #here (very small number of facilities)
-  processing_facilities <- ghgrp_transmission_compressor_emissions$facility_id %in% processing_CH4[,1]
+  processing_facilities <- ghgrp_transmission_compressor_emissions$facility_id %in% processing_CH4$facility_id
   ghgrp_transmission_compressor_emissions$ghg_quantity[processing_facilities] <- ghgrp_transmission_compressor_emissions$W_emissions[processing_facilities]
   
   #now filter out those without any emissions
