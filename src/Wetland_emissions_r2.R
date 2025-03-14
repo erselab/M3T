@@ -1,23 +1,24 @@
 #'@title Create SOCCR based wetland methane maps
 #'
-#'@description `SOCCR_Wetlands` writes 2 netcdf files of gridded wetland methane
-#'  emissions, 1 for SOCCR1 and 1 for SOCCR2.  May include freshwater wetland
-#'  emissions using Rosentretet et al. too.  Includes optional visuals as well.
+#'@description `SOCCR_Wetlands` writes up to 3 netcdf files of gridded wetland
+#'  methane emissions, 1 for SOCCR1, 1 for SOCCR2, and 1 for freshwater.
+#'  Includes optional visuals as well.
 #'
 #'@details This function takes the output of `NWI_Wetland_fraction`, which is
 #'  per pixel fractional coverage of wetlands separated by wetland type, and
 #'  applies emission factors to convert coverage to methane emissions.  It is
 #'  simply applying SOCCR1 or SOCCR2 average emissions from wetlands to the NWI
-#'  activity data.  Additionally, freshwater emissions are calculated using
+#'  activity data.  Additionally, freshwater emissions can be calculated using
 #'  emissions from Rosentreter et al.
 #'
 #'  SOCCR1 values are based on the arithmetic averages of Table F5, SOCC2 values
 #'  are based on the arithmetic averages of Tables 13B.8 to 13B.11 for PFO and
 #'  PNF and Table 15A.2 for M2 and E2, and Lakes and Rivers (L1, L2, and R1 -
 #'  R4) are from Rosentreter et al. using the median flux from rivers and the
-#'  largest lake class (>1 km).  This lake flux was chosen as McDonald et al.
-#'  show that large lakes (>1 km2) constitute 71\% of the total lake area in
-#'  CONUS (rising to 90\% if including the Great Lakes).
+#'  largest lake class (>1 km).  SOCCR2 is calculated by watershed as there was
+#'  regionally separated data.  The lake flux was chosen as McDonald et al. show
+#'  that large lakes (>1 km2) constitute 71\% of the total lake area in CONUS
+#'  (rising to 90\% if including the Great Lakes).
 #'
 #'  SOCCR1 is available at
 #'  \url{https://www.carboncyclescience.us/state-carbon-cycle-report-soccr} and
@@ -28,10 +29,11 @@
 #'@param output_directory Character providing the full filepath to save
 #'  processed data
 #'@param verbose Logical indicating whether to save additional output.  This
-#'  includes monthly plots of the gridded methane emissions on log scales, saved
-#'  separately for each model subset and each land cover dataset used.
-#'@param domain SpatRaster providing the desired output grid, including the
-#'  desired resolution and coordinate reference system
+#'  includes plots of the gridded methane emissions on log scales, saved
+#'  separately for SOCCR1, SOCCR2, and freshwater.
+#'@param domain SpatVector polygon outlining the desired output area
+#'@param domain_template SpatRaster providing the desired output grid, including
+#'  the desired resolution and coordinate reference system
 #'@param Use_SOCCR1 Logical.  Pulled from config file.  Indicating whether or
 #'  not to calculate emissions using SOCCR1.
 #'@param Use_SOCCR2 Logical.  Pulled from config file.  Indicating whether or
@@ -51,32 +53,30 @@
 #'  shapefile.  Available at
 #'  \url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.
 #'  Only relevant if verbose=TRUE.
-#'@param focus_city_tigerlines SpatVector.  United States Census Bureau county
-#'  shapefile.  Available at
-#'  \url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.
-#'  Only relevant if a focus city was set in main and verbose=TRUE.
 #'@param  watershed_shapefile Character.  Commission for Environmental
 #'  Cooperation watershed shapefile.  Available at
 #'  \url{http://www.cec.org/north-american-environmental-atlas/watersheds/}.
 #'  Only relevant if USE_SOCCR2 = TRUE.
-#'@returns Nothing is returned from the function, but the main outputs are 2
-#'  netcdcf files of the methane emissions from wetlands with 1 file for SOCCR1
-#'  and 1 file for SOCCR2 based emissions.  Lakes and rivers from Rosentreter et
-#'  al. emissions can also be included.  They are titled "SOCCR1.nc" and
-#'  "SOCCR2.nc".
+#'@returns Nothing is returned from the function, but the main outputs are up to
+#'  3 netcdcf files of the methane emissions from wetlands with 1 file for
+#'  SOCCR1 and 1 file for SOCCR2 based emissions.  Lakes and rivers from
+#'  Rosentreter et al. emissions can also be included.  They are titled
+#'  "SOCCR1.nc", "SOCCR2.nc", and "Freshwater.nc".
 #'
 #'  If verbose is set to TRUE, then multiple figures are also saved.  Log scale
-#'  plots with consistent axes are saved for the 2 SOCCR emissions.  They are
-#'  saved as "SOCCR1.png" and "SOCCR2.png".
+#'  plots with consistent axes are saved for the 2 SOCCR emissions and
+#'  freshwater emissions.  They are saved as "SOCCR1.png", "SOCCR2.png", and
+#'  "Freshwater.png".
 #'@examples
 #' library(terra)
 #' grid_bbox=cbind(c(-76.65,-73.65),c(38.97,40.97))
 #' grid_res=0.01
 #' grid_crs="epsg:4326"
 #' grid <- rast(nrows=diff(range(grid_bbox[,2]))/grid_res,
-#'             ncols=diff(range(grid_bbox[,1]))/grid_res, xmin=min(grid_bbox[,1]),
-#'             xmax=max(grid_bbox[,1]), ymin=min(grid_bbox[,2]), ymax=max(grid_bbox[,2]),
-#'             crs=grid_crs)
+#'              ncols=diff(range(grid_bbox[,1]))/grid_res, xmin=min(grid_bbox[,1]),
+#'              xmax=max(grid_bbox[,1]), ymin=min(grid_bbox[,2]), ymax=max(grid_bbox[,2]),
+#'              crs=grid_crs)
+#' grid_vect <- as.polygons(ext(grid),crs=grid_crs)
 #' EFs <- data.frame("E2"=c(10.3,15.29*16.043/12.011),
 #'                           "M2"=c(10.3,15.29*16.043/12.011),
 #'                           "PFO"=c(36,18.52*16.043/12.011),
@@ -92,7 +92,7 @@
 #' # convert from g CH4 per m2 per yr to nmol/m2/s
 #' EFs=EFs*1E9/(16.043*365.25*24*60*60)
 #'
-#' SOCCR_Wetlands(output_directory="~/../Desktop/",
+#' SOCCR_Wetlands(output_directory="~/../Desktop/out/",
 #'                plot_directory="~/../Desktop/plots/",
 #'                domain=grid,
 #'                Use_SOCCR1=TRUE,
@@ -100,10 +100,9 @@
 #'                Include_freshwater=TRUE,
 #'                Wetland_EFs=EFs,
 #'                verbose=TRUE,
-#'                County_Tigerlines=vect("~/../Desktop/County_Tigerlines/tl_2018_us_county.shp"),
-#'                State_Tigerlines=vect("~/../Desktop/State_Tigerlines/tl_2018_us_state.shp"),
-#'                focus_city_tigerlines=focus_city,
-#'                watershed_shapefile="~/../Desktop/watersheds_shapefile/watershed_p_v2.shp")
+#'                County_Tigerlines=vect("~/../Desktop/in/County_Tigerlines/tl_2018_us_county.shp"),
+#'                State_Tigerlines=vect("~/../Desktop/in/State_Tigerlines/tl_2018_us_state.shp"),
+#'                watershed_shapefile="~/../Desktop/in/watersheds_shapefile/watershed_p_v2.shp")
 #'
 #'@author Joe Pitt, \email{madeup@@wisc.edu}
 #'@author Kris Hajny, \email{blank@@fake.edu}
@@ -117,6 +116,7 @@
 SOCCR_Wetlands <- function(output_directory,
                            plot_directory,
                            domain,
+                           domain_template,
                            Use_SOCCR1,
                            Use_SOCCR2,
                            Include_freshwater,
@@ -124,7 +124,6 @@ SOCCR_Wetlands <- function(output_directory,
                            verbose,
                            County_Tigerlines,
                            State_Tigerlines,
-                           focus_city_tigerlines,
                            watershed_shapefile){
   
   ## Wetland_emissions_r2.R
@@ -146,7 +145,7 @@ SOCCR_Wetlands <- function(output_directory,
     #and remove extra data
     watershed <- watershed["NAW1_EN"]
     watershed <- aggregate(watershed,by="NAW1_EN")
-    watershed <- crop(watershed,ext(project(domain,crs(watershed)))*1.1)
+    watershed <- crop(watershed,project(domain_template,crs(watershed))*1.1)
     expanded_watershed <- buffer(watershed,2E4)
     watershed <- aggregate(expanded_watershed-watershed+watershed,"NAW1_EN")
     watershed <- project(watershed,crs(domain))
@@ -178,7 +177,7 @@ SOCCR_Wetlands <- function(output_directory,
   }
   
   #update wetland EF to simplify SOCCR1 since SOCCR2 E2 and M2 have already been
-  #dealt with
+  #dealt with.  SOCCR1 is not regional.
   Wetland_EFs_subset <- Wetland_EFs[,c("E2_Atlantic","M2_Atlantic","PFO","PNF","L1","L2","R1","R2","R3","R4")]
   colnames(Wetland_EFs_subset)[1:2] <- c("E2","M2")
   
@@ -186,29 +185,27 @@ SOCCR_Wetlands <- function(output_directory,
   #load in and process the Wetland_fraction_r1 output to convert from wetland
   #coverage to wetland emissions
   
-  NWI_files <- list.files(paste0(output_directory,"/NWI/"),".tiff",full.names = T)
+  NWI_files <- list.files(paste0(output_directory,"/Wetland_NWI/"),".tiff",full.names = T)
+  NWI_filetypes <- sapply(strsplit(basename(gsub(".tiff","",(NWI_files))),"_"),"[[",2)
   
   SOCCR_wetland_types <- c("M2","E2","PFO","PNF")
   Freshwater_wetland_types <- c("R1","R2","R3","R4","L1","L2")
-
-  if(Use_SOCCR2){
-    # subset_data <- rast(NWI_files[1])
-    # # subset_data <- rast(NWI_files[!duplicated(lapply(strsplit(basename(NWI_files),"_"),"[[",1))])
-    # if(nrow(watershed)!=1){
-    #   coverage <- watershed[,c("NAW1_EN",SOCCR_wetland_types[1])] %>% 
-    #     split(f=watershed$NAW1_EN) %>% 
-    #     lapply(function(x){extract(subset_data,x,weights=T,exact=T,cells=T)})
-    # }
-  }
+  
+  #filter out any wetland types that we don't have within the domain
+  SOCCR_wetland_types <- SOCCR_wetland_types[SOCCR_wetland_types %in% NWI_filetypes]
+  Freshwater_wetland_types <- Freshwater_wetland_types[Freshwater_wetland_types %in% NWI_filetypes]
   
   #process separately for each type (different EFs)
   if(Use_SOCCR1 | Use_SOCCR2){
+    #load in the first files to build the output
     subset_files <- NWI_files[grep(SOCCR_wetland_types[1],NWI_files)]
     subset_data <- rast(subset_files)
+    
     #given NWI extends somewhat beyond state bounds, there is overlap.  So max
     #should combine them akin to sum, but without double counting.
     subset_data <- max(subset_data)
     names(subset_data) <- SOCCR_wetland_types[1]
+    
     #for a later sanity check
     all_frac <- subset_data
     if(Use_SOCCR1){
@@ -217,25 +214,15 @@ SOCCR_Wetlands <- function(output_directory,
     if(Use_SOCCR2){
       temp <- rasterize(watershed,subset_data,field=SOCCR_wetland_types[1])
       SOCCR2_flux <- temp*subset_data
-      # if(nrow(watershed)==1){
-      #   subset_data <- subset_data*as.numeric(values(watershed[,SOCCR_wetland_types[1]]))
-      # }else{
-      #   for(A in 1:length(coverage)){
-      #     subset_data[coverage[[A]][,'cell'],drop=F] <- subset_data[coverage[[A]][,'cell'],drop=F]*
-      #       coverage[[A]][,'weight']*as.numeric(values(watershed[watershed$NAW1_EN==watershed$NAW1_EN[A],SOCCR_wetland_types[1]]))
-      #   }
-      # }
-      # SOCCR2_flux <- subset_data
     }
     
+    #repeat for all remaining states, now adding to all frac and combining as
+    #new layers of soccr1_flux and soccr2_flux
     for(i in 2:length(SOCCR_wetland_types)){
       subset_files <- NWI_files[grep(SOCCR_wetland_types[i],NWI_files)]
       subset_data <- rast(subset_files)
-      #given NWI extends somewhat beyond state bounds, there is overlap.  So max
-      #should combine them akin to sum, but without double counting.
       subset_data <- max(subset_data)
       names(subset_data) <- SOCCR_wetland_types[i]
-      #for a later sanity check
       all_frac <- all_frac+subset_data
       if(Use_SOCCR1){
         SOCCR1_flux <- c(SOCCR1_flux,subset_data*Wetland_EFs_subset["SOCCR1",SOCCR_wetland_types[i]]) 
@@ -243,12 +230,6 @@ SOCCR_Wetlands <- function(output_directory,
       if(Use_SOCCR2){
         temp <- rasterize(watershed,subset_data,field=SOCCR_wetland_types[i])
         SOCCR2_flux <- c(SOCCR2_flux,temp*subset_data)
-        # if(nrow(watershed)==1){
-        #   subset_data <- subset_data*as.numeric(values(watershed[,SOCCR_wetland_types[i]]))
-        # }else{
-        #   subset_data[coverage[,'cell'],drop=F] <- watershed[coverage[,'cell']*coverage[,'weight'],SOCCR_wetland_types[i]]
-        # }
-        # SOCCR2_flux <- c(SOCCR2_flux,subset_data)
       }
     }
   }
@@ -278,20 +259,23 @@ SOCCR_Wetlands <- function(output_directory,
     }
   }
   
-  # Check that the fractions are always between 0 and 1
-  max_frac <- unlist(global(all_frac,max,na.rm=T))*100
-  min_frac <- unlist(global(all_frac,min,na.rm=T))*100
-  if(max_frac>100.1){
-    stop(paste0("some pixels have over 100% wetland coverage.  Range is ",min_frac,"% to ",max_frac,"%"))
-  }
+  # # Check that the fractions are always between 0 and 1
+  # max_frac <- unlist(global(all_frac,max,na.rm=T))*100
+  # min_frac <- unlist(global(all_frac,min,na.rm=T))*100
+  # if(max_frac>100.1){
+  #   stop(paste0("some pixels have over 100% wetland coverage.  Range is ",min_frac,"% to ",max_frac,"%"))
+  # }
   ################################################################################
   #save the output
   
   if(Use_SOCCR1){
-    SOCCR1_flux <- crop(SOCCR1_flux,ext(domain))
+    #crop/mask to exact domain and account for pixels partially within a
+    #polygonal domain
+    SOCCR1_flux <- crop(SOCCR1_flux,domain_template)
     SOCCR1_flux <- mask(SOCCR1_flux,domain)
-    # cover <- extract(SOCCR1_flux,domain,weights=T,exact=T,cells=T)
-    # SOCCR1_flux[cover[,'cell']] <- SOCCR1_flux[cover[,'cell']]*cover[,'weight']
+    cover <- extract(SOCCR1_flux,domain,weights=T,cells=T)
+    SOCCR1_flux[cover[,'cell']] <- SOCCR1_flux[cover[,'cell']]*cover[,'weight']
+    
     writeCDF(sum(SOCCR1_flux,na.rm=T),
              file.path(output_directory,'SOCCR1.nc'),
              force_v4=TRUE,
@@ -302,12 +286,12 @@ SOCCR_Wetlands <- function(output_directory,
              overwrite=TRUE)
   }
   if(Use_SOCCR2){
-    SOCCR2_flux <- crop(SOCCR2_flux,ext(domain))
+    SOCCR2_flux <- crop(SOCCR2_flux,domain_template)
     SOCCR2_flux <- mask(SOCCR2_flux,domain)
-    # if(!Use_SOCCR1){
-    #   cover <- extract(SOCCR2_flux,domain,weights=T,exact=T,cells=T)
-    # }
-    # SOCCR2_flux[cover[,'cell']] <- SOCCR2_flux[cover[,'cell']]*cover[,'weight']
+    if(!Use_SOCCR1){
+      cover <- extract(SOCCR2_flux,domain,weights=T,cells=T)
+    }
+    SOCCR2_flux[cover[,'cell']] <- SOCCR2_flux[cover[,'cell']]*cover[,'weight']
     writeCDF(sum(SOCCR2_flux,na.rm=T),
              file.path(output_directory,'SOCCR2.nc'),
              force_v4=TRUE,
@@ -318,12 +302,12 @@ SOCCR_Wetlands <- function(output_directory,
              overwrite=TRUE)
   }
   if(Include_freshwater){
-    Freshwater_flux <- crop(Freshwater_flux,ext(domain))
+    Freshwater_flux <- crop(Freshwater_flux,domain_template)
     Freshwater_flux <- mask(Freshwater_flux,domain)
-    # if(!(Use_SOCCR1 | Use_SOCCR2)){
-    #   cover <- extract(Freshwater_flux,domain,weights=T,exact=T,cells=T)
-    # }
-    # Freshwater_flux[cover[,'cell']] <- Freshwater_flux[cover[,'cell']]*cover[,'weight']
+    if(!(Use_SOCCR1 | Use_SOCCR2)){
+      cover <- extract(Freshwater_flux,domain,weights=T,cells=T)
+    }
+    Freshwater_flux[cover[,'cell']] <- Freshwater_flux[cover[,'cell']]*cover[,'weight']
     writeCDF(sum(Freshwater_flux,na.rm=T),
              file.path(output_directory,'Freshwater.nc'),
              force_v4=TRUE,
