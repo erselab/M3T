@@ -1,11 +1,12 @@
-#'@title Create gridded methane emissions maps for waste water treatment plants
+#'@title Create gridded methane emissions maps for wastewater treatment plants
 #'  and septic systems
 #'
-#'@description `Wastewater` writes 4 netcdf files of gridded methane emissions -
-#'  1 for municipal wastewater treatment facilities, 1 for industrial wastewater
-#'  treatment facilities, and 2 for septic systems.   Also writes 5 csvs, 2 for
-#'  municipal facilities, 2 for industrial facilities, and 1 for septic systems
-#'  with all csvs being optional.
+#'@description `Wastewater` writes up to 7 netcdf files of gridded methane
+#'  emissions - 1 - 4  for municipal wastewater treatment facilities, 1 for
+#'  industrial wastewater treatment facilities, and 1 - 2 for septic systems.
+#'  Also writes up to 11 csvs, up to 8 for municipal facilities, 2 for
+#'  industrial facilities, and 1 for septic systems with all csvs being
+#'  optional.
 #'
 #'@details This function calculates and grids methane emissions from wastewater
 #'  treatment and septic systems. It takes the total flow through municipal
@@ -26,17 +27,18 @@
 #'  History Online (ECHO) tool at
 #'  \url{https://echo.epa.gov/trends/loading-tool/water-pollution-search}.  The
 #'  CWNS is produced infrequently while DMR data is regularly updated, though
-#'  the products do differ.  Facility locations and total effluent flow is used
-#'  from these files.  The calculation method can then either be set to
-#'  disaggregate the EPA Greenhouse Gas Inventory (GHGI) national total
-#'  emissions to these facilities, scaled by flow, or calculate emissions for
-#'  each facility using a log-linear relationship between flow and emissions
-#'  (log10(CH4 emissions in g/s) = 1.2*log10(flow in m3/s)+1) as determined by
-#'  Moore et al.  Moore et al. measured emission rates at 63 wastewater
-#'  treatment facilities to develop this relationship, which using DMR flow
-#'  rates suggests nearly 2x the emissions as the GHGI as of 2023 when their
-#'  paper was written.  Note the authors actually used emission factors with
-#'  organic loading rather than this log-linear relationship to scale emissions.
+#'  the facilities and their data can differ between these products.  Facility
+#'  locations and total effluent flow is used from these files.  The calculation
+#'  method can then either be set to disaggregate the EPA Greenhouse Gas
+#'  Inventory (GHGI) national total emissions to these facilities, scaled by
+#'  flow, or calculate emissions for each facility using a log-linear
+#'  relationship between flow and emissions (log10(CH4 emissions in g/s) =
+#'  1.2*log10(flow in m3/s)+1) as determined by Moore et al.  Moore et al.
+#'  measured emission rates at 63 wastewater treatment facilities to develop
+#'  this relationship, which suggests nearly 2x the emissions as the GHGI using
+#'  DMR flow rates as of 2023 when their paper was written.  Note the authors
+#'  actually used emission factors with organic loading rather than this
+#'  log-linear relationship to scale emissions.
 #'
 #'  GHGRP data is used for any and all industrial wastewater treatment
 #'  facilities.  The necessary GHGRP data will be automatically downloaded.
@@ -54,14 +56,14 @@
 #'  get gridded septic emissions.
 #'
 #'  Option 2 - we can instead take state-reported total emissions rather than
-#'  using national emissions.  Some states report the number of people in the
+#'  using national emissions.  Some states report the fraction of people in the
 #'  state using septic systems to the American Housing Survey in the Plumbing,
 #'  Water, and Sewage Disposal survey, available here
 #'  \url{https://www.census.gov/programs-surveys/ahs/data/interactive/ahstablecreator.html?s_areas=00000&s_year=2021&s_tablename=TABLE1&s_bygroup1=1&s_bygroup2=1&s_filtergroup1=1&s_filtergroup2=1}.
 #'  Note this data is reported every other year, not annually. For states that
 #'  don't, the 1990 census data on septic fraction is available here
 #'  \url{https://www.census.gov/data/tables/time-series/dec/coh-sewage.html} and
-#'  this can be scaled using the change in the national septic fraction from
+#'  this will be scaled using the change in the national septic fraction from
 #'  1990 (from census) to the desired year (from the housing survey).  This new
 #'  fraction can be combined with up to date population data available from the
 #'  census
@@ -84,18 +86,23 @@
 #'
 #'  See references \href{https://doi.org/10.1016/j.isprsjprs.2020.02.019}{Homer et
 #'  al.} and \href{https://doi.org/10.1021/acs.est.2c05373}{Moore et al.}
-#'@param domain SpatRaster providing the desired output grid, including the
-#'  desired resolution and coordinate reference system
-#'@param state_name_list Character vector listing all states within the desired
-#'  domain
+#'@param domain SpatVector polygon outlining the desired output area
+#'@param domain_template SpatRaster providing the desired output grid, including
+#'  the desired resolution and coordinate reference system
+#'@param ghgrp_facility_info Data.frame with the GHGRP location data for all
+#'  years and states.  See
+#'  https://www.epa.gov/enviro/envirofacts-data-service-api
+#'@param input_directory Character providing the full filepath to save/load
+#'  raw input data
 #'@param output_directory Character providing the full filepath to save
 #'  processed data
 #'@param inventory_year Numeric indicating the desired year of data to use.
 #'@param verbose Logical indicating whether to save additional output.  This
-#'  includes 4 csv files, 2 providing summarized and 2 providing detailed
-#'  information for all landfills within the domain, separated between LMOP and
-#'  GHGRP.  It also includes 2 plots of the gridded methane emissions on log
-#'  scales, one for LMOP facilities and one for GHGRP facilities.
+#'  includes up to 11 csv files including summarized and detailed information
+#'  for all municipal wastewater treatment plants within the domain and
+#'  industrial wastewater plants.  It also includes up to 5 plots of the gridded
+#'  methane emissions.  Up to 2 for municipal wastewater treatment facilities,
+#'  up to 2 for septic, and 1 for industrial wastewater treatment facilities
 #'@param DMR_file Character providing the full filepath to the discharge
 #'  monitoring report data available at
 #'  \url{https://echo.epa.gov/trends/loading-tool/water-pollution-search}.  Set
@@ -108,10 +115,14 @@
 #'  Flow (MGD) are used.  There is an example file in the package's datasets
 #'  folder that has been successfully used in this code available for reference.
 #'@param CWNS_file Character providing the full filepath to the 2012 Clean
-#'  Watershed Needs report data available at
-#'  \url{https://www.epa.gov/cwns/clean-watersheds-needs-survey-cwns-2012-report-and-data}.
-#'  Find the data download link near the bottom of the page.  This will download
-#'  all data as an access database.  To convert to a useable excel file:
+#'  Watershed Needs report data or the folder containing the 2022 data from the
+#'  report -  available at
+#'  \url{https://www.epa.gov/cwns/clean-watersheds-needs-survey-cwns-2012-report-and-data}
+#'  and
+#'  \url{https://www.epa.gov/cwns/clean-watersheds-needs-survey-cwns-2022-report-and-data},
+#'  respectively. For 2012, find the data download link near the bottom of the
+#'  page.  This will download all data as an access database.  To convert to a
+#'  useable excel file:
 #' \itemize{
 #'   \item Open mdb file in Microsoft Access
 #'   \item Go to Create tab -> Query Wizard
@@ -129,11 +140,29 @@
 #'  LONGITUDE, HORIZONTAL_COORDINATE_DATUM, and EXIST_MUNICIPAL are used.  There
 #'  is an example file in the package's datasets folder that has been
 #'  successfully used in this code available for reference.
-#'@param Wastewater_Municipal_method Character.  Pulled from config file. Either
-#'  "Moore_linear" or "GHGI" to indicate the desired method to estimate
-#'  municipal wastewater emissions.
-#'@param Wastewater_Municipal_file Character.  Pulled from config file.  Either
-#'  "DMR" or "CWNS" to indicate the desired input data.
+#'
+#'  For the 2022 data there is a link to the data dashboard which has a data
+#'  download tab.  Download the data as CSVs.
+#'@param Wastewater_use_CWNS Logical.  Pulled from config file.  Indicating
+#'  whether or not to use the clean watershed needs survey to get the flow for
+#'  municipal wastewater treatment plants.  Either CWNS or the DMR data must be
+#'  used, though both can be.
+#'@param Wastewater_use_DMR Logical.  Pulled from config file.  Indicating
+#'  whether or not to use discharge monitoring report data to get the flow for
+#'  municipal wastewater treatment plants.  Either CWNS or the DMR data must be
+#'  used, though both can be.
+#'@param Wastewater_Municipal_Method_Moore_linear Logical.  Pulled from config
+#'  file.  Indicating whether or not to use the log-log linear relationship
+#'  between flow and emissions determined in Moore et al.  Either moore linear,
+#'  moore EF, or the GHGI must be used, though any combination can be.
+#'@param Wastewater_Municipal_Method_Moore_EF Logical.  Pulled from config file.
+#'  Indicating whether or not to use the emission factor to relate flow and
+#'  emissions determined in Moore et al.  Either moore linear, moore EF, or the
+#'  GHGI must be used, though any combination can be.
+#'@param Wastewater_Municipal_Method_GHGI Logical.  Pulled from config file.
+#'  Indicating whether or not to downscale the greenhouse gas inventory national
+#'  total emissions using flow as the proxy.  Either moore linear, moore EF, or
+#'  the GHGI must be used, though any combination can be.
 #'@param Wastewater_State_info Data frame with 4 columns and 1 row for each
 #'  state.  Pulled from config file.  Column 1 is "State" and provides the state
 #'  abbreviation.  Column 2 is Population and contains the state's current
@@ -179,16 +208,12 @@
 #'  shapefile.  Available at
 #'  \url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.
 #'  Only relevant if verbose=TRUE.
-#'@param focus_city_tigerlines SpatVector.  United States Census Bureau county
-#'  shapefile.  Available at
-#'  \url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.
-#'  Only relevant if a focus city was set in main and verbose=TRUE.
-#'@returns Nothing is returned from the function, but the main outputs are 4
-#'  netcdf files of the methane emissions from wastewater.  They are titled
+#'@returns Nothing is returned from the function, but the main outputs are up to
+#'  7 netcdf files of the methane emissions from wastewater.  They are titled
 #'  "Wastewater_ind.nc" for industrial wastewater,
 #'  "Wastewater_X_Y_dom_central.nc" for municipal wastewater,
-#'  "Wastewater_dom_septic_byZ.nc" for septic emissions.  X is the input data
-#'  used for the wastewater treatment plants - CWNS or DMR, Y is the method of
+#'  "Wastewater_dom_septic_Z.nc" for septic emissions.  X is the input data used
+#'  for the wastewater treatment plants - CWNS or DMR, Y is the method of
 #'  converting to emissions - GHGI for downscaling GHGI totals proportionally
 #'  with flow or ML for applying the moore et al. log-linear relationship
 #'  between flow and emissions, and Z is the approach used for septic emissions
@@ -201,31 +226,35 @@
 #'  separately.
 #'
 #'  If verbose is set to TRUE, then "WWTP_industrial.csv",
-#'  "WWTP_industrial_all.csv", "WWTP_municipal.csv", and
-#'  "WWTP_municipal_all.csv" are also saved.  The simpler csvs include only the
-#'  name, location, and assigned emissions for facilities within the domain that
-#'  were pulled from the corresponding input file.  The _all files include all
-#'  variables that were in the corresponding input file for the same facilities.
+#'  "WWTP_industrial_all.csv", "WWTP_X_Y_municipal.csv", and
+#'  "WWTP_X_Y_municipal_all.csv" are also saved.  The simpler csvs include only
+#'  the name, location, and assigned emissions for facilities within the domain
+#'  that were pulled from the corresponding input file.  The _all files include
+#'  all variables that were in the corresponding input file for the same
+#'  facilities.
 #'@examples
 #'library(terra)
-#'grid_bbox=cbind(c(-76.65,-73.65),c(38.97,40.97))
-#'grid_res=0.01
-#'grid_crs="epsg:4326"
-#'grid <- rast(nrows=diff(range(grid_bbox[,2]))/grid_res,
-#'             ncols=diff(range(grid_bbox[,1]))/grid_res, xmin=min(grid_bbox[,1]),
-#'             xmax=max(grid_bbox[,1]), ymin=min(grid_bbox[,2]), ymax=max(grid_bbox[,2]),
-#'             crs=grid_crs)
+#' grid_bbox=cbind(c(-76.65,-73.65),c(38.97,40.97))
+#' grid_res=0.01
+#' grid_crs="epsg:4326"
+#' grid <- rast(nrows=diff(range(grid_bbox[,2]))/grid_res,
+#'              ncols=diff(range(grid_bbox[,1]))/grid_res, xmin=min(grid_bbox[,1]),
+#'              xmax=max(grid_bbox[,1]), ymin=min(grid_bbox[,2]), ymax=max(grid_bbox[,2]),
+#'              crs=grid_crs)
+#' grid_vect <- as.polygons(ext(grid),crs=grid_crs)
 #'
-#' Urban_Tigerlines <- vect("~/../Desktop/Urban_Tigerlines/tl_2018_us_uac10.shp")
-#' focus_city <- terra::subset(Urban_Tigerlines,Urban_Tigerlines$NAME10 %in% "Philadelphia, PA--NJ--DE--MD")
-#'
-#' Wastewater(DMR_file='~/../Desktop/DMR_2022_from_8_10_2023.csv',
-#'            CWNS_file='~/../Desktop/CWNS_merged_data_2012.xlsx',
-#'            output_directory="~/../Desktop/",
-#'            Wastewater_Municipal_method="Moore_linear",
-#'            Wastewater_Municipal_file="DMR",
-#'            domain=grid,
-#'            state_name_list=c("DE","MD","NJ","NY","PA"),
+#' Wastewater(DMR_file='~/../Desktop/in/DMR_2022_from_8_10_2023.csv',
+#'            CWNS_file='~/../Desktop/in/CWNS_merged_data_2012.xlsx',
+#'            input_directory="~/../Desktop/in/",
+#'            output_directory="~/../Desktop/out/",
+#'            Wastewater_use_CWNS=TRUE,
+#'            Wastewater_use_DMR=TRUE,
+#'            Wastewater_Municipal_Method_Moore_linear=TRUE,
+#'            Wastewater_Municipal_Method_Moore_EF=FALSE,
+#'            Wastewater_Municipal_Method_GHGI=TRUE,
+#'            domain=grid_vect,
+#'            domain_template=grid,
+#'            ghgrp_facility_info="~/../Desktop/in/GHGRP/facility_info.csv",
 #'            inventory_year=2018,
 #'            National_wastewater_info=data.frame("Year"=c(1990,2018),
 #'                                                "Septic_Fraction"=c(0.241,0.171)),
@@ -238,9 +267,8 @@
 #'            GHGI_septic_EF=10.7,
 #'            Total_national_open_or_low_int_area=352032,
 #'            verbose=TRUE,
-#'            State_Tigerlines=vect("~/../Desktop/State_Tigerlines/tl_2018_us_state.shp"),
-#'            County_Tigerlines=vect("~/../Desktop/County_Tigerlines/tl_2018_us_county.shp"),
-#'            focus_city_tigerlines=focus_city,
+#'            State_Tigerlines=vect("~/../Desktop/in/State_Tigerlines/tl_2018_us_state.shp"),
+#'            County_Tigerlines=vect("~/../Desktop/in/County_Tigerlines/tl_2018_us_county.shp"),
 #'            plot_directory="~/../Desktop/plots/")
 #'@author Joe Pitt, \email{madeup@@wisc.edu}
 #'@author Kris Hajny, \email{blank@@fake.edu}
@@ -305,17 +333,19 @@
 # These may not be located entirely at the WWTPs, but it's really hard to know where to put them otherwise
 #
 
-Wastewater <- function(DMR_file,
+Wastewater <- function(input_directory,
+                       DMR_file,
                        CWNS_file,
-                       CWNS_year,
                        output_directory,
-                       Wastewater_Municipal_method,
-                       Wastewater_Municipal_file,
+                       Wastewater_use_CWNS,
+                       Wastewater_use_DMR,
+                       Wastewater_Municipal_Method_Moore_linear,
+                       Wastewater_Municipal_Method_Moore_EF,
+                       Wastewater_Municipal_Method_GHGI,
                        domain,
                        domain_template,
                        ghgrp_facility_info,
                        inventory_year,
-                       state_name_list,
                        National_wastewater_info,
                        Wastewater_State_info,
                        GHGI_national_wastewater_nonseptic,
@@ -324,28 +354,32 @@ Wastewater <- function(DMR_file,
                        Total_national_open_or_low_int_area,
                        State_Tigerlines,
                        County_Tigerlines,
-                       focus_city_tigerlines,
                        plot_directory,
                        verbose){
   
   
   starttime <- Sys.time()
   cat("Starting wastewater sector: Wastewater\n")
+  
+  Wastewater_partial_output_directory <- paste0(output_directory,"Wastewater_NLCD_data/")
   ################################################################################
   # First load in and prep the flow data
   
   if(Wastewater_use_CWNS){
-    if(CWNS_year==2012){
+    #if the CWNS file is 1 file
+    if(file_test("-f",CWNS_file)){
       cwns_2012 <- read_xlsx(CWNS_file)
       
       #ID any that are in the western or southern hemisphere (- coordinates)
       Western_hemis <- grep("W",cwns_2012$LONGITUDE)
       Southern_hemis <- grep("S",cwns_2012$LATITUDE)
+      
       #remove the hemisphere text so we can make numeric
       cwns_2012$LATITUDE <- gsub("N|S","",cwns_2012$LATITUDE)
       cwns_2012$LONGITUDE <- gsub("W|E","",cwns_2012$LONGITUDE)
       cwns_2012$LATITUDE <- as.numeric(cwns_2012$LATITUDE)
       cwns_2012$LONGITUDE <- as.numeric(cwns_2012$LONGITUDE)
+      
       #make those in the S or W hemispheres the appropriate negative coordinates
       cwns_2012$LATITUDE[Southern_hemis] <- cwns_2012$LATITUDE[Southern_hemis]*-1
       cwns_2012$LONGITUDE[Western_hemis] <- cwns_2012$LONGITUDE[Western_hemis]*-1
@@ -374,15 +408,20 @@ Wastewater <- function(DMR_file,
       CWNS_Municipal_flow <- rbind(cwns_2012_wgs84,cwns_2012_nad27_trans,cwns_2012_nad83_trans)
       
       CWNS_tot_flow <- sum(CWNS_Municipal_flow$EXIST_MUNICIPAL, na.rm=T)
-    }else if(CWNS_year==2022){
+      
+      #if the CWNS file is a directory
+    }else if(file_test("-d",CWNS_file)){
       Location <- read.csv(file.path(CWNS_file,"PHYSICAL_LOCATION.csv"))
       Flow <- read.csv(file.path(CWNS_file,"FLOW.csv"))
       Facilities <- read.csv(file.path(CWNS_file,"FACILITIES.csv"))
       
+      #filter to only municipal facilities
       Flow <- Flow[Flow$FLOW_TYPE=="Municipal Flow",]
       Location <- Location[Location$CWNS_ID %in% Flow$CWNS_ID,]
       Facilities <- Facilities[Facilities$CWNS_ID %in% Flow$CWNS_ID,]
       
+      #combine the relevant data from the 3 files (equivalent to merge by ID,
+      #then subsetting columns)
       CWNS_Municipal_flow <- Location
       CWNS_Municipal_flow$EXIST_MUNICIPAL <- Flow$CURRENT_DESIGN_FLOW[match(Location$CWNS_ID,Flow$CWNS_ID)]
       CWNS_Municipal_flow$facility_name <- Facilities$FACILITY_NAME[match(Location$CWNS_ID,Facilities$CWNS_ID)]
@@ -391,13 +430,20 @@ Wastewater <- function(DMR_file,
       CWNS_tot_flow <- sum(CWNS_Municipal_flow$EXIST_MUNICIPAL, na.rm=T)
     }
   }
+  
+  
   if(Wastewater_use_DMR){
     DMR_data <- read.csv(DMR_file,skip=3)
+    
+    #replace periods with underscores in naming for consistency/ease
     colnames(DMR_data) <- gsub("\\.","\\_",colnames(DMR_data))
+    
+    #remove those without location data and vect as lat/long assuming WGS
+    #(didn't see one explicitly mentioned, little impact on location)
     DMR_Municipal_flow <- subset(DMR_data,!is.na(Facility_Latitude) & !is.na(Facility_Longitude))
     DMR_Municipal_flow <- vect(DMR_Municipal_flow,geom=c("Facility_Longitude","Facility_Latitude"))
     crs(DMR_Municipal_flow) <- "EPSG:4326"
-    # DMR_tot_flow <- sum(DMR_data$Average_Flow__MGD_, na.rm=T)
+    
     DMR_tot_flow <- sum(DMR_data$Average_Daily_Flow__MGD_, na.rm=T)
   }
   
@@ -409,10 +455,12 @@ Wastewater <- function(DMR_file,
   #write a small helper function.  Creates a raster of emissions, cropped to the
   #domain, converted to proper units, and saved as 2 csvs.
   rasterize_plus <- function(input,outputname){
+    #project and crop to the domain, remove NAs
     input_crop <- project(input,crs(domain))
     input_crop <- crop(input_crop,domain)
     input_crop_filt <- subset(input_crop,!is.na(input_crop$emiss))
     
+    #if there's at least 1 facility, rasterize it (mol/s)
     if(nrow(input_crop_filt)>0){
       rast <- rasterize(input_crop_filt, domain_template, "emiss", fun=sum)
     }else{
@@ -423,12 +471,20 @@ Wastewater <- function(DMR_file,
     rast_flux <- rast*1e9/(cellSize(rast,unit="m"))  
     rast_flux[is.na(rast_flux)]<-0
     
+    #mask now - just to NA data outside non-square domains.  No need to
+    #partially weight pixels by fractional coverage, cropped as points so only
+    #those within the domain have been rasterized.
     rast_flux <- mask(rast_flux,domain)
     
+    #save csvs with the facility info
     if(verbose){
       if(nrow(input_crop_filt)>0){
         input_crop_filt_df <- as.data.frame(input_crop_filt)
+        
+        #DMR and CWNS have different capitalizations, but same name - id column
         name_index <- grep("facility_name",colnames(input_crop_filt_df),ignore.case = T)
+        
+        #a small csv with only the relevant columns and another with all columns
         write.csv(input_crop_filt, paste0(output_directory,'/',outputname,"_all.csv"),row.names = F)
         output <- data.frame(input_crop_filt_df[name_index],
                              geom(input_crop_filt)[,"x"],geom(input_crop_filt)[,"y"],
@@ -437,12 +493,14 @@ Wastewater <- function(DMR_file,
         write.csv(output,paste0(output_directory,'/',outputname,'.csv'),row.names=FALSE)
       }
     }
+    
+    #save the raster to the active R environment
     assign(x = outputname,rast_flux,envir = parent.env(environment()))
   }
   
   ################################################################################
   #distribute EPA Municipal Wastewater Treatment Plant emissions from the GHGI
-  #using the CWNS or DMR municipal flow
+  #using the CWNS or DMR municipal flow as the proxy
   
   if(Wastewater_Municipal_Method_GHGI){
     if(Wastewater_use_CWNS){
@@ -450,7 +508,6 @@ Wastewater <- function(DMR_file,
       rasterize_plus(CWNS_Municipal_flow,"WWTP_CWNS_GHGI_municipal")
     }
     if(Wastewater_use_DMR){
-      # DMR_Municipal_flow$emiss <- central_EPA_emiss*DMR_Municipal_flow$Average_Flow__MGD_/DMR_tot_flow   # in mol/s
       DMR_Municipal_flow$emiss <- central_EPA_emiss*DMR_Municipal_flow$Average_Daily_Flow__MGD_/DMR_tot_flow   # in mol/s
       rasterize_plus(DMR_Municipal_flow,"WWTP_DMR_GHGI_municipal")
     }
@@ -460,22 +517,23 @@ Wastewater <- function(DMR_file,
   #moore et al. log-linear relationship
   
   if(Wastewater_Municipal_Method_Moore_linear){
-    #convert from million gallons/day to m3/s
     if(Wastewater_use_CWNS){
+      #convert from million gallons/day to m3/s
       CWNS_Municipal_flow$EXIST_MUNICIPAL <- CWNS_Municipal_flow$EXIST_MUNICIPAL*3785.41178/(24*60*60)  
       #Apply the log-log linear relationship from Figure 2A of Moore et al.
       CWNS_Municipal_flow$emiss <- 1.2*log10(CWNS_Municipal_flow$EXIST_MUNICIPAL)+1
       #convert from log10(g/s) to mol/s
       CWNS_Municipal_flow$emiss <- (10^(CWNS_Municipal_flow$emiss))/(12.011+1.008*4)
-      rasterize_plus(CWNS_Municipal_flow,"WWTP_CWNS_Moore_Linear_municipal")
+      rasterize_plus(CWNS_Municipal_flow,"WWTP_CWNS_ML_municipal")
     }
     if(Wastewater_use_DMR){
-      # DMR_Municipal_flow$Average_Flow__MGD_ <- DMR_Municipal_flow$Average_Flow__MGD_*3785.41178/(24*60*60)
-      # DMR_Municipal_flow$emiss <- 1.2*log10(DMR_Municipal_flow$Average_Flow__MGD_)+1
+      #convert from million gallons/day to m3/s
       DMR_Municipal_flow$Average_Daily_Flow__MGD_ <- DMR_Municipal_flow$Average_Daily_Flow__MGD_*3785.41178/(24*60*60)
+      #Apply the log-log linear relationship from Figure 2A of Moore et al.
       DMR_Municipal_flow$emiss <- 1.2*log10(DMR_Municipal_flow$Average_Daily_Flow__MGD_)+1
+      #convert from log10(g/s) to mol/s
       DMR_Municipal_flow$emiss <- (10^(DMR_Municipal_flow$emiss))/(12.011+1.008*4)
-      rasterize_plus(DMR_Municipal_flow,"WWTP_DMR_Moore_Linear_municipal")
+      rasterize_plus(DMR_Municipal_flow,"WWTP_DMR_ML_municipal")
     }
   }
   
@@ -496,11 +554,9 @@ Wastewater <- function(DMR_file,
   ################################################################################
   #Now septic systems.  First load in output from NLCD_fractions_by_state
   
-  #output from NLCD_fractions_by_state after reprojecting
-  Suburbia_rasterfile <- list.files(pattern=glob2rx("*NLCD_suburban.nc"),path=output_directory,full.names = T)
-  
-  #output from NLCD_fractions_by_state.R
-  nlcd_state_total_areas <- read.table(file.path(output_directory,"NLCD_state_total_areas.csv"),header=T,sep=",")
+  #output from NLCD_fractions_by_state - rasters have been reprojected
+  Suburbia_rasterfile <- list.files(pattern=glob2rx("*NLCD_suburban.nc"),path=Wastewater_partial_output_directory,full.names = T)
+  nlcd_state_total_areas <- read.table(file.path(Wastewater_partial_output_directory,"NLCD_state_total_areas.csv"),header=T,sep=",")
   
   #quickly ensure that the state data is all in the same order, alphabetical
   Suburbia_rasterfile <- sort(Suburbia_rasterfile)
@@ -530,10 +586,9 @@ Wastewater <- function(DMR_file,
     if(Wastewater_national_septic){
       #Calculate state-by-state totals by equally distributing GHGI totals
       #to developed, open and developed low intensity land cover nationally.
-      
       state_flux <- septic_EPA_emiss*Suburbia/tot_nlcd_area  # in mol/s/km2
       
-      #save within-domain state emissions for csv
+      #save within-domain state total emissions for csv later
       septic_flux_bystate <- c(septic_flux_bystate,
                                as.numeric(global(state_flux*cellSize(state_flux,unit="km"),sum,na.rm=T)))
       
@@ -547,15 +602,18 @@ Wastewater <- function(DMR_file,
       Tot_area <- nlcd_state_total_areas[A,2] # total area of both classes in km2 from nlcd_state_total_areas.csv
       pop <- Wastewater_State_info[A,2]
       
+      #Fraction that's septic as reported or calculating by scaling the 1990
+      #state value by the change in national septic fraction since 1990
       if(Wastewater_State_info[A,4]=="scaled"){
         septic_frac <- Wastewater_State_info[A,3]*National_wastewater_info[2,2]/National_wastewater_info[1,2]
       }else if(Wastewater_State_info[A,4]=="reported"){
         septic_frac <- Wastewater_State_info[A,3]
       }
-      state_tot_emiss <- pop*septic_frac*GHGI_septic_EF/(16.043*24*60*60)  #in mol/s (EF is in g/capita/day)
-      state_flux <- state_tot_emiss*Suburbia/Tot_area #gridded and distributed equally in mol/s/km2
       
-      #save within-domain state emissions for csv
+      state_tot_emiss <- pop*septic_frac*GHGI_septic_EF/(16.043*24*60*60)  #in mol/s (EF is in g/capita/day)
+      state_flux <- state_tot_emiss*Suburbia/Tot_area #gridded and distributed equally across the state in mol/s/km2
+      
+      #save within-domain state total emissions for csv later
       septic_flux2_bystate <- c(septic_flux2_bystate,
                                 as.numeric(global(state_flux*cellSize(state_flux,unit="km"),sum,na.rm=T)))
       
@@ -566,30 +624,32 @@ Wastewater <- function(DMR_file,
   }
   
   if(Wastewater_national_septic){
-    # Now multiply by total EPA emissions and convert to flux (per area)
-    septic_flux <- septic_flux*1e9*1E-6  # Calculate flux in nmol/m2/s
+    # Now finalize units
+    septic_flux <- septic_flux*1e9*1E-6  # Convert from mol/km2/s to nmol/m2/s
     septic_flux[is.na(septic_flux)]<-0
     
+    #mask and account for pixels partially within the domain
     septic_flux <- mask(septic_flux,domain)
-    cover <- extract(septic_flux,domain,weights=T,exact=T,cells=T)
+    cover <- extract(septic_flux,domain,weights=T,cells=T)
     septic_flux[cover[,'cell']] <- septic_flux[cover[,'cell']]*cover[,'weight']
   }
   
   if(Wastewater_state_septic){
-    # Now converting the totals to flux (per area)
-    septic_flux2 <- septic_flux2*1e9*1E-6  # Calculate flux in nmol/m2/s
+    # Now finalize units
+    septic_flux2 <- septic_flux2*1e9*1E-6  # Convert from mol/km2/s to nmol/m2/s
     septic_flux2[is.na(septic_flux2)]<-0
     
+    #mask and account for pixels partially within the domain
     septic_flux2 <- mask(septic_flux2,domain)
-    cover <- extract(septic_flux2,domain,weights=T,exact=T,cells=T)
+    cover <- extract(septic_flux2,domain,weights=T,cells=T)
     septic_flux2[cover[,'cell']] <- septic_flux2[cover[,'cell']]*cover[,'weight']
   }
   
   if(Wastewater_state_septic & Wastewater_national_septic){
-    #convert back to emissions and calculate the total emissions in each state
-    #(using extract to account for pixels partially in state bounds
-    #appropriately)
-    
+    #pull the state total emissions from both methods and a few additional
+    #details so state totals can be easily compared.  Because of how NLCD
+    #fractions by state works, this includes only the fraction of each state
+    #within the domain.
     Wastewater_State_info$State_based_septic_emissions_mol_per_s <- septic_flux2_bystate
     Wastewater_State_info$National_based_septic_emissions_mol_per_s <- septic_flux_bystate
     Wastewater_State_info$total_septic_area_km2 <- nlcd_state_total_areas[,2]
@@ -607,13 +667,16 @@ Wastewater <- function(DMR_file,
   
   #download the relevant industrial wastewater - sector data
   #(https://www.epa.gov/enviro/greenhouse-gas-model).  
+  ghgrp_wastewater_file <- file.path(input_directory,"GHGRP","industrial_wastewater_II.csv")
+  if(!file.exists(ghgrp_wastewater_file)){
+    data_URL <- "https://data.epa.gov/dmapservice/ghg.ii_subpart_level_information/csv"
+    Trycatch_downloader(URL = data_URL,method = "save",output_location = ghgrp_wastewater_file,
+                        error_message = paste0("Greenhouse Gas Reporting Program data could not be downloaded using API link: ",data_URL))
+  }
   
-  # data_URL <- "https://data.epa.gov/efservice/II_SUBPART_LEVEL_INFORMATION/JSON"
-  data_URL <- "https://data.epa.gov/dmapservice/ghg.ii_subpart_level_information/json"
-  ghgrp_data <- Trycatch_downloader(data_URL,method="API",
-                                    error_message = paste0("Greenhouse Gas Reporting Program data could not be downloaded using API link: ",data_URL))
-  # colnames(ghgrp_data) <- c("facility_id","year","facility_name","ghg_quantity","ghg_name")
-  colnames(ghgrp_data) <- c("facility_id","facility_name","ghg_name","ghg_quantity","year")
+  ghgrp_data <- read.csv(ghgrp_wastewater_file)
+  #convert reporting_year to year
+  colnames(ghgrp_data) <- gsub("reporting_","",colnames(ghgrp_data))
   ################################################################################
   #Merge with location-like data
   
@@ -641,6 +704,9 @@ Wastewater <- function(DMR_file,
   ghgrp_flux <- ghgrp_rast*1e9/(cellSize(ghgrp_rast,unit="m"))  # Calculate flux in nmol/m2/s
   ghgrp_flux[is.na(ghgrp_flux)]<-0
   
+  #mask now - just to NA data outside non-square domains.  No need to
+  #partially weight pixels by fractional coverage, cropped as points so only
+  #those within the domain have been rasterized.
   ghgrp_flux <- mask(ghgrp_flux,domain)
   
   if(verbose){
@@ -684,7 +750,7 @@ Wastewater <- function(DMR_file,
   }
   if(Wastewater_Municipal_Method_Moore_linear){
     if(Wastewater_use_CWNS){
-      writeCDF(WWTP_CWNS_Moore_Linear_municipal,
+      writeCDF(WWTP_CWNS_ML_municipal,
                file.path(output_directory,'Wastewater_CWNS_ML_dom_central.nc'),
                force_v4=TRUE,
                varname='methane_emissions',
@@ -694,7 +760,7 @@ Wastewater <- function(DMR_file,
                overwrite=TRUE)
     }
     if(Wastewater_use_DMR){
-      writeCDF(WWTP_DMR_Moore_Linear_municipal,
+      writeCDF(WWTP_DMR_ML_municipal,
                file.path(output_directory,'Wastewater_DMR_ML_dom_central.nc'),
                force_v4=TRUE,
                varname='methane_emissions',
@@ -772,7 +838,7 @@ Wastewater <- function(DMR_file,
     if(Wastewater_use_CWNS){
       if(Wastewater_Municipal_Method_Moore_linear){
         #set 0 to NA so the minimum ignores 0 (log plot, so 0 = -inf)
-        temp <- WWTP_CWNS_Moore_Linear_municipal
+        temp <- WWTP_CWNS_ML_municipal
         temp[temp==0] <- NA
         if(!all(is.na(values(temp)))){
           WWTP_min <- min(WWTP_min,as.numeric(global(temp,min,na.rm=T)))
@@ -790,7 +856,7 @@ Wastewater <- function(DMR_file,
     }
     if(Wastewater_use_DMR){
       if(Wastewater_Municipal_Method_Moore_linear){
-        temp <- WWTP_DMR_Moore_Linear_municipal
+        temp <- WWTP_DMR_ML_municipal
         temp[temp==0] <- NA
         if(!all(is.na(values(temp)))){
           WWTP_min <- min(WWTP_min,as.numeric(global(temp,min,na.rm=T)))
@@ -814,7 +880,7 @@ Wastewater <- function(DMR_file,
     WWTP_max <- log10(WWTP_max)
     if(Wastewater_use_CWNS){
       if(Wastewater_Municipal_Method_Moore_linear){
-        log_plot(WWTP_CWNS_Moore_Linear_municipal,filename="Wastewater_dom_central_CWNS_Moore_linear",
+        log_plot(WWTP_CWNS_ML_municipal,filename="Wastewater_dom_central_CWNS_ML",
                  "Domestic Wastewater -\n Moore log-linear relationship combined with\nClean Watersheds Needs Survey",
                  WWTP_min,WWTP_max,plot_directory=plot_directory,
                  domain=domain,County_Tigerlines=County_Tigerlines,
@@ -831,7 +897,7 @@ Wastewater <- function(DMR_file,
     }
     if(Wastewater_use_DMR){
       if(Wastewater_Municipal_Method_Moore_linear){
-        log_plot(WWTP_DMR_Moore_Linear_municipal,filename="Wastewater_dom_central_DMR_Moore_linear",
+        log_plot(WWTP_DMR_ML_municipal,filename="Wastewater_dom_central_DMR_ML",
                  "Domestic Wastewater -\n Moore log-linear relationship combined with\nDischarge Monitoring Reports",
                  WWTP_min,WWTP_max,plot_directory=plot_directory,
                  domain=domain,County_Tigerlines=County_Tigerlines,
@@ -861,7 +927,7 @@ Wastewater <- function(DMR_file,
     #plot separately, it has no visible impact on spatial distribution or
     #emissions.
     if(Wastewater_Municipal_Method_Moore_linear){
-      WWTP_method <- "Moore_Linear_municipal"
+      WWTP_method <- "ML_municipal"
       WWTP_text <- "Moore et al. log-linear relationship combined with"
     }else if(Wastewater_Municipal_Method_GHGI){
       WWTP_method <- "GHGI_municipal"
