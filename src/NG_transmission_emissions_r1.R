@@ -8,14 +8,15 @@
 #'  transmission systems. It uses the Homeland Infrastructure Foundation-Level
 #'  Data (HIFLD), Environmental Protection Agency's (EPA) Greenhouse Gas
 #'  Inventory (GHGI), EPA Greenhouse Gas Reporting Program (GHGRP) and Energy
-#'  Information Administration (EIA) Energy Atlas data.  First the relevant data
-#'  is pulled from the GHGI Annex file.
+#'  Information Administration (EIA) Energy Atlas data.  
+#'  
+#'  The necessary GHGRP and EIA data will be automatically downloaded.
 #'
 #'  For pipelines the GHGI data includes the emissions and activity data for
 #'  pipeline leaks, meter and regulating stations, and venting.  An emission
 #'  factor in mols of methane per meter of pipeline per second can then be
 #'  calculated.  This emission factor is then applied to the EIA
-#'  inter/intrastate pipeline data.
+#'  inter/intrastate pipeline location data.
 #'
 #'  For compressors the GHGI data includes the emissions and activity data for
 #'  compressor station fugitive emissions, dehydrator vents, flaring, engines,
@@ -29,13 +30,9 @@
 #'  rate.  Note most compressor stations do not report their emissions to the
 #'  GHGRP, so only a subset will be overwritten using GHGRP data.  The GHGRP
 #'  compressor emissions are scaled so that the average emissions within the
-#'  domain are equal to the national average calculated from the GHGI.  As their
+#'  domain are equal to the national average calculated from the GHGI.  As there
 #'  is not a common identifier between the GHGRP and HIFLD datasets, the nearest
-#'  facility is considered the matching facility, though an error is flagged if
-#'  a GHGRP compressor has no matching HIFLD compressor within 1 km.
-#'
-#'  The necessary GHGRP compressor location/emissions data, EIA pipeline data
-#'  and HIFLD compressor location data will be automatically downloaded.
+#'  facility is considered the matching facility.
 #'
 #'  The GHGRP includes only facilities that emit at least 25,000 metric tons of
 #'  carbon dioxide equivalent while the GHGI is intended to capture all national
@@ -44,15 +41,14 @@
 #'  updated approximately in sync with the GHGRP.  Both datasets are annual. The
 #'  GHGRP is at the facility scale while the GHGI is national totals.
 #'
-#'  The EIA pipeline data being used was last updated January 2020.  The HIFLD
-#'  compressor data being used was last updated December 2022.
+#'  The HIFLD compressor data being used was last updated December 2022.  It has
+#'  since been deprecated, but as there is no replacement available, it is still
+#'  being used.
 #'
 #'  The GHGI is available at
 #'  \url{https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks},
-#'  the GHGRP is available at \url{https://ghgdata.epa.gov/ghgp/main.do}, the
-#'  HIFLD data is available at
-#'  \url{https://hifld-geoplatform.hub.arcgis.com/datasets/geoplatform::natural-gas-compressor-stations/about},
-#'  and the EIA data is available at
+#'  the GHGRP is available at \url{https://ghgdata.epa.gov/ghgp/main.do}, and
+#'  the EIA data is available at
 #'  \url{https://atlas.eia.gov/datasets/eia::natural-gas-interstate-and-intrastate-pipelines/about}.
 #'@param GHGI_file Character providing the full filepath to the GHGI Annex 3.6
 #'  excel file. This data is available at
@@ -64,16 +60,25 @@
 #'  multiple sheets, each of which has a separate layout.  There is an example
 #'  file in the package's datasets folder that has been successfully used in
 #'  this code available for reference.
-#'@param GHGI_Emissions_sheet Character providing the sheet name in "GHGI_file"
-#'  that provides the "CH4 Emissions for Natural Gas Systems, by Segment and
-#'  Source, for All Years".  The sheet name as of the 2022 GHGI is "3.6-1".
-#'@param GHGI_Activity_sheet Character providing the sheet name in "GHGI_file"
-#'  that provides the "Activity Data for Natural Gas Systems Sources, for All
-#'  Years".  The sheet name as of the 2022 GHGI is "3.6-7".
-#'@param domain SpatRaster providing the desired output grid, including the
-#'  desired resolution and coordinate reference system
+#'@param domain SpatVector polygon outlining the desired output area
+#'@param domain_template SpatRaster providing the desired output grid, including
+#'  the desired resolution and coordinate reference system
 #'@param state_name_list Character vector listing all states within the desired
 #'  domain
+#'@param GHGI_transmission_compressors Character or data.frame.  Pulled from
+#'  config file. Either GHGI to indicate the GHGI file should be used to pull
+#'  emissions and activity data or a data frame providing the needed values.
+#'@param GHGI_Pipeline Character or data.frame.  Pulled from
+#'  config file. Either GHGI to indicate the GHGI file should be used to pull
+#'  emissions and activity data or a data frame providing the needed values.
+#'@param HIFLD_compressor_file Character providing the full filepath to the
+#'  HIFLD compressor data.  As this file is now deprecated and no replacement
+#'  has been created, it currently must be provided as part of the package.
+#'@param ghgrp_facility_info Data.frame with the GHGRP location data for all
+#'  years and states.  See
+#'  https://www.epa.gov/enviro/envirofacts-data-service-api
+#'@param input_directory Character providing the full filepath to save/load
+#'  raw input data
 #'@param output_directory Character providing the full filepath to save
 #'  processed data
 #'@param inventory_year Character indicating the desired year of data to use.
@@ -90,10 +95,6 @@
 #'  shapefile.  Available at
 #'  \url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.
 #'  Only relevant if verbose=TRUE.
-#'@param focus_city_tigerlines SpatVector.  United States Census Bureau county
-#'  shapefile.  Available at
-#'  \url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.
-#'  Only relevant if a focus city was set in main and verbose=TRUE.
 #'@returns Nothing is returned from the function, but the main outputs are 2
 #'  netcdf files of the methane emissions from natural gas transmission.  They
 #'  are titled "NG_trans_compressors.nc" and "NG_trans_pipes.nc" where
@@ -114,19 +115,21 @@
 #'              ncols=diff(range(grid_bbox[,1]))/grid_res, xmin=min(grid_bbox[,1]),
 #'              xmax=max(grid_bbox[,1]), ymin=min(grid_bbox[,2]), ymax=max(grid_bbox[,2]),
 #'              crs=grid_crs)
-#' Urban_Tigerlines <- vect("~/../Desktop/Urban_Tigerlines/tl_2018_us_uac10.shp")
-#' focus_city <- terra::subset(Urban_Tigerlines,Urban_Tigerlines$NAME10 %in% "Philadelphia, PA--NJ--DE--MD")
-#' Transmission(GHGI_file="~/../Desktop/2022_ghgi_natural_gas_systems_annex36_tables.xlsx",
-#'                       GHGI_Emissions_sheet="3.6-1",
-#'                       GHGI_Activity_sheet="3.6-7",
-#'                       domain=grid,
+#' grid_vect <- as.polygons(ext(grid),crs=grid_crs)
+#' Transmission(GHGI_file="~/../Desktop/in/2022_ghgi_natural_gas_systems_annex36_tables.xlsx",
+#'                       GHGI_transmission_compressors="GHGI",
+#'                       GHGI_Pipeline="GHGI",
+#'                       HIFLD_compressor_file="~/../Desktop/in/Natural_Gas_Compressor_Stations.csv",
+#'                       ghgrp_facility_info="~/../Desktop/in/GHGRP/facility_info.csv",
+#'                       domain=grid_vect,
+#'                       domain_template=grid,
 #'                       state_name_list=c("DE","MD","NJ","NY","PA"),
-#'                       output_directory="~/../Desktop/",
+#'                       output_directory="~/../Desktop/out/",
+#'                       input_directory="~/../Desktop/in/",
 #'                       inventory_year=2018,
 #'                       verbose=TRUE,
-#'                       State_Tigerlines=vect("~/../Desktop/State_Tigerlines/tl_2018_us_state.shp"),
-#'                       County_Tigerlines=vect("~/../Desktop/County_Tigerlines/tl_2018_us_county.shp"),
-#'                       focus_city_tigerlines=focus_city,
+#'                       State_Tigerlines=vect("~/../Desktop/in/State_Tigerlines/tl_2018_us_state.shp"),
+#'                       County_Tigerlines=vect("~/../Desktop/in/County_Tigerlines/tl_2018_us_county.shp"),
 #'                       plot_directory="~/../Desktop/plots/")
 #'@author Joe Pitt, \email{madeup@@wisc.edu}
 #'@author Kris Hajny, \email{blank@@fake.edu}
@@ -139,9 +142,8 @@
 #
 # Calculate NG transmission emissions for d03 domain
 
-Transmission <- function(GHGI_file,
-                         GHGI_Emissions_sheet,
-                         GHGI_Activity_sheet,
+Transmission <- function(input_directory,
+                         GHGI_file,
                          GHGI_transmission_compressors,
                          GHGI_Pipeline,
                          HIFLD_compressor_file,
@@ -154,8 +156,7 @@ Transmission <- function(GHGI_file,
                          verbose,
                          plot_directory,
                          County_Tigerlines,
-                         State_Tigerlines,
-                         focus_city_tigerlines){
+                         State_Tigerlines){
   
   starttime <- Sys.time()
   cat("Starting natural gas transmission sector: Transmission\n")
@@ -172,7 +173,7 @@ Transmission <- function(GHGI_file,
   #Checked and GHGRP compressors now perfectly match the GHGRP download within
   #noise (<0.5, a few as much as 0.4 MT CH4 difference).
   
-  data_URL <- "https://services7.arcgis.com/FGr1D95XCGALKXqM/arcgis/rest/services/NaturalGas_InterIntrastate_Pipelines_US_EIA/FeatureServer/0/query?where=1%3D1&outFields=*&outSR=4326&f=json"
+  data_URL <- "https://services7.arcgis.com/FGr1D95XCGALKXqM/arcgis/rest/services/NaturalGas_InterIntrastate_Pipelines_US_EIA/FeatureServer/0/query?where=1%3D1&outFields=*&outSR=4326&f=geojson"
   pipes_EIA <- Trycatch_downloader(data_URL,method="vect",error_message=paste0("Unable to download EIA pipeline data at: ",data_URL))
 
   #need to use the downloaded file for the moment - as of 9/30/24 the API and
@@ -180,6 +181,77 @@ Transmission <- function(GHGI_file,
   compressors_HIFLD <- read.csv(HIFLD_compressor_file)
   compressors_HIFLD <- vect(compressors_HIFLD,geom=c("LONGITUDE", "LATITUDE"),crs="epsg:4326")
   # compressors_HIFLD=vect("https://services1.arcgis.com/Hp6G80Pky0om7QvQ/arcgis/rest/services/Natural_Gas_Compressor_Stations/FeatureServer/0/query?where=1%3D1&outFields=*&outSR=4326&f=json")
+
+  ################################################################################
+  #though it's later cropped to the domain, crop out facilities in Canada
+  #immediately
+
+  compressors_HIFLD <- mask(compressors_HIFLD,ext(-125,-95,49.0001,60),inverse=T)
+  ################################################################################
+  #troubleshooting
+  
+  # data_URL <- "https://services7.arcgis.com/FGr1D95XCGALKXqM/arcgis/rest/services/NaturalGas_InterIntrastate_Pipelines_US_EIA/FeatureServer/0/query?where=1%3D1&outFields=*&outSR=4326&f=geojson"
+  # pipes_EIA <- Trycatch_downloader(data_URL,method="vect",error_message=paste0("Unable to download EIA pipeline data at: ",data_URL))
+  # # writeVector(pipes_EIA,pipes_EIA_file)
+  # # 
+  # # pipes_EIA_file <- file.path(input_directory,"EIA","interintrastate_pipelines.geojson")
+  # # if(!file.exists(pipes_EIA_file)){
+  # #   data_URL <- "https://services7.arcgis.com/FGr1D95XCGALKXqM/arcgis/rest/services/NaturalGas_InterIntrastate_Pipelines_US_EIA/FeatureServer/0/query?outFields=*&where=1%3D1&f=geojson"
+  # #   Trycatch_downloader(URL = data_URL,method = "save",output_location = pipes_EIA_file,
+  # #                       error_message = paste0("Unable to download EIA pipeline data at: ",data_URL))
+  # # }
+  # pipes_EIA_gson <- vect("G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Raw_data_12_2024/EIA/NaturalGas_InterIntrastate_Pipelines_US_EIA_365726140959634023.geojson")
+  # # pipes_EIA_shape <- vect("G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Raw_data_12_2024/EIA/NaturalGas_InterIntrastate_Pipelines_US_EIA_-4478325912711341125/NaturalGas_InterIntrastate_Pipelines_US_EIA.shp")
+  # # pipes_EIA_gpkg <- vect("G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Raw_data_12_2024/EIA/NaturalGas_InterIntrastate_Pipelines_US_EIA_-5692899880001079636.gpkg")
+  # # pipes_EIA_shape <- project(pipes_EIA_shape,pipes_EIA_gson)
+  # # pipes_EIA_gpkg <- project(pipes_EIA_gpkg,pipes_EIA_gson)
+  # 
+  # # View(as.data.frame(pipes_EIA[which(!(pipes_EIA$FID%in%pipes_EIA_gson$FID)),]))
+  # 
+  # # pipes_EIA <- pipes_EIA[pipes_EIA$TYPEPIPE!="Gathering",]
+  # #not a solution, but part of a problem - doesn't match online map - the old version.  New one is not automated.
+  # 
+  # 
+  # # plot(pipes_EIA[which(!(pipes_EIA$FID%in%pipes_EIA_gson$FID)),])
+  # # plot(pipes_EIA[pipes_EIA$TYPEPIPE=="Gathering",])
+  # 
+  # temp <- pipes_EIA[pipes_EIA$TYPEPIPE!="Gathering",]
+  # 
+  # test=compareGeom(temp,pipes_EIA_gson)
+  # test2=diag(test)
+  # 
+  # png("Transmission_test1.png",width=480*2)
+  # plot(State_Tigerlines[!(State_Tigerlines$STUSPS %in% c("AK","GU","AS","VI","MP","HI","PR")),],border="lightgrey",main="red over black")
+  # lines(temp[which(test2==FALSE),])
+  # lines(pipes_EIA_gson[which(test2==FALSE),],col="red")
+  # add_legend("bottomleft",col=c("red","black"),
+  #            legend = c("Web download","R download"),lty=1)
+  # dev.off()
+  # 
+  # png("Transmission_test2.png",width=480*2)
+  # plot(State_Tigerlines[!(State_Tigerlines$STUSPS %in% c("AK","GU","AS","VI","MP","HI","PR")),],border="lightgrey",main="black over red")
+  # lines(pipes_EIA_gson[which(test2==FALSE),],col="red")
+  # lines(temp[which(test2==FALSE),])
+  # add_legend("bottomleft",col=c("red","black"),
+  #            legend = c("Web download","R download"),lty=1)
+  # dev.off()
+  # 
+  # png("Transmission_test3.png",width=480*2)
+  # plot(State_Tigerlines[!(State_Tigerlines$STUSPS %in% c("AK","GU","AS","VI","MP","HI","PR")),],border="lightgrey",main="ID 31664 - 31668")
+  # lines(shift(pipes_EIA_gson[pipes_EIA_gson$FID%in%c(31664:31668),],dy=0.5),col="red")
+  # text(shift(pipes_EIA_gson[pipes_EIA_gson$FID%in%c(31664:31668),],dy=0.5),"FID",col="red")
+  # lines(temp[temp$FID%in%c(31664:31668),])
+  # text(temp[temp$FID%in%c(31664:31668),],"FID")
+  # add_legend("bottomleft",col=c("red","black"),
+  #            legend = c("Web download","R download"),lty=1)
+  # dev.off()
+  # 
+  # png("Tranmsmission_test4.png",width=480*2)
+  # plot(State_Tigerlines[!(State_Tigerlines$STUSPS %in% c("AK","GU","AS","VI","MP","HI","PR")),],border="lightgrey",main="Gathering Pipelines")
+  # lines(pipes_EIA[pipes_EIA$TYPEPIPE=="Gathering",])
+  # dev.off()
+  # 
+  # View(cbind(as.data.frame(temp[test2==FALSE,]),as.data.frame(pipes_EIA_gson[test2==F,])))
   ################################################################################
   #Download the relevant GHGRP emissions data using the API
   #(https://www.GHGI.gov/enviro/envirofacts-data-service-api) and combine the
@@ -187,18 +259,29 @@ Transmission <- function(GHGI_file,
   
   #download the relevant naturalgas-sector data
   #(https://www.GHGI.gov/enviro/greenhouse-gas-model).  Must download the relevant
-  #data for each possible sector sGHGIrately as emissions are split by sector. The
+  #data for each possible sector separately as emissions are split by sector. The
   #total is combustion + NG systems, dominated by NG systems.  
-  # data_URL <- "https://data.epa.gov/efservice/ef_w_emissions_source_ghg/json"
-  data_URL <- "https://data.epa.gov/dmapservice/ghg.ef_w_emissions_source_ghg/JSON"
-  ghgrp_transmission_compressor_emissions <- Trycatch_downloader(URL = data_URL,method = "API",
-                                                       error_message = paste0("Greenhouse Gas Reporting Program data could not be downloaded using API link: ",data_URL))
-  
-  # data_URL <- "https://data.epa.gov/efservice/C_SUBPART_LEVEL_INFORMATION/json"
-  data_URL <- "https://data.epa.gov/dmapservice/ghg.c_subpart_level_information/json"
-  ghgrp_combustion_emissions <- Trycatch_downloader(URL = data_URL,method = "API",
-                                                       error_message = paste0("Greenhouse Gas Reporting Program data could not be downloaded using API link: ",data_URL))
 
+  ghgrp_compressor_file <- file.path(input_directory,"GHGRP","Oil_and_gas_W.csv")
+  ghgrp_combustion_file <- file.path(input_directory,"GHGRP","combustion_C.csv")
+
+  if(!file.exists(ghgrp_compressor_file)){
+    data_URL <- "https://data.epa.gov/dmapservice/ghg.ef_w_emissions_source_ghg/csv"
+    Trycatch_downloader(URL = data_URL,method = "save",output_location = ghgrp_compressor_file,
+                        error_message = paste0("Greenhouse Gas Reporting Program data could not be downloaded using API link: ",data_URL))
+  }
+  if(!file.exists(ghgrp_combustion_file)){
+    data_URL <- "https://data.epa.gov/dmapservice/ghg.c_subpart_level_information/csv"
+    Trycatch_downloader(URL = data_URL,method = "save",output_location = ghgrp_combustion_file,
+                        error_message = paste0("Greenhouse Gas Reporting Program data could not be downloaded using API link: ",data_URL))
+  }
+  
+  ################################################################################
+  #load in and combine the emission data appropriately
+  
+  ghgrp_transmission_compressor_emissions <- read.csv(ghgrp_compressor_file)
+  ghgrp_combustion_emissions <- read.csv(ghgrp_combustion_file)
+  
   #because we're getting sub-facility level information for transmission
   #compressor, first need to aggregate.  Subsetting to only the year of interest
   #now instead of later.
@@ -273,85 +356,99 @@ Transmission <- function(GHGI_file,
   ################################################################################
   #process the transmission pipeline data
   
+  #use grep and the index page of the annex file to identify the pages we want
+  GHGI_index <- read_xlsx(GHGI_file,.name_repair = "minimal")
+  GHGI_Activity_sheet <- gsub("Table ","",
+                              GHGI_index[sapply(GHGI_index[,2],FUN=function(x){grep(pattern="Activity Data for Natural Gas Systems Sources",x)}),1])
+  GHGI_Emissions_sheet <- gsub("Table ","",
+                              GHGI_index[sapply(GHGI_index[,2],FUN=function(x){grep(pattern="CH4 Emissions \\(kt\\) for Natural Gas Systems",x)}),1])
+
+  #Columns = year, rows = various types of sources.  First row is just to
+  #identify the first row of the tables as there is also header information that
+  #we want to exclude
   first_row <- which(read_xlsx(GHGI_file,sheet = GHGI_Activity_sheet,.name_repair = "minimal")[,1]=="Segment/Source")
-  GHGI_p1 <- read_xlsx(GHGI_file,sheet = GHGI_Activity_sheet,skip=first_row,col_names = T)
+  GHGI_Activity <- read_xlsx(GHGI_file,sheet = GHGI_Activity_sheet,skip=first_row,col_names = T)
   
   first_row <- which(read_xlsx(GHGI_file,sheet = GHGI_Emissions_sheet,.name_repair = "minimal")[,1]=="Segment/Source")
-  GHGI_p2 <- read_xlsx(GHGI_file,sheet = GHGI_Emissions_sheet,skip=first_row,col_names = T)
-  #p2 = emissions, p1 = activity data.  Columns = year, rows = various types of
-  #sources.  First col is just to identify the first column of useable data
+  GHGI_Emissions <- read_xlsx(GHGI_file,sheet = GHGI_Emissions_sheet,skip=first_row,col_names = T)
   
   if(all(GHGI_Pipeline=="GHGI")){
+    #all the sources we're looking for, written exactly as in the GHGI file
     Data_list <- c("Pipeline Leaks","M&R (Trans. Co. Interconnect)","M&R (Farm Taps + Direct Sales)",
                    "Pipeline venting")
-    #all the sources we're looking for, written exactly as in the GHGI file
     
+    #use sapply to find the row using data list, specify the column as the year
+    #and grab the relevant emissions and activity data into a dataframe.
     GHGI_Pipeline <- data.frame("Type"=Data_list,
-                                "Emissions"=as.numeric(unlist(sapply(Data_list,FUN=function(x){GHGI_p2[which(GHGI_p2[,1]==x)[1],as.character(inventory_year)]})))*
+                                "Emissions"=as.numeric(unlist(
+                                  sapply(Data_list,FUN=function(x){GHGI_Emissions[which(GHGI_Emissions[,1]==x)[1],as.character(inventory_year)]})))*
                                   1E9/(16.043*60*60*24*365),#convert from kt/yr to mol/s
-                                "Total_stations"=as.numeric(unlist(sapply(Data_list,FUN=function(x){GHGI_p1[which(GHGI_p1[,1]==x)[1],as.character(inventory_year)]})))*
+                                "Total_stations"=as.numeric(unlist(
+                                  sapply(Data_list,FUN=function(x){GHGI_Activity[which(GHGI_Activity[,1]==x)[1],as.character(inventory_year)]})))*
                                   1609.344,#convert from miles to meters
                                 row.names = NULL)
-    #use sapply to find the row using data list, specify the column as the year and
-    #grab the relevant EF and activity data into a dataframe.
   }
   
   pipeline_EF <- sum(GHGI_Pipeline[,2])/GHGI_Pipeline[1,3] #mol/m/s
   #sum of emissions / miles of pipelines (activity data from leaks entry)
   
   if(all(GHGI_transmission_compressors=="GHGI")){
-    
-    
+    #transmission station total + emissions during operations (vents, flaring,
+    #leaks, exhaust, etc.)
     Data_list <- c("Station Total Emissions","Dehydrator vents (Transmission)",
                    "Flaring (Transmission)","Engines (Transmission)",
                    "Turbines (Transmission)","Engines (Storage)",
                    "Turbines (Storage)","Generators (Engines)",
                    "Generators (Turbines)","Pneumatic Devices Transmission",
                    "Station Venting Transmission")
-    #transmission station total + emissions during operations (vents, flaring,
-    #leaks, exhaust, etc.)
     
+    #use sapply to find the row using data list, specify the column as the year
+    #and grab the relevant emissions and activity data into a dataframe.
     GHGI_transmission_compressors <- data.frame("Type"=Data_list,
-                                                "Emissions"=as.numeric(unlist(sapply(Data_list,FUN=function(x){GHGI_p2[which(GHGI_p2[,1]==x)[1],as.character(inventory_year)]})))*
+                                                "Emissions"=as.numeric(unlist(sapply(Data_list,FUN=function(x){GHGI_Emissions[which(GHGI_Emissions[,1]==x)[1],as.character(inventory_year)]})))*
                                                   1E9/(16.043*60*60*24*365),#convert from kt/yr to mol/s
-                                                "Total_stations"=as.numeric(unlist(sapply(Data_list,FUN=function(x){GHGI_p1[which(GHGI_p1[,1]==x)[1],as.character(inventory_year)]}))),
+                                                "Total_stations"=as.numeric(unlist(sapply(Data_list,FUN=function(x){GHGI_Activity[which(GHGI_Activity[,1]==x)[1],as.character(inventory_year)]}))),
                                                 row.names = NULL)
-    #use sapply to find the row using data list, specify the column as the year and
-    #grab the relevant EF and activity data into a dataframe.
   }
   
-  Engine_transmission_fraction <- GHGI_transmission_compressors[4,2]/sum(GHGI_transmission_compressors[c(4,6),2])
-  Turbine_transmission_fraction <- GHGI_transmission_compressors[5,2]/sum(GHGI_transmission_compressors[c(5,7),2])
   #calculate the ratio between transmission and storage emissions from engines and
   #turbines
+  Engine_transmission_fraction <- GHGI_transmission_compressors[4,2]/sum(GHGI_transmission_compressors[c(4,6),2])
+  Turbine_transmission_fraction <- GHGI_transmission_compressors[5,2]/sum(GHGI_transmission_compressors[c(5,7),2])
   
-  GHGI_transmission_compressors[8,2] <- Engine_transmission_fraction*GHGI_transmission_compressors[8,2]
-  GHGI_transmission_compressors[9,2] <- Turbine_transmission_fraction*GHGI_transmission_compressors[9,2]
   #apply those ratios to the Generators for engines or turbines since they're not
   #separated into transmission and storage
+  GHGI_transmission_compressors[8,2] <- Engine_transmission_fraction*GHGI_transmission_compressors[8,2]
+  GHGI_transmission_compressors[9,2] <- Turbine_transmission_fraction*GHGI_transmission_compressors[9,2]
   
-  GHGI_transmission_compressors <- GHGI_transmission_compressors[c(1:5,8:11),]
   #remove the storage data
-  compressor_avg_emissions <- sum(GHGI_transmission_compressors[,2])/GHGI_transmission_compressors[3,3] #mol/station/s
+  GHGI_transmission_compressors <- GHGI_transmission_compressors[c(1:5,8:11),]
   #sum of emissions / N stations (activity data from flaring entry)
+  compressor_avg_emissions <- sum(GHGI_transmission_compressors[,2])/GHGI_transmission_compressors[3,3] #mol/station/s
   
-  suppressWarnings(rm(GHGI_transmission_compressors,GHGI_Pipeline,GHGI_p1,GHGI_p2,first_row,Data_list,
+  suppressWarnings(rm(GHGI_transmission_compressors,GHGI_Pipeline,GHGI_Activity,GHGI_Emissions,first_row,Data_list,
                       Engine_transmission_fraction,Turbine_transmission_fraction))
   cat("Finished loading all input data at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
   ################################################################################
   #process the transmission pipeline data
   
-  # Crop to just larger than d03 - don't know if it's necessary to have this buffer but it can't hurt
+  # Crop to just larger than d03 - don't know if it's necessary to have this
+  # buffer but it can't hurt
   e <- ext(domain)*1.1
   pipes_crop_EIA <- crop(project(pipes_EIA,crs(domain)),e)
   
+  #Set values to the pipe length (in metres) in each cell
   if(nrow(pipes_crop_EIA)>0){
     pipes_by_cell_EIA=rasterizeGeom(pipes_crop_EIA,domain_template,fun="length")
   }else{
     pipes_by_cell_EIA=domain_template
   }
-  pipes_rast_EIA <- pipes_by_cell_EIA*pipeline_EF   # Set values to the pipe length (in metres) in each cell, multiplied by the effective emission factor in mol/m/s
-  pipes_flux <- pipes_rast_EIA*1e9/(cellSize(pipes_rast_EIA,unit="m"))  # Calculate flux, mol/s to nmol/m2/s
+  #Now multiply by the effective emission factor in mol/m/s to get to mol/s
+  pipes_rast_EIA <- pipes_by_cell_EIA*pipeline_EF
+  #Calculate flux, mol/s to nmol/m2/s
+  pipes_flux <- pipes_rast_EIA*1e9/(cellSize(pipes_rast_EIA,unit="m"))  
+  
+  #Set NA values to 0 and mask to the exact domain
   pipes_flux[is.na(pipes_flux)]<-0
   pipes_flux <- mask(pipes_flux,domain)
   ################################################################################
@@ -395,7 +492,7 @@ Transmission <- function(GHGI_file,
     # }
     
     #scale the GHGRP emissions so that the domain average is equal to the national
-    #average
+    #average and convert GHGRP from MT CH4/yr to mol/s
     GHGRP_scaling <- compressor_avg_emissions/mean(compressors_ghgrp_crop$ghg_quantity*1e6/(16.043*365*24*60*60))
     compressors_final$emiss[location_matches$to_id] <- compressors_ghgrp_crop$ghg_quantity*1e6/(16.043*365*24*60*60)*GHGRP_scaling
   }
