@@ -27,21 +27,30 @@
 #'   \item Rice Cultivation
 #'   \item Field Burning
 #'   }
+#'   
 #'  The data is available at \url{https://doi.org/10.5281/zenodo.8367082}.  The
-#'  file will be saved to input_directory to avoid re-downloading every run.
+#'  closest year will be automatically downloaded.
 #'
 #'  See reference \href{https://doi.org/10.1021/acs.est.3c05138}{Maasakkers et
 #'  al.}
-#'@param domain SpatRaster providing the desired output grid, including the
-#'  desired resolution and coordinate reference system
+#'@param domain SpatVector polygon outlining the desired output area
+#'@param domain_template SpatRaster providing the desired output grid, including
+#'  the desired resolution and coordinate reference system
 #'@param input_directory Character providing the full filepath to save/load
 #'  input data
 #'@param output_directory Character providing the full filepath to save
 #'  processed data
 #'@param inventory_year Numeric indicating the desired year of data to use.
-#'@param verbose Logical indicating whether to save visuals.  It includes 2
-#'  plots of the gridded methane emissions on log scales, one for LMOP
-#'  facilities and one for GHGRP facilities.
+#'@param verbose Logical indicating whether to save visuals.  It includes 3
+#'  plots of the gridded methane emissions, 1 for each netcdf file.
+#'@param County_Tigerlines SpatVector.  United States Census Bureau county
+#'  shapefile downloaded in Main.
+#'@param plot_directory Character providing the full filepath to save figures.
+#'  Only relevant if verbose = TRUE.
+#'@param State_Tigerlines SpatVector.  United States Census Bureau county
+#'  shapefile.  Available at
+#'  \url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.
+#'  Only relevant if verbose=TRUE.
 #'@returns Nothing is returned from the function, but the main outputs are 3
 #'  netcdf files of the methane emissions from the gridded EPA product.  They
 #'  are titled "GEPA_thermo.nc" for gridded EPA thermogenic,
@@ -49,18 +58,23 @@
 #'  industrial landfills.
 #'@examples
 #'library(terra)
-#'grid_bbox=cbind(c(-76.65,-73.65),c(38.97,40.97))
-#'grid_res=0.01
-#'grid_crs="epsg:4326"
-#'grid <- rast(nrows=diff(range(grid_bbox[,2]))/grid_res,
-#'             ncols=diff(range(grid_bbox[,1]))/grid_res, xmin=min(grid_bbox[,1]),
-#'             xmax=max(grid_bbox[,1]), ymin=min(grid_bbox[,2]), ymax=max(grid_bbox[,2]),
-#'             crs=grid_crs)
+#' grid_bbox=cbind(c(-76.65,-73.65),c(38.97,40.97))
+#' grid_res=0.01
+#' grid_crs="epsg:4326"
+#' grid <- rast(nrows=diff(range(grid_bbox[,2]))/grid_res,
+#'              ncols=diff(range(grid_bbox[,1]))/grid_res, xmin=min(grid_bbox[,1]),
+#'              xmax=max(grid_bbox[,1]), ymin=min(grid_bbox[,2]), ymax=max(grid_bbox[,2]),
+#'              crs=grid_crs)
+#' grid_vect <- as.polygons(ext(grid),crs=grid_crs)
 #' Prepare_GEPA(inventory_year=2018,
-#'              input_directory="~/../Desktop/",
-#'              output_directory="~/../Desktop/",
-#'              domain=grid,
-#'              verbose=T)
+#'              input_directory="~/../Desktop/in/",
+#'              output_directory="~/../Desktop/out/",
+#'              domain=grid_vect,
+#'              domain_template=grid,
+#'              verbose=TRUE,
+#'              State_Tigerlines=vect("~/../Desktop/in/State_Tigerlines/tl_2018_us_state.shp"),
+#'              County_Tigerlines=vect("~/../Desktop/in/County_Tigerlines/tl_2018_us_county.shp"),
+#'              plot_directory="~/../Desktop/plots/")
 #'@author Joe Pitt, \email{madeup@@wisc.edu}
 #'@author Kris Hajny, \email{blank@@fake.edu}
 #'@author Israel Lopez-Coto, \email{test@@test.edu}
@@ -99,10 +113,8 @@ Prepare_GEPA <- function(inventory_year,
   
   #download the GEPA file.  for some reason failed without setting method.
   if(!file.exists(file.path(input_directory,GEPA_filename))){
-    download.file(GEPA_URL,destfile=paste0(input_directory,GEPA_filename),
-                  quiet = T,method='curl')
+    Trycatch_downloader(URL=GEPA_URL,output_location=paste0(input_directory,GEPA_filename),method="save")
   }
-  rm(GEPA_URL)
   ################################################################################
   #load in the file and split into the fossil fuel and non-fossil components we need
   
@@ -116,18 +128,17 @@ Prepare_GEPA <- function(inventory_year,
   domain_trans <- project(domain_template,crs(GEPA))
   domain_res <- res(domain_trans)
   if(any(domain_res<res(GEPA))){
-    # domain_GEPA <- aggregate(domain,round(res(GEPA)/domain_res,3))
-    # GEPA <- project(GEPA,domain_GEPA)
-    # GEPA <- disagg(GEPA,round(res(GEPA)/domain_res,3),"nearest")
-    
     #crop to the domain + buffer first to speed up process
     GEPA <- crop(GEPA,ext(domain_trans)*1.1,snap="out")
     GEPA <- disagg(GEPA,round(res(GEPA)/domain_res,3),"near")
+    
     #reproject to exact domain now.  Here using nearest neighbor to prevent only
     #1 row/column of higher res pixels on the border of each GEPA pixel from
     #being interpolated.
     GEPA <- project(GEPA,domain_template,method="near")
     GEPA <- mask(GEPA,domain)
+    
+    #account for pixels partially within the domain
     cover <- extract(GEPA[[1]],domain,weights=T,exact=T,cells=T)
     GEPA[cover[,'cell']] <- GEPA[cover[,'cell']]*cover[,'weight']
   }else if(any(domain_res>res(GEPA))){
@@ -139,7 +150,7 @@ Prepare_GEPA <- function(inventory_year,
                 ext(GEPA)+(res(project(domain_template,crs(GEPA)))*5))
     
     #reproject to exact domain now using an average to effectively aggregate
-    #while reprojecting.
+    #while reprojecting instead.
     GEPA <- project(GEPA,domain_template,method="average")
   }
   
@@ -168,6 +179,10 @@ Prepare_GEPA <- function(inventory_year,
   GEPA_landfill <- GEPA$emi_ch4_5A1_Landfills_Industrial
   GEPA_non_thermo <- GEPA[[which(names(GEPA) %in% GEPA_non_thermo_sectors)]]
   GEPA_thermo <- GEPA[[which(names(GEPA) %in% GEPA_thermo_sectors)]]
+  
+  ##simple check that the sectors were properly grabbed
+  # length(GEPA_non_thermo_sectors)==nlyr(GEPA_non_thermo)
+  # length(GEPA_thermo_sectors)==nlyr(GEPA_thermo)
   
   #sum across layers for those that are multiple individual sectors
   GEPA_non_thermo <- sum(GEPA_non_thermo)
