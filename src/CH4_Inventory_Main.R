@@ -6,11 +6,11 @@
 #'  the config file and inputs.
 #'
 #'@details This function will source all other functions and the config, create
-#'  the domain from the input data in the case that a SpatVector was not
-#'  provided, and download some files (Census tigerlines, ghgrp location/name
-#'  data) that will be needed for multiple sectors.  It will then use the
-#'  information in the config file and inputs to run every relevant sector.  As
-#'  such, the inputs to this function and the config may require user editing.
+#'  the domain from the input data, and download some files (Census tigerlines, 
+#'  ghgrp location/name data) that will be needed for multiple sectors.  It will
+#'  then use the information in the config file and inputs to run every relevant
+#'  sector.  As such, the inputs to this function and the config may require 
+#'  user editing.
 #'
 #'  See references \href{https://doi.org/10.1029/2020JD032974}{Vulcan} and
 #'  \href{https://doi.org/10.1002/2017JD027359}{ACES}
@@ -23,10 +23,19 @@
 #'  Tigerlines.  It can be a state abbreviation, state name, state FIPS code (as
 #'  a character), Urban Area name, or Urban Area Census Code.  For example:
 #'  "DE", "Delaware", and "10" are all equivalent and "Long Neck, DE" and
-#'  "51202" are equivalent.
+#'  "51202" are equivalent.  Names must match exactly and FIPS or urban area
+#'  codes must include leading 0's.  Lists of the names and codes for all urban
+#'  areas for the most recent census are available at
+#'  \url{https://www.census.gov/programs-surveys/geography/guidance/geo-areas/urban-rural.html}.
+#'  Links to previous census urban areas are on the same page.  A list with
+#'  state fips codes is available here
+#'  \url{https://www.census.gov/library/reference/code-lists/ansi.html}.
 #'@param domain_res Numeric providing the resolution for the domain.  Can be
-#'  length 1 for equal x and y resolution or 2 (x,y).
-#'@param domain_crs Character providing the projection of the domain
+#'  length 1 for equal x and y resolution or length 2 (x, y).
+#'@param domain_crs Character providing the projection of the domain in PROJ
+#'  string (\url{https://proj.org/en/stable/operations/projections/index.html})
+#'  or EPSG codes (\url{https://epsg.io/}) or WKT
+#'  (\url{https://docs.ogc.org/is/12-063r5/12-063r5.html}) formats.
 #'@param input_directory Character providing the full filepath to load/save
 #'  input data
 #'@param plot_directory Character providing the full filepath to save figures.
@@ -40,28 +49,17 @@
 #'@param vulcan_directory Character providing the full filepath to a folder with
 #'  annual, sectoral Vulcan inventory files.  Vulcan v3.0 is available at
 #'  \url{https://doi.org/10.3334/ORNLDAAC/1741}.
-#'@param inventory_year Numeric indicating the desired year of data to use.
+#'@param inventory_year Numeric indicating the desired year of data to use.  The
+#'  closest available will be used for datasets that are not provided annually.
 #'@param verbose Logical indicating whether to save additional output.  This
 #'  includes easier to read csv files of the data that has been gridded for
 #'  multiple sectors as well as sector and subsector visuals.
-#'@param LMOP_file Character providing the full filepath to the landfill methane
-#'  outreach program data in xlsx format available at
-#'  \url{https://www.epa.gov/lmop/landfill-technical-data}.
 #'@param EIA_file Character providing the full filepath to the EIA form 176 data
 #'  in xlsx format available at
 #'  \url{https://www.eia.gov/naturalgas/ngqs/#?report=RP4&year1=2020&year2=2020&company=Name}.
-#'@param PHMSA_file Character providing the full filepath to the PHMSA annual
-#'  gas distribution data in xlsx format available at
-#'  \url{https://www.phmsa.dot.gov/data-and-statistics/pipeline/gas-distribution-gas-gathering-gas-transmission-hazardous-liquids}.
 #'@param GHGI_file Character providing the full filepath to the GHGI natural gas
 #'  systems annex file in xlsx format available at
 #'  \url{https://www.epa.gov/ghgemissions/natural-gas-and-petroleum-systems-ghg-inventory-additional-information-1990-2022-ghg}.
-#'@param GHGI_Emissions_sheet Character indicating the sheet with emissions data
-#'  in the GHGI annex file.  Has been 3.6-1 to date.
-#'@param GHGI_EF_sheet Character indicating the sheet with emission factor data
-#'  in the GHGI annex file.  Has been 3.6-2 to date.
-#'@param GHGI_Activity_sheet Character indicating the sheet with activity data
-#'  in the GHGI annex file.  Has been 3.6-7 to date.
 #'@param HIFLD_compressor_file Character providing the full filepath to the
 #'  HIFLD natural gas transmission compressor data in csv format.  This data has
 #'  been deprecated and is no longer available from HIFLD.
@@ -76,10 +74,10 @@
 #'  \url{https://echo.epa.gov/trends/loading-tool/water-pollution-search}.
 #'@param CWNS_file Character providing the full filepath to the CWNS wastewater
 #'  treatment plant data.  For 2012 this should be in xlsx format and for 2022
-#'  this should be a folder with multiple csv's. in xlsx format available at
-#'  \url{}.
-#'@param CWNS_year Numeric indicating the year of CWNS data to utilize as the
-#'  data format differs.  Either 2012 or 2022.
+#'  this should be a folder with multiple csv's. The 2012 CWNS is available at
+#'  \url{https://ordspub.epa.gov/ords/cwns2012/f?p=cwns2012:25:} and the 2022
+#'  CWNS is available at
+#'  \url{https://sdwis.epa.gov/ords/sfdw_pub/r/sfdw/cwns_pub/data-download?session=8491118346746}.
 #'@param watershed_shapefile Character providing the full filepath to the
 #'  watershed polygons in shapefile format available at
 #'  \url{http://www.cec.org/north-american-environmental-atlas/watersheds/}.
@@ -115,7 +113,6 @@ CH4_inventory_build <- function(input_directory,
                                 output_directory,
                                 code_directory,
                                 plot_directory,
-                                focus_city="none",
                                 inventory_year,
                                 domain=as.data.frame(cbind(c(-76.65,-73.65),
                                                            c(38.97,40.97))),
@@ -124,129 +121,26 @@ CH4_inventory_build <- function(input_directory,
                                 ACES_directory,
                                 vulcan_directory,
                                 verbose,
-                                LMOP_file,
                                 EIA_file,
-                                PHMSA_file,
                                 GHGI_file,
-                                GHGI_Emissions_sheet="3.6-1",
-                                GHGI_EF_sheet = "3.6-2",
-                                GHGI_Activity_sheet = "3.6-7",
                                 HIFLD_compressor_file,
                                 NLCD_file,
                                 NALCMS_file,
                                 DMR_file,
                                 CWNS_file,
-                                CWNS_year=2022,
                                 watershed_shapefile){
-  # code_directory="~/../../Kristian/Desktop/methane_inventory/src/"
-  # 
-  # input_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Raw_data_CONUS/"
-  # output_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Processed_CONUS/"
-  # plot_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Figures_CONUS/"
-  # #if desired.  Must either be UACE code entered as numeric or exact text match
-  # #entered as character. Too many cities have similar/identical names otherwise.
-  # #Can be > 1 city. These can be found here (see "List of 2020 Census Urban
-  # #Areas")
-  # #(https://www.census.gov/programs-surveys/geography/guidance/geo-areas/urban-rural.html)
-  # #for 2020 - 2020 and here
-  # #(https://www2.census.gov/geo/pdfs/maps-data/maps/reference/2010UAUC_List.pdf)
-  # #for 2010 - 2019
-  # # focus_city="Philadelphia, PA--NJ--DE--MD"
-  # 
-  # inventory_year=2019
-  # #domain can be 4 corners, a vector/raster file to load, state name/acronym/FIPS,
-  # #or urban area name/FIPS.
-  # 
-  # # domain=as.data.frame(cbind(c(-125,-65),
-  # #                            c(24,50)))
-  # domain=as.data.frame(cbind(c(-2.5E6,2.5E6),
-  #                            c(-1.7E6,1.5E6)))
-  # # domain=as.data.frame(cbind(c(-76.65,-73.65),
-  # #                            c(38.97,40.97)))
-  # # domain=as.data.frame(cbind(c(-50,-45),
-  # #                            c(38.97,40.97)))
-  # # domain <- vect("~/../Desktop/testshape/testshape.shp")
-  # # domain <- "DE"
-  # # domain <- "nonsense_not_real"
-  # # domain <- "Delaware"
-  # # domain <- "039"
-  # # domain <- "10"
-  # # domain <- "Long Neck, DE"
-  # # domain <- "51202"
-  # # domain_res=0.01 #deg
-  # domain_res=1000 #m
-  # domain_crs <- "+proj=lcc +lat_1=33 +lat_2=45 +lat_0=40 +lon_0=-97 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs" #Lambert Conic Conformal, same as Vulcan/ACES
-  # # domain_crs="epsg:4326" #lat/long
-  # ACES_directory="G:/My Drive/Shepson Group Drive/General Inventories and Shapefiles/Inventories/ACES_v2.0"
-  # vulcan_directory="G:/My Drive/Shepson Group Drive/General Inventories and Shapefiles/Inventories/Vulcan_v3.0"
-  # verbose=TRUE
-  # 
-  # 
-  # 
-  # 
-  # #just rerunning the domain to check the output is unchanged after some testing edits
-  # # output_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Processed_test2/"
-  # # plot_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Figures_test2/"
-  # # output_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Processed_test/"
-  # # plot_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Figures_test/"
-  # 
-  # 
-  # 
-  # 
-  # #overwrite these values for testing
-  # # output_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Processed_test/"
-  # # plot_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Figures_test/"
-  # # focus_city=FALSE
-  # # inventory_year=2019
-  # # domain=as.data.frame(cbind(c(-119.1,-116.78),
-  # #                            c(33.37,35.69)))
-  # # domain_res=0.01
-  # # domain_crs="epsg:4326" #lat/long
+
   ################################################################################
-  #User input
   #do not save data for XESMF reprojection in Python - just reproject with
   #Terra.
   XESMF <- F
-  #an easy way to switch to stress-testing code.  Changes year to 2016, resolution
-  #to 0.1 and reprojects to a cylindrical projection (or the Vulcan one) to make
-  #sure functions still run without failing.
-  testmode <- F
-  testmode_vulcan <- F
-  ################################################################################
-  #User input
-  # 
-  # 
-  # # LMOP_file=file.path(input_directory,"lmopdata(Mar_24)_landfill_only.xlsx")
-  # LMOP_file=file.path(input_directory,"lmopdata(Nov_24)_landfill_only.xlsx")
-  # EIA_file = file.path(input_directory,"176 Type of Operations and Sector Items.xlsx")
-  # PHMSA_file = file.path(input_directory,"annual_gas_distribution_2010_present/annual_gas_distribution_2019.xlsx")
-  # # GHGI_file = file.path(input_directory,"2022_ghgi_natural_gas_systems_annex36_tables.xlsx")
-  # GHGI_file = file.path(input_directory,"2024_ghgi_natural_gas_systems_annex36_tables.xlsx")
-  # GHGI_Emissions_sheet="3.6-1"
-  # GHGI_EF_sheet = "3.6-2"
-  # GHGI_Activity_sheet = "3.6-7"
-  # HIFLD_compressor_file=file.path(input_directory,'Natural_Gas_Compressor_Stations.csv')
-  # NLCD_file=file.path("G:/My Drive/Shepson Group Drive/General Inventories and Shapefiles/Shapefiles/nlcd_2019_land_cover_l48_20210604/nlcd_2019_land_cover_l48_20210604.img")
-  # NALCMS_file=file.path("G:/My Drive/Shepson Group Drive/General Inventories and Shapefiles/Shapefiles/NALCMS_2020_land_cover/NA_NALCMS_landcover_2020_30m/data/NA_NALCMS_landcover_2020_30m.tif")
-  # # DMR_file=file.path(input_directory,'DMR_2022_from_8_10_2023.csv')
-  # DMR_file=file.path(input_directory,'DMR_2019_from_11_1_2024.csv')
-  # # CWNS_file=file.path(input_directory,'CWNS_merged_data_2012_KH.xlsx')
-  # CWNS_file=file.path(input_directory,'2022CWNS_NATIONAL_APR2024')
-  # watershed_shapefile=file.path(input_directory,"watersheds_shapefile/watershed_p_v2.shp")
-  # CWNS_year=2022
-  
   ################################################################################
   #load all packages necessary throughout processsing
   
   packagecheck <- c("terra", "ncdf4", "readxl","jsonlite","dplyr")
-  # 
-  # #install each package and library them.  Ensures all are up to date. 
-  # lapply(packagecheck,install.packages,dependencies=T,quiet=T)
-  # lapply(packagecheck,library,character.only=T)
-  # 
-  # rm(packagecheck)
-  
-  #quick way to install only packages that are not already installed
+
+  #quick way to install only packages that are not already installed and make
+  #sure they're up to date
   i=1
   while(i<=length(packagecheck)){
     if(length(find.package(packagecheck[i],quiet = TRUE))<1){
@@ -257,6 +151,7 @@ CH4_inventory_build <- function(input_directory,
     i <- i+1
   }
   
+  #Library all packages.  Ignore startup messages.
   suppressPackageStartupMessages(invisible(lapply(packagecheck, library, character.only=TRUE)))
   rm(packagecheck,i)
   
@@ -265,21 +160,10 @@ CH4_inventory_build <- function(input_directory,
   #readxl = enables loading in .xlsx or similar filetypes
   #jsonlite = allows simple loading of JSON files, primarily for downloading input data via API
   
-  
   #may need, but may be able to avoid using
   #dplyr = part of tidyverse for cleaner, sometimes more efficient code.
   #        Landfill sector uses piping, group_by, and slice_max from this.
-  
-  
-  #shouldn't need anymore, may need to code out in some scripts still
-  #geosphere = some processing functions for spatial data
-  #fBasics = timpallete colorscale
-  #pracma = haversine function to calculate distances from lat/long points.  terra can do this
-  #rvest and httr = easier access to html data
-  #rgdal = dead package for spatial processing
-  #maps = basic maps, other datasets are better
-  #sf and sp = many spatial dataclasses
-  #raster = raster dataclasses and processing functions
+  #        NG dist and stationary comb use piping too
   
   ################################################################################
   #Create input/output directories
@@ -290,16 +174,9 @@ CH4_inventory_build <- function(input_directory,
     dir.create(plot_directory,showWarnings = F)
     dir.create(paste0(plot_directory,"Summed_Sectors"),showWarnings = F)
   }
-  
-  ################################################################################
-  #Get the years for ACES and Vulcan based on the input year.
-  
-  #year of ACES data, will be part of the filename
-  ACES_year <- (2012:2017)[which.min(abs(2012:2017 - inventory_year))]
-  
-  #year of Vulcan data.  Assuming Vulcan v3.0, 1 - 6 corresponding to years 2010 -
-  #2015
-  vulcan_band <- which.min(abs(2010:2015 - inventory_year))
+  dir.create(file.path(input_directory,"GHGRP"),showWarnings = F)
+  dir.create(file.path(input_directory,"EIA"),showWarnings = F)
+  dir.create(file.path(input_directory,"NEI"),showWarnings = F)
   
   ################################################################################
   #load in the many relevant functions and the config file
@@ -339,23 +216,6 @@ CH4_inventory_build <- function(input_directory,
   error_text <- ""
   error_found <- FALSE
   
-  # temp <- rast(matrix(1:25, nrow=5, ncol=5))
-  # 
-  # #these are inputs that won't work
-  # if(try(crs(temp)=domain_crs)){
-  #   error_found <- TRUE
-  #   error_text <- paste0(error_text,"\n\nMust set both Process_stationary_combustion and Process_natural_gas_distribution to FALSE or set Use_ACES and/or Use_Vulcan to TRUE to disaggregate stationary combustion and natural gas distribution data")
-  # }
-  # 
-  # if((!Use_ACES & !Use_Vulcan) & (Process_stationary_combustion | Process_natural_gas_distribution)){
-  #   error_found <- TRUE
-  #   error_text <- paste0(error_text,"\n\nMust set both Process_stationary_combustion and Process_natural_gas_distribution to FALSE or set Use_ACES and/or Use_Vulcan to TRUE to disaggregate stationary combustion and natural gas distribution data")
-  # }
-  # rm(temp)
-  #examples - crs must be valid, domain must be in CONUS, inventory year >2010, res >= 0.01, set res to be interpreted using input crs, all directories valid
-  
-  
-  
   #each of the below is just a combination of config options that is unusable
   #(e.g., all activity data choices for a sector set to F).  Add to error text so
   #all config errors can be presented at once.
@@ -372,6 +232,11 @@ CH4_inventory_build <- function(input_directory,
   if(Process_natural_gas_distribution & (!NG_distribution_by_LDC & !NG_distribution_by_state & !NG_distribution_by_domain)){
     error_found <- TRUE
     error_text <- paste0(error_text,"\n\nMust set Process_natural_gas_distribution to FALSE or set NG_distribution_by_LDC and/or NG_distribution_by_state and/or NG_distribution_by_domain to TRUE to disaggregate natural gas distribution data")
+  }
+  
+  if(Process_natural_gas_distribution & NG_distribution_by_LDC & !file.exists(file.path(input_directory,"/byLDC_merged/byLDC_merged.shp"))){
+    error_found <- TRUE
+    error_text <- paste0(error_text,"\n\nNG_distribution_by_LDC must be set to FALSE or the NG_distribution_byLDC_prep.R script must be manually adjusted, run, and the output checked before running main")
   }
   
   #if any of the NG distribution GHGI EFs were not clearly specified, default to
@@ -398,11 +263,6 @@ CH4_inventory_build <- function(input_directory,
   }
   rm(transmission_GHGI_EFs)
   
-  
-  if(Process_wastewater & Wastewater_use_CWNS & (CWNS_year!=2022 & CWNS_year!=2012)){
-    error_found <- TRUE
-    error_text <- paste0(error_text,"\n\nMust set Wastewater_use_CWNS to false or CWNS_year to 2012 or 2022 as those are the only years of CWNS data coded for")
-  }
   
   if(Process_wastewater & (!Wastewater_use_CWNS & !Wastewater_use_DMR)){
     error_found <- TRUE
@@ -442,11 +302,31 @@ CH4_inventory_build <- function(input_directory,
   
   rm(error_found,error_text)
   ################################################################################
+  #Get the years for ACES and Vulcan based on the input year.
+  
+  if(Use_ACES & (Process_stationary_combustion | Process_natural_gas_distribution)){
+    #year of ACES data, will be part of the filename
+    ACES_year <- (2012:2017)[which.min(abs(2012:2017 - inventory_year))]
+    if(inventory_year!=ACES_year){
+      cat("ACES does not include",inventory_year,"using",ACES_year,"as the nearest data available\n")
+    }
+  }
+  
+  if(Use_Vulcan & (Process_stationary_combustion | Process_natural_gas_distribution)){
+    #year of Vulcan data.  Assuming Vulcan v3.0, 1 - 6 corresponding to years
+    #2010 - 2015
+    vulcan_band <- which.min(abs(2010:2015 - inventory_year))
+    if(inventory_year!=(2010:2015)[vulcan_band]){
+      cat("Vulcan does not include",inventory_year,"using",(2010:2015)[vulcan_band],"as the nearest data available\n")
+    }
+  }
+  
+  ################################################################################
   #save the config and input data from this point to a text file for reference
   #with the output
-  
+
   sink(file = file.path(output_directory,"Config_settings.txt"),type='output')
-  
+
   #loop through all objects in the environment, except functions, and save them to
   #the file.
   for(object in setdiff(ls(envir = environment()),ls.str(mode = "function"))){
@@ -467,15 +347,15 @@ CH4_inventory_build <- function(input_directory,
     print("",quote = FALSE)
     print("",quote = FALSE)
   }
-  closeAllConnections()  
-  
+  closeAllConnections()
+
   ################################################################################
-  #writing a function to simplify the code a bit.  Just a trycatch for downloading
-  #data that pauses for a second if the download fails, then tries again (5x
-  #before giving up).  Includes user update and can either handle a file URL (FTP
-  #mode) or a JSON (API mode).
+  #writing a function to simplify the code a bit.  Just a trycatch for
+  #downloading data that pauses for a second if the download fails, then tries
+  #again (5x before giving up).  Includes user update and can handle a file URL
+  #or a JSON or can directly vect in a file from online.
   
-  #try to download the url, and retry up to 5x with 1s between tries. Based on
+  #try to download the url, and retry up to 5x with 2s between tries. Based on
   #https://stackoverflow.com/a/60880960
   
   Trycatch_downloader <- function(URL,output_location=NULL,method,error_message){
@@ -486,13 +366,13 @@ CH4_inventory_build <- function(input_directory,
         cat("\n",URL,"Download failed, retrying up to 5x")
       }
       info=tryCatch(
-        #the url is build from the GHGRP ID, the desired year, and a common url.
-        #This file contains more information about the facility that isn't in the
-        #downloaded file.
-        if(method=="FTP"){
+        #save to file
+        if(method=="save"){
           download.file(URL,destfile=output_location,quiet = T,method="curl")
-        }else if(method=="API"){
+        #load in as JSON
+        }else if(method=="JSON"){
           fromJSON(URL)
+        #load in as SpatVector
         }else if(method=="vect"){
           vect(URL)
         },
@@ -505,12 +385,14 @@ CH4_inventory_build <- function(input_directory,
           NA
         }
       )
+      #download was successful
       if(!all(is.na(info)) | length(info)>1){
-        if(method!="FTP"){
+        if(method!="save"){
           return(info)
         }
         break
       }
+      #download failed repeatedly
       if(counter>=5){
         stop(error_message)
       }
@@ -530,6 +412,7 @@ CH4_inventory_build <- function(input_directory,
                         paste0(input_directory,"Urban_Tigerlines/tl_",inventory_year,"_us_uac",UAC_year,".shp"),
                         paste0(input_directory,"County_Tigerlines/tl_",inventory_year,"_us_county.shp"))
   
+  #only redownload if not already available
   if(!all(file.exists(Census_filenames))){
     #URLs for state, county, and urban shapefiles
     Census_FTP_URLs <- c(paste0("https://www2.census.gov/geo/tiger/TIGER",inventory_year,"/STATE/tl_",inventory_year,"_us_state.zip"),
@@ -538,7 +421,7 @@ CH4_inventory_build <- function(input_directory,
     download_location <- tempfile(fileext = ".zip")
     #download each to a temp file then unzip to the input directory
     for(A in 1:length(Census_FTP_URLs)){
-      Trycatch_downloader(URL = Census_FTP_URLs[A],output_location = download_location,method = "FTP",
+      Trycatch_downloader(URL = Census_FTP_URLs[A],output_location = download_location,method = "save",
                           error_message = paste("Census tigerlines could not be downloaded using link:",Census_FTP_URLs[A]))
       unzip(download_location,exdir=file.path(input_directory,c("State_Tigerlines","Urban_Tigerlines","County_Tigerlines")[A]))
     }
@@ -557,32 +440,12 @@ CH4_inventory_build <- function(input_directory,
   Urban_Tigerlines <- project(Urban_Tigerlines,domain_crs)
   County_Tigerlines <- project(County_Tigerlines,domain_crs)
   
-  #grab the urban area tigerlines for just the focus city
-  if(!exists("focus_city")){
-    focus_city_tigerlines <- "none"
-  }else if(class(focus_city)=="numeric"){
-    #can't use $ for urban tigerlines as column name is UACE10 for 2010 Census,
-    #UACE20 for 2020 Census
-    focus_city_tigerlines <- terra::subset(Urban_Tigerlines,as.numeric(unlist(Urban_Tigerlines[[1]])) %in% focus_city)
-  }else if(class(focus_city)=="character"){
-    focus_city_tigerlines <- terra::subset(Urban_Tigerlines,Urban_Tigerlines$NAME10 %in% focus_city)
-  }else{
-    focus_city_tigerlines <- "none"
-  }
-  
-  
-  rm(UAC_year,Census_filenames)
   ################################################################################
   #create the domain
   
-  if(testmode){
-    domain_res <- domain_res*10
-    inventory_year <- 2016
-  }
   if(length(domain_res)==1){
     domain_res <- rep(domain_res,2)
   }
-  
   
   if(class(domain)=="data.frame"){
     # domain=data.frame("lon"=c(-76.65,-73.65),
@@ -601,8 +464,8 @@ CH4_inventory_build <- function(input_directory,
     # domain <- "Long Neck, DE"
     # domain <- "51202"
     
+    #text is actually text
     if(is.na(suppressWarnings(as.numeric(domain)))){
-      #text is actually text
       if(nchar(domain)==2){
         #2 letters = state abbreviation
         State_Tigerlines <- State_Tigerlines[State_Tigerlines$STUSPS==domain,]
@@ -615,8 +478,8 @@ CH4_inventory_build <- function(input_directory,
         #full name of an urban area
         domain <- Urban_Tigerlines[unlist(values(Urban_Tigerlines[,3]))==domain,]
       }
+    #text is actually a number
     }else{
-      #text is actually a number
       if(nchar(domain)==2){
         #State FIPS
         State_Tigerlines <- State_Tigerlines[State_Tigerlines$STATEFP==domain,]
@@ -624,8 +487,6 @@ CH4_inventory_build <- function(input_directory,
       }else if(nchar(domain)==5){
         #urban area code
         domain <- Urban_Tigerlines[Urban_Tigerlines$UACE10==domain,]
-      }else{
-        domain <- try(vect(domain),silent=T)
       }
     }
   }
@@ -633,33 +494,15 @@ CH4_inventory_build <- function(input_directory,
   if(class(domain)!="SpatVector"){
     stop("domain is not set to a state abbreviation, state full name, state FIPS code, urban area abbreviation, urban area full name, urban area census code, data.frame with the corners of a box, or a SpatVector file with the desired polygon.")
   }
-  
-  
-  # if(class(domain)=="SpatVector"){
-  #   temp <- rast(ext(domain)*1.1,resolution=domain_res,crs=domain_crs,vals=1)
-  #   cover <- extract(temp,domain,weights=T,exact=T,cells=T)
-  #   values(temp) <- NA
-  #   temp[cover[,'cell']] <- cover[,'weight']
-  #   domain <- temp
-  #   
-  #   rm(temp,cover)
-  # }
-  
+
   domain_template <- rast(domain,resolution=domain_res,crs=domain_crs,vals=NA)
-  
-  
-  if(testmode_vulcan){
-    domain <- project(domain,"+proj=lcc +lat_1=33 +lat_2=45 +lat_0=40 +lon_0=-97 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs") #Lambert Conic Conformal, same as Vulcan/ACES
-  }else if(testmode){
-    domain <- project(domain,"epsg:4087") #Equidistant Cylindrical - nothing we use has this, significantly different spatially, good test option
-  }
-  
+
   ################################################################################
   # Now crop/mask the tigerlines to the domain
   
-  #subset to just those relevant for the domain.  For state it's any
-  #state that touches the domain at all.  For county, it's only those within the
-  #states (i.e., not just touching the states, crop vs mask for vectors).
+  #subset to just those relevant for the domain.  For state it's any state that
+  #touches the domain at all.  For county, it's only those within the states
+  #(i.e., not those touching but outside the states, crop vs mask for vectors).
   State_Tigerlines <- mask(State_Tigerlines,mask=domain)
   Urban_Tigerlines <- mask(Urban_Tigerlines,mask=domain)
   County_Tigerlines <- crop(County_Tigerlines,State_Tigerlines)
@@ -681,20 +524,26 @@ CH4_inventory_build <- function(input_directory,
   ################################################################################
   #Download the facility details (e.g., location) for GHGRP facilities using the
   #API.  Will be needed for several sectors.
-  
+
   if(Process_landfills | Process_natural_gas_distribution | Process_natural_gas_transmission | Process_wastewater){
-    #see https://www.epa.gov/enviro/envirofacts-data-service-api
-    # data_URL <- "https://data.epa.gov/efservice/PUB_DIM_FACILITY/JSON"
-    data_URL <- "https://data.epa.gov/dmapservice/ghg.pub_dim_facility/json"
+    GHGRP_facility_info_file <- file.path(input_directory,"GHGRP","facility_info.csv")
     
-    # download data and read in an R dataframe.  Cannot filter to year as
-    # previous year's data is used in some functions.  Cannot filter to state as
-    # distribution needs to correct some states as they list headquarters rather
-    # than area of operation.
-    ghgrp_facility_info <- Trycatch_downloader(URL = data_URL,method = "API",
-                                               error_message = paste0("Greenhouse Gas Reporting Program data could not be downloaded using API link: ",data_URL))
+    if(!file.exists(GHGRP_facility_info_file)){
+      #download data and read in an R dataframe.  Cannot filter to year as
+      #previous year's data is used in some functions.  Cannot filter to state
+      #as distribution needs to correct some states as they list headquarters
+      #rather than area of operation.  See
+      #https://www.epa.gov/enviro/envirofacts-data-service-api
+      data_URL <- "https://data.epa.gov/dmapservice/ghg.pub_dim_facility/CSV"
+      Trycatch_downloader(URL = data_URL,method = "save",output_location = GHGRP_facility_info_file,
+                                                 error_message = paste0("Greenhouse Gas Reporting Program data could not be downloaded using API link: ",data_URL))
+    }
     
-    rm(data_URL)
+    #read in the data and update the county fips and zip with leading zeroes
+    #where needed.  Neither is used, but this is good practice.
+    ghgrp_facility_info <- read.csv(GHGRP_facility_info_file)
+    ghgrp_facility_info$county_fips <- sprintf("%05d",ghgrp_facility_info$county_fips)
+    ghgrp_facility_info$zip <- sprintf("%05d",ghgrp_facility_info$zip)
   }
   
   cat("Finished loading in GHGRP facility location data.  Running individual sectors now\n\n")
@@ -723,19 +572,10 @@ CH4_inventory_build <- function(input_directory,
   #                       ACES_year,
   #                       vulcan_band,
   #                       State_Tigerlines)
+  # filter_vulcan()
   # }
   if(Process_landfills){
-    # rm(list=setdiff(ls(),c("input_directory","domain","output_directory",
-    #                        "inventory_year","verbose","clear","state_name_list",
-    #                        "GHGI_landfill_total","code_directory",
-    #                        "plot_directory","County_Tigerlines",
-    #                        "State_Tigerlines","focus_city_tigerlines")))
-    # source(paste0(code_directory,"CH4_inventory_config.R"))
-    # source(paste0(code_directory,"Landfill_emissions_r1.R"))
-    # source(paste0(code_directory,"Plotting_individual_sectors.R"))
-    # main_config()
-    # rm(code_directory)
-    Municipal_solid_waste(LMOP_file=LMOP_file,
+    Municipal_solid_waste(input_directory=input_directory,
                           domain=domain,
                           domain_template=domain_template,
                           state_name_list=state_name_list,
@@ -744,26 +584,14 @@ CH4_inventory_build <- function(input_directory,
                           verbose=verbose,
                           GHGI_landfill_total=GHGI_landfill_total,
                           ghgrp_facility_info=ghgrp_facility_info,
+                          landfill_ghgrp_reported,
+                          landfill_ghgrp_modeled,
+                          landfill_ghgrp_collection_efficiency,
                           plot_directory=plot_directory,
                           County_Tigerlines=County_Tigerlines,
-                          State_Tigerlines=State_Tigerlines,
-                          focus_city_tigerlines=focus_city_tigerlines)
+                          State_Tigerlines=State_Tigerlines)
   }
   if(Process_natural_gas_distribution){
-    # rm(list=setdiff(ls(),c("input_directory","domain","output_directory",
-    #                        "inventory_year","verbose","clear","state_name_list",
-    #                        "code_directory",
-    #                        "plot_directory","County_Tigerlines",
-    #                        "State_Tigerlines","focus_city_tigerlines",
-    #                        "ACES_directory","vulcan_directory","ACES_year",
-    #                        "vulcan_band")))
-    # source(paste0(code_directory,"CH4_inventory_config.R"))
-    # source(paste0(code_directory,"NG_distribution_emissions_r4.R"))
-    # source(paste0(code_directory,"Plotting_individual_sectors.R"))
-    # source(paste0(code_directory,"Inventory_based_disaggregation.R"))
-    # main_config()
-    # rm(code_directory)
-    # filter_vulcan()
     NG_distribution(domain=domain,
                     domain_template=domain_template,
                     state_name_list=state_name_list,
@@ -771,13 +599,10 @@ CH4_inventory_build <- function(input_directory,
                     output_directory=output_directory,
                     inventory_year=inventory_year,
                     verbose=verbose,
-                    XESMF=XESMF,
                     ghgrp_facility_info=ghgrp_facility_info,
                     EIA_file = EIA_file,
                     PHMSA_file = PHMSA_file,
                     GHGI_file = GHGI_file,
-                    GHGI_EF_sheet = GHGI_EF_sheet,
-                    GHGI_Activity_sheet = GHGI_Activity_sheet,
                     GHGI_MnR = GHGI_MnR,
                     GHGI_maintenance = GHGI_maintenance,
                     GHGI_meters = GHGI_meters,
@@ -795,24 +620,11 @@ CH4_inventory_build <- function(input_directory,
                     ACES_year=ACES_year,
                     vulcan_band=vulcan_band,
                     plot_directory=plot_directory,
-                    County_Tigerlines=County_Tigerlines,
-                    focus_city_tigerlines=focus_city_tigerlines)
-    # filter_vulcan
+                    County_Tigerlines=County_Tigerlines)
   }
   if(Process_natural_gas_transmission){
-    # rm(list=setdiff(ls(),c("input_directory","domain","output_directory",
-    #                        "inventory_year","verbose","clear","state_name_list",
-    #                        "code_directory",
-    #                        "plot_directory","County_Tigerlines",
-    #                        "State_Tigerlines","focus_city_tigerlines")))
-    # source(paste0(code_directory,"CH4_inventory_config.R"))
-    # source(paste0(code_directory,"NG_transmission_emissions_r1.R"))
-    # source(paste0(code_directory,"Plotting_individual_sectors.R"))
-    # main_config()
-    # rm(code_directory)
-    Transmission(GHGI_file=GHGI_file,
-                 GHGI_Emissions_sheet=GHGI_Emissions_sheet,
-                 GHGI_Activity_sheet=GHGI_Activity_sheet,
+    Transmission(input_directory=input_directory,
+                 GHGI_file=GHGI_file,
                  GHGI_transmission_compressors=GHGI_transmission_compressors,
                  GHGI_Pipeline=GHGI_Pipeline,
                  HIFLD_compressor_file=HIFLD_compressor_file,
@@ -825,31 +637,16 @@ CH4_inventory_build <- function(input_directory,
                  verbose=verbose,
                  plot_directory=plot_directory,
                  County_Tigerlines=County_Tigerlines,
-                 State_Tigerlines=State_Tigerlines,
-                 focus_city_tigerlines=focus_city_tigerlines)
+                 State_Tigerlines=State_Tigerlines)
   }
   if(Process_stationary_combustion){
-    # rm(list=setdiff(ls(),c("input_directory","domain","output_directory",
-    #                        "inventory_year","verbose","clear","state_name_list",
-    #                        "GHGI_landfill_total","code_directory",
-    #                        "plot_directory","County_Tigerlines",
-    #                        "State_Tigerlines","focus_city_tigerlines",
-    #                        "ACES_directory","vulcan_directory","ACES_year",
-    #                        "vulcan_band")))
-    # source(paste0(code_directory,"CH4_inventory_config.R"))
-    # source(paste0(code_directory,"stationary_combustion_r4.R"))
-    # source(paste0(code_directory,"Plotting_individual_sectors.R"))
-    # source(paste0(code_directory,"Inventory_based_disaggregation.R"))
-    # main_config()
-    # rm(code_directory)
-    # Stationary_combustion(NEI_file=file.path("~/../Desktop/nei.xlsx"),
-    Stationary_combustion(domain=domain,
+    Stationary_combustion(input_directory=input_directory,
+                          domain=domain,
                           domain_template=domain_template,
                           state_name_list=state_name_list,
                           output_directory=output_directory,
                           inventory_year=inventory_year,
                           verbose=verbose,
-                          XESMF=XESMF,
                           County_Tigerlines=County_Tigerlines,
                           Use_ACES=Use_ACES,
                           Use_Vulcan=Use_Vulcan,
@@ -863,44 +660,28 @@ CH4_inventory_build <- function(input_directory,
                           stationary_combustion_emission_factors=stationary_combustion_emission_factors,
                           EIA_API_key=EIA_API_key,
                           plot_directory=plot_directory,
-                          State_Tigerlines=State_Tigerlines,
-                          focus_city_tigerlines=focus_city_tigerlines)
+                          State_Tigerlines=State_Tigerlines)
   }
   if(Process_wastewater){
-    # rm(list=setdiff(ls(),c("domain","output_directory",
-    #                        "clear","state_name_list","code_directory","State_Tigerlines")))
-    # source(paste0(code_directory,"CH4_inventory_config.R"))
-    # source(paste0(code_directory,"NLCD_fractions_by_state.R"))
-    # main_config()
-    # rm(code_directory)
     NLCD_open_and_low_int(NLCD_file=NLCD_file,
                           domain=domain,
                           domain_template=domain_template,
-                          XESMF,
                           state_name_list=state_name_list,
                           State_Tigerlines=State_Tigerlines,
                           output_directory=output_directory)
-    
-    # rm(list=setdiff(ls(),c("input_directory","domain","output_directory",
-    #                        "inventory_year","verbose","clear","state_name_list",
-    #                        "code_directory",
-    #                        "plot_directory","County_Tigerlines",
-    #                        "State_Tigerlines","focus_city_tigerlines")))
-    # source(paste0(code_directory,"CH4_inventory_config.R"))
-    # source(paste0(code_directory,"WWTP_emissions_r3.R"))
-    # source(paste0(code_directory,"Plotting_individual_sectors.R"))
-    # main_config()
-    # rm(code_directory)
-    Wastewater(DMR_file=DMR_file,
+
+    Wastewater(input_directory=input_directory,
+               DMR_file=DMR_file,
                CWNS_file=CWNS_file,
-               CWNS_year=CWNS_year,
                output_directory=output_directory,
-               Wastewater_Municipal_method=Wastewater_Municipal_method,
-               Wastewater_Municipal_file=Wastewater_Municipal_file,
+               Wastewater_use_CWNS=Wastewater_use_CWNS,
+               Wastewater_use_DMR=Wastewater_use_DMR,
+               Wastewater_Municipal_Method_Moore_linear=Wastewater_Municipal_Method_Moore_linear,
+               Wastewater_Municipal_Method_Moore_EF=Wastewater_Municipal_Method_Moore_EF,
+               Wastewater_Municipal_Method_GHGI=Wastewater_Municipal_Method_GHGI,
                domain=domain,
                domain_template=domain_template,
                ghgrp_facility_info=ghgrp_facility_info,
-               state_name_list=state_name_list,
                inventory_year=inventory_year,
                National_wastewater_info=National_wastewater_info,
                Wastewater_State_info=Wastewater_State_info,
@@ -910,22 +691,11 @@ CH4_inventory_build <- function(input_directory,
                Total_national_open_or_low_int_area=Total_national_open_or_low_int_area,
                State_Tigerlines=State_Tigerlines,
                County_Tigerlines=County_Tigerlines,
-               focus_city_tigerlines=focus_city_tigerlines,
                verbose=verbose,
                plot_directory=plot_directory)
   }
   if(Process_wetlands_and_inland_waters){
     if(Use_Wetcharts){
-      # rm(list=setdiff(ls(),c("input_directory","domain","output_directory",
-      #                        "inventory_year","verbose","clear",
-      #                        "code_directory",
-      #                        "plot_directory","County_Tigerlines",
-      #                        "State_Tigerlines","focus_city_tigerlines")))
-      # source(paste0(code_directory,"CH4_inventory_config.R"))
-      # source(paste0(code_directory,"WETCHARTS_downscaling.R"))
-      # source(paste0(code_directory,"Plotting_individual_sectors.R"))
-      # main_config()
-      # rm(code_directory)
       Disaggregate_Wetcharts(input_directory=input_directory,
                              output_directory=output_directory,
                              domain=domain,
@@ -935,19 +705,12 @@ CH4_inventory_build <- function(input_directory,
                              plot_directory=plot_directory,
                              State_Tigerlines=State_Tigerlines,
                              County_Tigerlines=County_Tigerlines,
-                             focus_city_tigerlines=focus_city_tigerlines,
                              Use_NLCD=Use_NLCD,
                              Use_NALCMS=Use_NALCMS,
                              NLCD_file=NLCD_file,
                              NALCMS_file=NALCMS_file,
                              Wetcharts_model_subset)
     }
-    # rm(list=setdiff(ls(),c("input_directory","domain","output_directory",
-    #                        "state_name_list","code_directory")))
-    # source(paste0(code_directory,"CH4_inventory_config.R"))
-    # source(paste0(code_directory,"Wetland_fraction_r2_WIP.R"))
-    # main_config()
-    # rm(code_directory)
     NWI_Wetland_fraction(input_directory=input_directory,
                          output_directory=output_directory,
                          domain=domain,
@@ -956,17 +719,11 @@ CH4_inventory_build <- function(input_directory,
                          Use_SOCCR1=Use_SOCCR1,
                          Use_SOCCR2=Use_SOCCR2,
                          Include_freshwater=Include_freshwater)
-    # rm(list=setdiff(ls(),c("plot_directory","domain","output_directory",
-    #                        "code_directory","verbose","County_Tigerlines",
-    #                        "State_Tigerlines","focus_city_tigerlines")))
-    # source(paste0(code_directory,"CH4_inventory_config.R"))
-    # source(paste0(code_directory,"Wetland_emissions_r2.R"))
-    # source(paste0(code_directory,"Plotting_individual_sectors.R"))
-    # main_config()
-    # rm(code_directory)
+    
     SOCCR_Wetlands(output_directory=output_directory,
                    plot_directory=plot_directory,
                    domain=domain,
+                   domain_template=domain_template,
                    Use_SOCCR1=Use_SOCCR1,
                    Use_SOCCR2=Use_SOCCR2,
                    Include_freshwater=Include_freshwater,
@@ -974,14 +731,9 @@ CH4_inventory_build <- function(input_directory,
                    verbose=verbose,
                    County_Tigerlines=County_Tigerlines,
                    State_Tigerlines=State_Tigerlines,
-                   focus_city_tigerlines=focus_city_tigerlines,
                    watershed_shapefile=watershed_shapefile)
   }
   if(Incorporate_remaining_sectors_from_gridded_EPA){
-    # rm(list=setdiff(ls(),c("input_directory","domain","output_directory",
-    #                        "inventory_year","clear","code_directory")))
-    # source(paste0(code_directory,"Prepare_GEPA.R"))
-    # rm(code_directory)
     Prepare_GEPA(inventory_year=inventory_year,
                  input_directory=input_directory,
                  output_directory=output_directory,
@@ -995,7 +747,6 @@ CH4_inventory_build <- function(input_directory,
   if(Combine_sectors){
     stop("Combine Sectors hasn't been coded yet.  Do not set to TRUE in config")
   }
-  options("timeout"=default_timeout)
 }
 
 #example quick plots
