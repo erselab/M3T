@@ -642,8 +642,8 @@ Stationary_combustion <- function(input_directory,
   #Now load in the shapefiles and ACES/Vulcan, merge geometries
   
   #add leading zeroes to the fips codes - when saving to csv these were removed
-  df_wide$STATE_FIPS <- sprintf("%02d",df_wide$STATE_FIPS)
-  df_wide$COUNTY_FIPS <- sprintf("%03d",df_wide$COUNTY_FIPS)
+  df_wide$STATE_FIPS <- sprintf("%02d",as.numeric(df_wide$STATE_FIPS))
+  df_wide$COUNTY_FIPS <- sprintf("%03d",as.numeric(df_wide$COUNTY_FIPS))
   
   merge_with_poly <- terra::merge(x = County_Tigerlines,y = df_wide,
                                   by.y=c('STATE_FIPS', 'COUNTY_FIPS'),
