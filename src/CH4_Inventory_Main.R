@@ -322,6 +322,12 @@ CH4_inventory_build <- function(input_directory,
   }
   
   ################################################################################
+  #create the directories if needed
+  
+  dir.create(input_directory,showWarnings = F,recursive = T)
+  dir.create(output_directory,showWarnings = F,recursive = T)
+  dir.create(plot_directory,showWarnings = F,recursive = T)
+  ################################################################################
   #save the config and input data from this point to a text file for reference
   #with the output
 
@@ -330,22 +336,25 @@ CH4_inventory_build <- function(input_directory,
   #loop through all objects in the environment, except functions, and save them to
   #the file.
   for(object in setdiff(ls(envir = environment()),ls.str(mode = "function"))){
-    print(paste(object,"="),quote = FALSE)
+    cat(object,"=\n")
     temp_data <- get(object)
     #only include row names if they exist, not just row numbers (confusing to
-    #read)
+    #read).  Use print for tables/lists (outputs ~formatted) and cat for
+    #number/text.
     if(class(temp_data)=="data.frame"){
       if(rownames(temp_data)[1]=="1"){
         print(temp_data,quote = FALSE,row.names=F,width=300)
       }else{
         print(temp_data,quote = FALSE,width=300)
       }
-    }else{
+    }else if(class(temp_data)=="list"){
       print(temp_data,quote = FALSE,width=300)
+    }else{
+      cat(temp_data)
     }
     #add some blank lines between entries for easier reading
-    print("",quote = FALSE)
-    print("",quote = FALSE)
+    cat("\n")
+    cat("\n")
   }
   closeAllConnections()
 
@@ -399,6 +408,13 @@ CH4_inventory_build <- function(input_directory,
     }
   }
   assign("Trycatch_downloader",Trycatch_downloader,envir = .GlobalEnv)
+  ################################################################################
+  #overwrite this function with an identical form, but capture output (just
+  #avoids a newline print)
+  writeCDF <- function(...){
+    invisible(capture.output(terra::writeCDF(...)))
+  }
+  assign("writeCDF",writeCDF,envir = .GlobalEnv)
   
   cat("Finished loading config and error checking it\n")
   ################################################################################
