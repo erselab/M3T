@@ -68,10 +68,11 @@ main_config <- function(){
     #landfills
     #Landfills have 2 options for reporting their emissions - equation HH-6 and
     #HH-8.  HH-6 is based on a first order decay model, HH-8 is based on the
-    #assumed collection efficiency of a gas collection system.  You can use the 
+    #assumed collection efficiency of a gas collection system.  You can use the
     #one they report, or force it to the model or gas collection efficiency
     #value.  Note landfills without gas collection systems will still be
-    #included using the modeled emission rate.
+    #included using the modeled emission rate if forcing to the collection
+    #efficiency value.
     landfill_ghgrp_reported <- TRUE
     landfill_ghgrp_modeled <- TRUE
     landfill_ghgrp_collection_efficiency <- TRUE
@@ -84,7 +85,8 @@ main_config <- function(){
     
     #Natural Gas Distribution
     #disaggregate local distribution company (LDC), state, or domain level total
-    #emissions to the pixel scale
+    #emissions to the pixel scale.  By LDC requires use of a function that is
+    #not completely automated and is not in the normal workflow.
     NG_distribution_by_LDC <- FALSE
     NG_distribution_by_state <- TRUE
     NG_distribution_by_domain <- TRUE
@@ -479,14 +481,14 @@ main_config <- function(){
     #                                     "Population"     =c(1018396 ,6164660 ,9261699 ,19677151  ,12972008),
     #                                     "Septic_Fraction"=c(0.257   ,0.181   ,0.116   ,0.159     ,0.245),
     #                                     "Method"         =c("scaled","scaled","scaled","reported","scaled"))
-    Wastewater_State_info <- data.frame("State"          =c("CT"    ,"DE"    ,"MA"    ,"NJ"    ,"NY"      ,"PA"),
-                                        "Population"     =c(3565287 ,973764  ,6892503 ,8882190 ,19453561  ,12801989),
-                                        "Septic_Fraction"=c(0.286   ,0.257   ,0.267   ,0.116   ,0.161     ,0.245),
-                                        "Method"         =c("scaled","scaled","scaled","scaled","reported","scaled"))
-    # Wastewater_State_info <- data.frame("State"          =c("DE"),
-    #                                     "Population"     =c(1018396),
-    #                                     "Septic_Fraction"=c(0.257),
-    #                                     "Method"         =c("scaled"))
+    # Wastewater_State_info <- data.frame("State"          =c("CT"    ,"DE"    ,"MA"    ,"NJ"    ,"NY"      ,"PA"),
+    #                                     "Population"     =c(3565287 ,973764  ,6892503 ,8882190 ,19453561  ,12801989),
+    #                                     "Septic_Fraction"=c(0.286   ,0.257   ,0.267   ,0.116   ,0.161     ,0.245),
+    #                                     "Method"         =c("scaled","scaled","scaled","scaled","reported","scaled"))
+    Wastewater_State_info <- data.frame("State"          =c("DE"),
+                                        "Population"     =c(1018396),
+                                        "Septic_Fraction"=c(0.257),
+                                        "Method"         =c("scaled"))
     
     #Only needed if any states are using the scaled method.  National septic
     #fraction in the year of interest and the year that the scaled states reported a
