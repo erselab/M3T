@@ -107,6 +107,7 @@ Prepare_GEPA <- function(inventory_year,
   }else if(inventory_year<2021){
     GEPA_filename <- paste0("Express_Extension_Gridded_GHGI_Methane_v2_",inventory_year,".nc")
     GEPA_URL <- paste0("https://zenodo.org/api/records/8367082/files/",GEPA_filename,"/content")
+    cat("Using Express Extension - see https://zenodo.org/records/8367082 to understand the difference\n")
   }else{
     stop("No GEPA available for the chosen year, ",inventory_year)
   }
