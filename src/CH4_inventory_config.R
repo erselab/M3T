@@ -38,7 +38,7 @@ main_config <- function(){
   #and in case of a slow internet speed.  May need to increase if internet is
   #slow and you get download errors but the links are valid.
   options("timeout"=60*20)
-  
+
   #Sectors to process
   {
     Process_landfills <- TRUE
@@ -49,6 +49,9 @@ main_config <- function(){
     Process_wetlands_and_inland_waters <- TRUE
     Incorporate_remaining_sectors_from_gridded_EPA <- TRUE
     Combine_sectors <- FALSE #create total CH4 inventory(s) by summing across sectors - not yet developed
+    #API key to access SEDS data API.  The API is described at
+    #\url{https://www.eia.gov/opendata/} and one can register for a key with a
+    #link on the right hand side of this page.
     EIA_API_key <- "1kLep4UApTZKwdOrDkW6J8qlO0niiw8ej0JPliyc"
   }
   
