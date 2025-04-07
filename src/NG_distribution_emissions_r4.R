@@ -139,15 +139,23 @@
 #'  inclusive of national facilities. All data is annual.  The GHGI is national
 #'  totals while all other datasets are at the facility scale.
 #'
-#'  GHGRP data and the HIFLD shapefile will be automatically downloaded.
+#'  GHGRP data, GHGI data, and the HIFLD shapefile will be automatically 
+#'  downloaded.
 #'
-#'  The GHGRP is available at \url{https://ghgdata.epa.gov/ghgp/main.do}. The
-#'  GHGI is available at
-#'  \url{https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks}.
-#'  For individual LDC metering and regulating station counts, among other
+#'  The GHGRP is available at \url{https://ghgdata.epa.gov/ghgp/main.do}. For
+#'  individual LDC metering and regulating station counts, among other
 #'  variables, one must filter to the natural gas local distribution companies
 #'  sector, select an individual facility and select "View reported data".  The
-#'  HIFLD dataset is available at
+#'  GHGI is available at
+#'  \url{https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks}.
+#'  The necessary GHGI Annex data is available at
+#'  \url{https://www.epa.gov/ghgemissions/natural-gas-and-petroleum-systems-ghg-inventory-additional-information-1990-2022-ghg}
+#'  for the 2024 GHGI.  In the GHGI Annexes, available at
+#'  \url{https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks-1990-2022},
+#'  for 2024 there is a link to the file in Section 3.6: "Methodology for
+#'  Estimating CH4, CO2, and N2O Emissions from Natural Gas Systems".  The excel
+#'  file has multiple sheets, each of which has a separate layout.  The HIFLD
+#'  dataset is available at
 #'  \url{https://hifld-geoplatform.hub.arcgis.com/datasets/geoplatform::natural-gas-service-territories/about}
 #'  and can be donwloaded as both a shapefile or a csv. EIA form 176 is
 #'  available at
@@ -212,16 +220,6 @@
 #'  is a consistent identifier with other input data (EIA, HIFLD, GHGRP).  There
 #'  is an example file in the package's datasets folder that has been
 #'  successfully used in this code available for reference.
-#'@param GHGI_file Character providing the full filepath to the GHGI Annex 3.6
-#'  excel file. This data is available at
-#'  \url{https://www.epa.gov/ghgemissions/natural-gas-and-petroleum-systems-ghg-inventory-additional-information-1990-2020-ghg}
-#'  for the 2022 GHGI.  In the GHGI Annexes, available at
-#'  \url{https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks-1990-2020},
-#'  there is a link to the file in Section 3.6: "Methodology for Estimating CH4,
-#'  CO2, and N2O Emissions from Natural Gas Systems".  The excel file has
-#'  multiple sheets, each of which has a separate layout.  There is an example
-#'  file in the package's datasets folder that has been successfully used in
-#'  this code available for reference.
 #'@param State_Tigerlines SpatVector.  United States Census Bureau county
 #'  shapefile.  Available at
 #'  \url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.
@@ -310,7 +308,6 @@
 #'                 ghgrp_facility_info="~/../Desktop/in/GHGRP/facility_info.csv",
 #'                 EIA_file = "~/../Desktop/in/176 Type of Operations and Sector Items.xlsx",
 #'                 PHMSA_file = "~/../Desktop/in/annual_gas_distribution_2010_present/annual_gas_distribution_2019.xlsx",
-#'                 GHGI_file = "~/../Desktop/in/2022_ghgi_natural_gas_systems_annex36_tables.xlsx",
 #'                 GHGI_MnR="GHGI",
 #'                 GHGI_maintenance="GHGI",
 #'                 GHGI_meters="GHGI",
@@ -360,7 +357,6 @@ NG_distribution <- function(domain,
                             ghgrp_facility_info,
                             EIA_file,
                             PHMSA_file,
-                            GHGI_file,
                             GHGI_MnR,
                             GHGI_maintenance,
                             GHGI_meters,
@@ -723,9 +719,46 @@ NG_distribution <- function(domain,
     all_merge_clean <- vect(file.path(input_directory,"/byLDC_merged/byLDC_merged.shp"))
     names(all_merge_clean) <- unlist(read.table(file.path(input_directory,"/byLDC_merged/colnames.txt")))
   }
+  
+  ################################################################################
+  #Download the GHGI annex file if not already downloaded
+  
+  GHGI_file <- list.files(input_directory,pattern="*GHGI_natural_gas_annex_tables.xlsx",full.names = T)
+  
+  if(identical(GHGI_file,character(0))){
+    #download the webpage and load in the HTML.  The webpage is year specific, so
+    #check ~2 years ago (the most recent based on current reporting times)
+    #and go farther back as needed
+    GHGI_year <- as.numeric(substring(Sys.Date(),1,4))-2
+    repeat{
+      data_URL <- paste0("https://www.epa.gov/ghgemissions/natural-gas-and-petroleum-systems-ghg-inventory-additional-information-1990-",GHGI_year,"-ghg")
+      download_dest <- tempfile(fileext = ".html")
+      Trycatch_downloader(URL = data_URL,method = "save",output_location = download_dest,
+                          error_message = paste0("LMOP data could not be webscraped from webpage: ",data_URL))
+      HTML_data <- readChar(download_dest,file.info(download_dest)$size)
+      if(grepl("<title>Page Not Found",HTML_data)){
+        GHGI_year <- GHGI_year-1
+        Sys.sleep(1)
+        next
+      }else{
+        break
+      }
+    }
+    
+    #Search for https:// - any 100 or fewer characters - landfilllmopdata.xlsx in
+    #the HTML_data.  The link had about 50 characters between https:// and
+    #landfilllmopdata at most across the past few versions, but this should
+    #identify any version if the format is reasonably consistent.  
+    Matchtext <- regexpr("https://.{1,100}ghgi_natural_gas_systems_annex36_tables.xlsx",HTML_data)
+    data_URL2 <- substring(HTML_data,Matchtext[1],Matchtext[1]+attr( Matchtext , "match.length")-1)
+    GHGI_file <- paste0(input_directory,"/",GHGI_year,"_GHGI_natural_gas_annex_tables.xlsx")
+    Trycatch_downloader(URL = data_URL2,method = "save",output_location = GHGI_file,
+                        error_message = paste0("GHGI annex data could not be downloaded from webpage:\n",data_URL2,"\nMake sure the main EPA page for it is accurate:\n",data_URL))
+    unlink(download_dest)
+  }
+  
   ################################################################################
   #Pull the GHGI data we'll need later and save it to a few dataframes
-  
   
   #use grep and the index page of the annex file to identify the pages we want
   GHGI_index <- read_xlsx(GHGI_file,.name_repair = "minimal")
@@ -1447,7 +1480,7 @@ NG_distribution <- function(domain,
                      paste0('Methane emissions from natural gas distribution\n',subsector_name,
                             ', spatially allocated from\n',disaggregation_name,
                             ' totals using\n',inventory_name,' ',sector_long,' CO2 emissions')[A],
-                     zlim_min = zmin,zlim_max = zmax,plot_directory=plot_directory,
+                     zlim_min = zmin,zlim_max = zmax,plot_directory=NG_dist_plot_directory,
                      domain=domain,County_Tigerlines=County_Tigerlines,
                      State_Tigerlines=State_Tigerlines)
       }
