@@ -10,7 +10,7 @@
 #'  Inventory (GHGI), EPA Greenhouse Gas Reporting Program (GHGRP) and Energy
 #'  Information Administration (EIA) Energy Atlas data.  
 #'  
-#'  The necessary GHGRP and EIA data will be automatically downloaded.
+#'  The necessary GHGRP, GHGI, and EIA data will be automatically downloaded.
 #'
 #'  For pipelines the GHGI data includes the emissions and activity data for
 #'  pipeline leaks, meter and regulating stations, and venting.  An emission
@@ -46,20 +46,18 @@
 #'  being used.
 #'
 #'  The GHGI is available at
-#'  \url{https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks},
-#'  the GHGRP is available at \url{https://ghgdata.epa.gov/ghgp/main.do}, and
-#'  the EIA data is available at
+#'  \url{https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks}.
+#'  The necessary GHGI Annex data is available at
+#'  \url{https://www.epa.gov/ghgemissions/natural-gas-and-petroleum-systems-ghg-inventory-additional-information-1990-2022-ghg}
+#'  for the 2024 GHGI.  In the GHGI Annexes, available at
+#'  \url{https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks-1990-2022},
+#'  for 2024 there is a link to the file in Section 3.6: "Methodology for
+#'  Estimating CH4, CO2, and N2O Emissions from Natural Gas Systems".  The excel
+#'  file has multiple sheets, each of which has a separate layout.  The GHGRP is
+#'  available at \url{https://ghgdata.epa.gov/ghgp/main.do}, and the EIA data is
+#'  available at
 #'  \url{https://atlas.eia.gov/datasets/eia::natural-gas-interstate-and-intrastate-pipelines/about}.
-#'@param GHGI_file Character providing the full filepath to the GHGI Annex 3.6
-#'  excel file. This data is available at
-#'  \url{https://www.epa.gov/ghgemissions/natural-gas-and-petroleum-systems-ghg-inventory-additional-information-1990-2020-ghg}
-#'  for the 2022 GHGI.  In the GHGI Annexes, available at
-#'  \url{https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks-1990-2020},
-#'  there is a link to the file in Section 3.6: "Methodology for Estimating CH4,
-#'  CO2, and N2O Emissions from Natural Gas Systems".  The excel file has
-#'  multiple sheets, each of which has a separate layout.  There is an example
-#'  file in the package's datasets folder that has been successfully used in
-#'  this code available for reference.
+#'  
 #'@param domain SpatVector polygon outlining the desired output area
 #'@param domain_template SpatRaster providing the desired output grid, including
 #'  the desired resolution and coordinate reference system
@@ -116,8 +114,7 @@
 #'              xmax=max(grid_bbox[,1]), ymin=min(grid_bbox[,2]), ymax=max(grid_bbox[,2]),
 #'              crs=grid_crs)
 #' grid_vect <- as.polygons(ext(grid),crs=grid_crs)
-#' Transmission(GHGI_file="~/../Desktop/in/2022_ghgi_natural_gas_systems_annex36_tables.xlsx",
-#'                       GHGI_transmission_compressors="GHGI",
+#' Transmission(GHGI_transmission_compressors="GHGI",
 #'                       GHGI_Pipeline="GHGI",
 #'                       HIFLD_compressor_file="~/../Desktop/in/Natural_Gas_Compressor_Stations.csv",
 #'                       ghgrp_facility_info="~/../Desktop/in/GHGRP/facility_info.csv",
@@ -143,7 +140,6 @@
 # Calculate NG transmission emissions for d03 domain
 
 Transmission <- function(input_directory,
-                         GHGI_file,
                          GHGI_transmission_compressors,
                          GHGI_Pipeline,
                          HIFLD_compressor_file,
@@ -353,6 +349,43 @@ Transmission <- function(input_directory,
   #convert the relevant columns to numeric class
   ghgrp[,c("latitude","longitude","ghg_quantity")] <- apply(ghgrp[,c("latitude","longitude","ghg_quantity")],
                                                             2,FUN = function(x){as.numeric(x)})
+  ################################################################################
+  #Download the GHGI annex file if not already downloaded
+  
+  GHGI_file <- list.files(input_directory,pattern="*GHGI_natural_gas_annex_tables.xlsx",full.names = T)
+  
+  if(identical(GHGI_file,character(0))){
+    #download the webpage and load in the HTML.  The webpage is year specific, so
+    #check ~2 years ago (the most recent based on current reporting times)
+    #and go farther back as needed
+    GHGI_year <- as.numeric(substring(Sys.Date(),1,4))-2
+    repeat{
+      data_URL <- paste0("https://www.epa.gov/ghgemissions/natural-gas-and-petroleum-systems-ghg-inventory-additional-information-1990-",GHGI_year,"-ghg")
+      download_dest <- tempfile(fileext = ".html")
+      Trycatch_downloader(URL = data_URL,method = "save",output_location = download_dest,
+                          error_message = paste0("LMOP data could not be webscraped from webpage: ",data_URL))
+      HTML_data <- readChar(download_dest,file.info(download_dest)$size)
+      if(grepl("<title>Page Not Found",HTML_data)){
+        GHGI_year <- GHGI_year-1
+        Sys.sleep(1)
+        next
+      }else{
+        break
+      }
+    }
+    
+    #Search for https:// - any 100 or fewer characters - landfilllmopdata.xlsx in
+    #the HTML_data.  The link had about 50 characters between https:// and
+    #landfilllmopdata at most across the past few versions, but this should
+    #identify any version if the format is reasonably consistent.  
+    Matchtext <- regexpr("https://.{1,100}ghgi_natural_gas_systems_annex36_tables.xlsx",HTML_data)
+    data_URL2 <- substring(HTML_data,Matchtext[1],Matchtext[1]+attr( Matchtext , "match.length")-1)
+    GHGI_file <- paste0(input_directory,"/",GHGI_year,"_GHGI_natural_gas_annex_tables.xlsx")
+    Trycatch_downloader(URL = data_URL2,method = "save",output_location = GHGI_file,
+                        error_message = paste0("GHGI annex data could not be downloaded from webpage:\n",data_URL2,"\nMake sure the main EPA page for it is accurate:\n",data_URL))
+    unlink(download_dest)
+  }
+  
   ################################################################################
   #process the transmission pipeline data
   
