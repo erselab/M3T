@@ -1,3 +1,225 @@
+# Packagename (we need to define still)
+
+This is an R package designed to help create an urban-focused gridded
+methane inventory for any region within the continental United States.  Typical
+users should only need to modify a configuration file and define certain inputs
+when running the main function.
+
+The config allows a user to select the emitting sectors they want to include,
+emission factors to use, and methods for sectors where multiple are available.
+
+When running the main function you set the directories to save data, the year,
+resolution, and area you want an inventory for.  Years should be between 2010
+and 2022 (as of this writing) and the resolution should not be greater than 0.01
+degrees or 1 square kilometer.
+
+## Background
+
+This tool is developed using a wide variety of published research, publicly
+available datasets, and models.  If you are knowledgeable about any particular
+sector we would greatly appreciate you alerting us to newer information that
+could be incorporated using the Github issues page.
+
+For a full, detailed explanation of the package at the time of its development,
+you should see the published article that is freely available at Earth System
+Science Data ().
+
+Other particularly relevant articles for the various sectors are mentioned
+below when describing the functions in this package.
+
+## Functions
+
+1. General Functions
+   + CH4_inventory_config.R
+      - Place to modify a variety of settings that affect how emissions are calculated
+   + CH4_inventory_main.R
+      - Calls config and runs all sector functions
+   + Prepare_ACES_Vulcan.R
+      - Download the ACES and Vulcan CO~2~ 1 km^2^ inventories for different sectors.  Convert hourly ACES values into annual.  Strongly recommend against using given the large amount of data downloaded (>100 GB).
+      - See publications for [ACES](https://doi.org/10.1002/2017JD027359) and [Vulcan](https://doi.org/10.1029/2020JD032974).  Datasets are publicly available for [ACES](https://doi.org/10.3334/ORNLDAAC/1943) and [Vulcan](https://doi.org/10.3334/ORNLDAAC/1741) as well.
+   + Inventory_based_aggregation.R
+      - Helper function to disaggregate emissions e.g., from the state total to pixels using the CO~2~ inventories.
+   + Plotting_individual_sectors.R
+      - Plotting functions to provide log-scale and linear-scale visuals
+1. Landfills
+   + Landfill_emissions_r1.R
+      - Calculates emissions from municipal solid waste facilities
+1. Natural Gas Distribution
+   + NG_distribution_byLDC_prep.R
+      - Only for those who wish to calculate emissions in more detail - disaggregating from the Local Distribution Company (LDC) values rather than state totals.  This may perform reasonably by default, but generally requires user edits to appropriately match facilities across datasets and update LDC coverage maps. 
+   + NG_distribution_emissions_r4.R
+      - Calculates emissions from the natural gas distribution system, including residential household leaks
+      - See publications [Weller et al.](https://doi.org/10.1021/acs.est.0c00437) discussing emissions measurements for distribution pipelines, [Fischer et al.](https://doi.org/10.1021/acs.est.8b03217) discussing whole-home emissions measurements, and the [Vulcan](https://doi.org/10.1029/2020JD032974) and [ACES](https://doi.org/10.1002/2017JD027359) CO~2~ inventories.
+1. Natural Gas Transmission
+   + NG_transmission_emissions_r1.R
+      - Calculates emissions from the natural gas transmission system (both pipelines and compressor stations)
+1. Stationary Combustion
+   + stationary_combustion_r4.R
+     - Calculates emissions from stationary combustion, excluding residential coal (the U.S. has none) and residential natural gas (handled separately)
+1. Wastewater
+   + NLCD_fractions_by_state.R
+      - Processes the National Land Cover Database (NLCD) to define areas to assign septic emissions
+   + WWTP_emissions_r3.R
+      - Calculates emissions from municipal wastewater treatment plants, septic systems, and industrial wastewater treatment plants
+      - See publications [Homer et al.](https://doi.org/10.1016/j.isprsjprs.2020.02.019) discussing the National Land Cover Database (NLCD) and [Moore et al.](https://doi.org/10.1021/acs.est.2c05373) discussing emissions measurements from municipal wastewater treatment plants
+1. Wetlands and Inland Waters
+   + WETCHARTS_downscaling.R
+      - Disaggregates the WETcharts modeled wetland emissions from 0.5 degrees to 0.1 degrees using land cover
+      - The dataset is publicly available for [Wetcharts](https://doi.org/10.3334/ORNLDAAC/2346)
+   + Wetland_fraction_r2_WIP.R
+      - Calculates freshwater and wetland land area using the National Wetland Inventory
+   + Wetland_emissions_r2.R
+      - Combines freshwater and wetland land area with emission factors to calculate emissions
+      - See the publications [McDonald et al.](https://doi.org/10.4319/lo.2012.57.2.0597) discussing freshwater lakes in the United States and [Rosentreter et al.](https://doi.org/10.1038/s41561-021-00715-2) discussing freshwater emissions.  The [State Of the Carbon Cycle Report version 1](https://www.carboncyclescience.us/state-carbon-cycle-report-soccr) and [State of the Carbon Cycle Report version 2](https://carbon2018.globalchange.gov/) are publicly available
+1. Gridded EPA (GEPA)
+   + Prepare_GEPA.R
+      - Downloads and processes the appropriate gridded EPA emissions data for sectors not included here.  This includes industrial landfills, agricultural emissions, mobile combustion, fossil fuel exploration, fossil fuel production, fossil fuel refining, petroleum transport, the petrochemical industry and the ferroalloy industry.
+      - See the publication [Maasakkers et al.](https://doi.org/10.1021/acs.est.3c05138).  The [GEPA](https://doi.org/10.5281/zenodo.8367082) dataset is publicly available.
+1. Combining sectors
+   + Combiner.R
+     - Combines output from across all sectors and all variations to create all unique combinations of inventories
+
+## Output
+
+For most sectors emissions are calculated for various subsectors before they're
+combined.  Some sectors also have partial output.  To keep the output organized,
+each sector has its own folder in the main output folder.  Subsectors and
+partial output is saved here while sector totals (all variations as defined by
+the config) are saved in the main output folder.  The sector total values are
+named to clarify the combination of subsectors used.  The below lists the
+subsector output for each sector, including all possible variations.  Minor
+variations in the filenames to differentiate subsectors are in **bold**. If you
+are interested in methodology, we recommend you to the paper mentioned in the
+background section or the help files for each individual function.
+
+1. Landfills
+   + MSW_GHGRP_**method**.nc
+      - Municipal Solid Waste (MSW) emissions from the GreenHouse Gas Reporting Program (GHGRP) using 1 of 3 methods.
+      - **method**
+         - **Reported**
+            - Uses values as reported to the GHGRP.  Facilities can choose either method below as their reported value.
+         - **Modeled**
+            - Uses GHGRP method HH-6 emissions which are based on a first order decay model
+         - **Collection_efficiency** 
+            - Uses GHGRP method HH-8 emissions which are based on an assumed landfill gas capture efficiency and the known quantity of gas captured
+   + MSW_LMOP.nc
+      - Municipal Solid Waste (MSW) emissions assigned to Landfill Methane Outreach Program (LMOP) facilities
+1. Natural Gas Distribution
+   + NG_dist_**type_sector_variation_inventory**.nc
+      - **type**
+         - **upset**
+            - upsets - relief valves, blowdowns, and mishaps like dig-ins
+         - **serv**
+            - service pipeline
+         - **post_meter**
+            - all residential emissions after the gas has passed the home's gas meter including leaks from furnaces, stoves, water heaters, pipelines, etc.
+         - **MnR**
+            - Metering and Regulating (MnR) stations
+         - **mains**
+            - main pipeline
+      - **sector**
+         - **res**
+            - residential
+         - **com**
+            - commercial
+      - **variation**
+         - **byLDC**
+            - disaggregating from Local Distribution Company (LDC) total emissions to pixels
+         - **bystate**
+            - disaggregating from state total emissions to pixels
+         - **bydomain**
+            - disaggregating from entire domain total emissions to pixels
+      - **inventory**
+         - **ACES**
+            - using ACES sectoral CO2 inventories to disaggregate to pixels
+         - **Vulcan**
+            - using Vulcan sectoral CO2 inventories to disaggregate to pixels
+1. Natural Gas Transmission
+   + NG_trans_compressors.nc
+      - Natural gas transmission compressor emissions
+   + NG_trans_pipes.nc
+      - Natural gas transmission pipeline emissions
+1. Stationary Combustion
+   + Stat_comb_**sector_fuel_variation_inventory**.nc
+      - **sector**
+         - **res**
+            - residential
+         - **com**
+            - commercial
+         - **elec**
+            - electric
+         - **ind**
+            - industrial
+      - **fuel**
+         - **wood**
+         - **coal**
+         - **petr**
+            - petroleum
+         - **gas**
+            - natural gas
+      - **variation**
+         - **bystate**
+            - disaggregating from state total emissions to pixels
+         - **bydomain**
+            - disaggregating from entire domain total emissions to pixels
+      - **inventory**
+         - **ACES**
+            - using ACES sectoral CO2 inventories to disaggregate to pixels
+         - **Vulcan**
+            - using Vulcan sectoral CO2 inventories to disaggregate to pixels
+1. Wastewater
+   + Wastewater_ind.nc
+      - Industrial wastewater facility emissions
+   + Wastewater_**input_method**_dom_central.nc
+      - Municipal wastewater treatment facility emissions
+      - **input**
+         - **CWNS**
+            - Uses the Clean Watershed Needs Survey (CWNS) to get the flow handled by each facility
+         - **DMR**
+            - Uses the Discharge Monitoring Reports (DMR) to get the flow handled by each facility
+      - **method**
+         - **GHGI** 
+            - Disaggregates the GreenHouse Gas Inventory (GHGI) national total emissions to each facility assuming they're proportional to flow handled
+         - **ML**
+            - Calculates emissions using the Moore et al. log-log Linear (ML) relationship between flow handled and emissions determined using measurements
+   + Wastewater_dom_septic_**scale**.nc
+      - Septic emissions
+      - **scale**
+         - **bystate**
+            - calculated using state-specific septic data
+         - **national**
+            - calculated using the fraction of open / low density urban land cover relative to the national total
+1. Wetlands and Inland Waters
+   + Wetcharts_**landcover**_downscaled_subset_**N**.nc
+      - Wetland emissions from WETcharts downscaled from 0.5 degress to 0.1 degrees using landcover
+      - **landcover**
+         - **NLDC**
+            - National Land Cover Database (NLCD)
+         - **NACLMS**
+            - North American Land Change Monitoring System (NALCMS)
+      - **N**
+         - Sequential.  You can select different subsets of wetcharts models and these will be calculated sequentially as input in the config.
+   + SOCCR1.nc
+      - Wetland emissions using the National Wetlands Inventory (NWI) and State Of the Carbon Cycle Report (SOCCR) version 1 emission factors
+   + SOCCR2.nc
+      - Wetland emissions using the National Wetlands Inventory (NWI) and State Of the Carbon Cycle Report (SOCCR) version 2 emission factors
+   + Freshwater.nc
+      - Freshwater emissions using the National Wetlands Inventory (NWI) and [Rosentreter et al.](https://doi.org/10.1038/s41561-021-00715-2) emission factors
+1. Gridded EPA (GEPA)
+   + GEPA_ind_landfill.nc
+      - industrial landfill emissions
+   + GEPA_non_thermo.nc
+      - non-thermogenic emissions (composting, manure, enteric fermentation, rice cultivation, and field burning)
+   + GEPA_thermo.nc
+      - thermogenic emissions (mobile combustion, fossil fuel exploration, fossil fuel production, fossil fuel refining, petroleum transport, the petrochemical industry and the ferroalloy industry)
+1. Combining sectors
+   + a separate folder will be created with each unique combination of sectors saved numerically.  A csv will also be saved which provides a clear legend detailing which variations are in each inventory file.
+
+## Installation
+This package is available from CRAN, so you can use install.packages("this
+package") to get the current released version.
+
+# NIST default information:
 # NIST Open-Source Software Repository Template
 
 Use of GitHub by NIST employees for government work is subject to
