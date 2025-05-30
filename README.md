@@ -190,7 +190,7 @@ background section or the help files for each individual function.
          - **national**
             - calculated using the fraction of open / low density urban land cover relative to the national total
 1. Wetlands and Inland Waters
-   + Wetcharts_**{landcover}**_downscaled_subset_**{N}**.nc
+   + Wetcharts_**landcover_**downscaled_subset_**N**.nc
       - Wetland emissions from WetCHARTs downscaled from 0.5 degress to 0.1 degrees using landcover
       - **landcover**
          - **NLDC**
