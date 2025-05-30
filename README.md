@@ -35,10 +35,10 @@ below when describing the functions in this package.
    + CH4_inventory_main.R
       - Calls config and runs all sector functions
    + Prepare_ACES_Vulcan.R
-      - Download the ACES and Vulcan CO~2~ 1 km^2^ inventories for different sectors.  Convert hourly ACES values into annual.  Strongly recommend against using given the large amount of data downloaded (>100 GB).
+      - Download the ACES and Vulcan CO₂ 1 km² inventories for different sectors.  Convert hourly ACES values into annual.  Strongly recommend against using given the large amount of data downloaded (>100 GB).
       - See publications for [ACES](https://doi.org/10.1002/2017JD027359) and [Vulcan](https://doi.org/10.1029/2020JD032974).  Datasets are publicly available for [ACES](https://doi.org/10.3334/ORNLDAAC/1943) and [Vulcan](https://doi.org/10.3334/ORNLDAAC/1741) as well.
    + Inventory_based_aggregation.R
-      - Helper function to disaggregate emissions e.g., from the state total to pixels using the CO~2~ inventories.
+      - Helper function to disaggregate emissions e.g., from the state total to pixels using the CO₂ inventories.
    + Plotting_individual_sectors.R
       - Plotting functions to provide log-scale and linear-scale visuals
 1. Landfills
@@ -49,7 +49,7 @@ below when describing the functions in this package.
       - Only for those who wish to calculate emissions in more detail - disaggregating from the Local Distribution Company (LDC) values rather than state totals.  This may perform reasonably by default, but generally requires user edits to appropriately match facilities across datasets and update LDC coverage maps. 
    + NG_distribution_emissions_r4.R
       - Calculates emissions from the natural gas distribution system, including residential household leaks
-      - See publications [Weller et al.](https://doi.org/10.1021/acs.est.0c00437) discussing emissions measurements for distribution pipelines, [Fischer et al.](https://doi.org/10.1021/acs.est.8b03217) discussing whole-home emissions measurements, and the [Vulcan](https://doi.org/10.1029/2020JD032974) and [ACES](https://doi.org/10.1002/2017JD027359) CO~2~ inventories.
+      - See publications [Weller et al.](https://doi.org/10.1021/acs.est.0c00437) discussing emissions measurements for distribution pipelines, [Fischer et al.](https://doi.org/10.1021/acs.est.8b03217) discussing whole-home emissions measurements, and the [Vulcan](https://doi.org/10.1029/2020JD032974) and [ACES](https://doi.org/10.1002/2017JD027359) CO₂ inventories.
 1. Natural Gas Transmission
    + NG_transmission_emissions_r1.R
       - Calculates emissions from the natural gas transmission system (both pipelines and compressor stations)
@@ -64,8 +64,8 @@ below when describing the functions in this package.
       - See publications [Homer et al.](https://doi.org/10.1016/j.isprsjprs.2020.02.019) discussing the National Land Cover Database (NLCD) and [Moore et al.](https://doi.org/10.1021/acs.est.2c05373) discussing emissions measurements from municipal wastewater treatment plants
 1. Wetlands and Inland Waters
    + WETCHARTS_downscaling.R
-      - Disaggregates the WETcharts modeled wetland emissions from 0.5 degrees to 0.1 degrees using land cover
-      - The dataset is publicly available for [Wetcharts](https://doi.org/10.3334/ORNLDAAC/2346)
+      - Disaggregates the WetCHARTs modeled wetland emissions from 0.5 degrees to 0.1 degrees using land cover
+      - The dataset is publicly available for [WetCHARTs](https://doi.org/10.3334/ORNLDAAC/2346)
    + Wetland_fraction_r2_WIP.R
       - Calculates freshwater and wetland land area using the National Wetland Inventory
    + Wetland_emissions_r2.R
@@ -131,9 +131,9 @@ background section or the help files for each individual function.
             - disaggregating from entire domain total emissions to pixels
       - **inventory**
          - **ACES**
-            - using ACES sectoral CO2 inventories to disaggregate to pixels
+            - using ACES sectoral CO₂ inventories to disaggregate to pixels
          - **Vulcan**
-            - using Vulcan sectoral CO2 inventories to disaggregate to pixels
+            - using Vulcan sectoral CO₂ inventories to disaggregate to pixels
 1. Natural Gas Transmission
    + NG_trans_compressors.nc
       - Natural gas transmission compressor emissions
@@ -164,9 +164,9 @@ background section or the help files for each individual function.
             - disaggregating from entire domain total emissions to pixels
       - **inventory**
          - **ACES**
-            - using ACES sectoral CO2 inventories to disaggregate to pixels
+            - using ACES sectoral CO₂ inventories to disaggregate to pixels
          - **Vulcan**
-            - using Vulcan sectoral CO2 inventories to disaggregate to pixels
+            - using Vulcan sectoral CO₂ inventories to disaggregate to pixels
 1. Wastewater
    + Wastewater_ind.nc
       - Industrial wastewater facility emissions
@@ -190,15 +190,15 @@ background section or the help files for each individual function.
          - **national**
             - calculated using the fraction of open / low density urban land cover relative to the national total
 1. Wetlands and Inland Waters
-   + Wetcharts_**landcover**_downscaled_subset_**N**.nc
-      - Wetland emissions from WETcharts downscaled from 0.5 degress to 0.1 degrees using landcover
+   + Wetcharts_**{landcover}**_downscaled_subset_**{N}**.nc
+      - Wetland emissions from WetCHARTs downscaled from 0.5 degress to 0.1 degrees using landcover
       - **landcover**
          - **NLDC**
             - National Land Cover Database (NLCD)
          - **NACLMS**
             - North American Land Change Monitoring System (NALCMS)
       - **N**
-         - Sequential.  You can select different subsets of wetcharts models and these will be calculated sequentially as input in the config.
+         - Sequential.  You can select different subsets of WetCHARTs models and these will be calculated sequentially as input in the config.
    + SOCCR1.nc
       - Wetland emissions using the National Wetlands Inventory (NWI) and State Of the Carbon Cycle Report (SOCCR) version 1 emission factors
    + SOCCR2.nc
