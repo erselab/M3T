@@ -91,6 +91,9 @@ NWI_Wetland_fraction <- function(input_directory,
   
   starttime <- Sys.time()
   cat("Starting wetland sector: NWI_Wetland_fraction\n")
+  
+  NWI_output_directory <- paste0(output_directory,"Wetlands/processed_NWI_data/")
+  dir.create(NWI_output_directory,showWarnings = F,recursive = T)
   ################################################################################
   #Some settings
   
@@ -98,15 +101,11 @@ NWI_Wetland_fraction <- function(input_directory,
   NWI_url <- "https://documentst.ecosphere.fws.gov/wetlands/data/State-Downloads/"
   
   ################################################################################
-  #create input/output folders (multiple nested folders will be created via
-  #download)
+  #create input folder for raw NWI data
   
   dir.create(paste0(input_directory,"NWI"),showWarnings = F)
-  dir.create(paste0(output_directory,"Wetland_NWI"),showWarnings = F)
-  
   NWI_input_directory <- paste0(input_directory,"NWI/")
-  NWI_output_directory <- paste0(output_directory,"Wetland_NWI/")
-  
+
   ################################################################################
   #Create a function that will reproject to the proper CRS and then rasterize,
   #and account for invalid polygons if they exist
@@ -275,7 +274,12 @@ NWI_Wetland_fraction <- function(input_directory,
         rasterize_plus(PNF)
       }
     }
-    cat("Finished processing",state_name_list[i],"which is",i,"of",length(state_name_list),"at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n\n")
+    #minor - just have one less newline at the end if this is the last one
+    if(i==length(state_name_list)){
+      cat("Finished processing",state_name_list[i],"which is",i,"of",length(state_name_list),"at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
+    }else{
+      cat("Finished processing",state_name_list[i],"which is",i,"of",length(state_name_list),"at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n\n")
+    }
   }
   cat("Finished wetland sector: NWI_Wetland_fraction in",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
 }
