@@ -28,9 +28,8 @@
 #'
 #'  The appropriate year of Wetcharts v1.3.1 will be automatically downloaded.
 #'
-#'  Wetcharts is available at
-#'  \url{https://daac.ornl.gov/CMS/guides/MonthlyWetland_CH4_WetCHARTs.html},
-#'  the NLCD is available at
+#'  Wetcharts is available at \url{https://doi.org/10.3334/ORNLDAAC/2346}, the
+#'  NLCD is available at
 #'  \url{https://www.mrlc.gov/data?f%5B0%5D=category%3ALand%20Cover&f%5B1%5D=region%3Aconus},
 #'  and the NALCMS is available at
 #'  \url{http://www.cec.org/north-american-land-change-monitoring-system/}.
@@ -60,6 +59,8 @@
 #'  simultaneously.  This is far faster than running them separately as
 #'  landcover processing is more time consuming and avoided if running multiple
 #'  wetcharts subsets simultaneously.
+#'@param Wetcharts_file Character providing the full filepath to the Wetcharts
+#'  model file
 #'@param inventory_year Character indicating the desired year of data to use.
 #'@param plot_directory Character providing the full filepath to save figures.
 #'  Only relevant if verbose = TRUE.
@@ -72,15 +73,15 @@
 #'  \url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.
 #'  Only relevant if verbose=TRUE.
 #'@returns Nothing is returned from the function, but the main outputs are
-#'  netcdf files of the methane emissions from wetlands with 1 file per
-#'  land cover used and per model subset.  They are titled
+#'  netcdf files of the methane emissions from wetlands with 1 file per land
+#'  cover used and per model subset.  They are titled
 #'  "Wetcharts_landcover_Downscaled_subset_A.nc" where landcover is NLCD or
 #'  NALCMS and A is just a numeric to identify which model subset, in case
 #'  multiple were set.
 #'
 #'  If verbose is set to TRUE, then multiple figures are also saved.  Log scale
-#'  plots with consistent axes are saved for each model subset and land
-#'  cover used.  They are named "Wetcharts_landcover_subset_A_annual.png" where
+#'  plots with consistent axes are saved for each model subset and land cover
+#'  used.  They are named "Wetcharts_landcover_subset_A_annual.png" where
 #'  landcover is NLCD or NALCMS, A is a numeric to identify the model subset.
 #'@examples
 #'library(terra)
@@ -92,7 +93,7 @@
 #'              xmax=max(grid_bbox[,1]), ymin=min(grid_bbox[,2]), ymax=max(grid_bbox[,2]),
 #'              crs=grid_crs)
 #' grid_vect <- as.polygons(ext(grid),crs=grid_crs)
-#' 
+#'
 #' Disaggregate_Wetcharts(input_directory="~/../Desktop/in/",
 #'                        output_directory="~/../Desktop/out/",
 #'                        domain=grid_vect,
@@ -133,43 +134,47 @@ Disaggregate_Wetcharts <- function(input_directory,
                                    Use_NALCMS,
                                    NLCD_file,
                                    NALCMS_file,
+                                   Wetcharts_file,
                                    Wetcharts_model_subset){
   
   starttime <- Sys.time()
   cat("Starting wetland sector: Disaggregate_Wetcharts\n")
+  
+  Wetland_output_directory <- paste0(output_directory,"Wetlands/")
+  dir.create(Wetland_output_directory,showWarnings = F)
   ################################################################################
   #download and load in  wetcharts
   
-  #first use the catalog and webscrape then use grep to identify the years of
-  #available files
-  Wetcharts_catalog_url <- "https://thredds.daac.ornl.gov/thredds/catalog/ornldaac/1915/catalog.html"
-  Wetcharts_page <- readLines(Wetcharts_catalog_url)
-  Wetcharts_page <- Wetcharts_page[grep(glob2rx("*WetCHARTs_v1_3_1_*.nc*"),Wetcharts_page)]
-  Wetcharts_years <- regexpr("WetCHARTs_v1_3_1_.*.nc",Wetcharts_page)
-  Wetcharts_years <- as.numeric(substring(Wetcharts_page,Wetcharts_years+17,Wetcharts_years+17+3))
-  
-  #actually use whichever is closest to the inventory_year, update the user if
-  #this isn't actually the inventory_year
-  Wetcharts_year <- Wetcharts_years[which.min(abs(Wetcharts_years-inventory_year))]
-  if(inventory_year!=Wetcharts_year){
-    cat("Wetcharts does not include",inventory_year,"using",Wetcharts_year,"as the nearest data available\n")
-  }
-  
-  Wetcharts_file <- paste0(input_directory,"WetCHARTs_v1_3_1_",Wetcharts_year,".nc")
-  
-  if(!file.exists(Wetcharts_file)){
-    cat("Downloading Wetcharts data, this may take a few minutes\n")
-
-    #download the data.  URL is slightly different than the catalog.  See
-    #https://thredds.daac.ornl.gov/thredds/catalog/ornldaac/1915/catalog.html?dataset=1915/WetCHARTs_v1_3_1_2001.nc
-    #for details on using thredds for this dataset and
-    #https://docs.unidata.ucar.edu/tds/current/userguide/index.html for THREDDS in
-    #general.
-    data_URL <- paste0("https://thredds.daac.ornl.gov/thredds/fileServer/ornldaac/1915/WetCHARTs_v1_3_1_",Wetcharts_year,".nc")
-    Trycatch_downloader(data_URL,output_location=paste0(input_directory,"WetCHARTs_v1_3_1_",Wetcharts_year,".nc"),
-                        method="save",
-                        error_message=paste0("\nFailed to download Wetcharts data from the DAAC THREDDS database at URL",data_URL))
-  }
+  # #first use the catalog and webscrape then use grep to identify the years of
+  # #available files
+  # Wetcharts_catalog_url <- "https://thredds.daac.ornl.gov/thredds/catalog/ornldaac/1915/catalog.html"
+  # Wetcharts_page <- readLines(Wetcharts_catalog_url)
+  # Wetcharts_page <- Wetcharts_page[grep(glob2rx("*WetCHARTs_v1_3_1_*.nc*"),Wetcharts_page)]
+  # Wetcharts_years <- regexpr("WetCHARTs_v1_3_1_.*.nc",Wetcharts_page)
+  # Wetcharts_years <- as.numeric(substring(Wetcharts_page,Wetcharts_years+17,Wetcharts_years+17+3))
+  # 
+  # #actually use whichever is closest to the inventory_year, update the user if
+  # #this isn't actually the inventory_year
+  # Wetcharts_year <- Wetcharts_years[which.min(abs(Wetcharts_years-inventory_year))]
+  # if(inventory_year!=Wetcharts_year){
+  #   cat("Wetcharts does not include",inventory_year,"using",Wetcharts_year,"as the nearest data available\n")
+  # }
+  # 
+  # Wetcharts_file <- paste0(input_directory,"WetCHARTs_v1_3_1_",Wetcharts_year,".nc")
+  # 
+  # if(!file.exists(Wetcharts_file)){
+  #   cat("Downloading Wetcharts data, this may take a few minutes\n")
+  # 
+  #   #download the data.  URL is slightly different than the catalog.  See
+  #   #https://thredds.daac.ornl.gov/thredds/catalog/ornldaac/1915/catalog.html?dataset=1915/WetCHARTs_v1_3_1_2001.nc
+  #   #for details on using thredds for this dataset and
+  #   #https://docs.unidata.ucar.edu/tds/current/userguide/index.html for THREDDS in
+  #   #general.
+  #   data_URL <- paste0("https://thredds.daac.ornl.gov/thredds/fileServer/ornldaac/1915/WetCHARTs_v1_3_1_",Wetcharts_year,".nc")
+  #   Trycatch_downloader(data_URL,output_location=paste0(input_directory,"WetCHARTs_v1_3_1_",Wetcharts_year,".nc"),
+  #                       method="save",
+  #                       error_message=paste0("\nFailed to download Wetcharts data from the DAAC THREDDS database at URL",data_URL))
+  # }
   
   Wetcharts <- rast(Wetcharts_file)
   ################################################################################
@@ -191,7 +196,7 @@ Disaggregate_Wetcharts <- function(input_directory,
     NALCMS <- crop(NALCMS,
                    project(x=ext(Wetcharts),from=crs(Wetcharts),to=crs(NALCMS)))
   }
-  cat("Finished loading in all data at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
+  cat("Finished loading in all data at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start. Next step is time-consuming.\n")
   ################################################################################
   #set wetlands to a value of 1 and all other land cover to 0, then project to
   #domain CRS at 0.1 deg.
@@ -313,6 +318,12 @@ Disaggregate_Wetcharts <- function(input_directory,
   Averaged_wetcharts <- lapply(Averaged_wetcharts,FUN=function(x){
     x*1e9/(1000*16.043*24*3600)})
   
+  #convert any NA's to 0's.  Wetcharts sets any pixels including ocean to NA.
+  #We use NA to mean outside domain, so 0 makes more sense for these.
+  for(B in 1:length(Wetcharts_model_subset)){
+    Averaged_wetcharts[[B]][is.na(Averaged_wetcharts[[B]])] <- 0
+  }
+  
   ################################################################################
   #disaggregate Wetcharts using wetland fractions from the landcover
   
@@ -409,7 +420,7 @@ Disaggregate_Wetcharts <- function(input_directory,
   for(B in 1:length(Downscaled_Averaged_wetcharts)){
     if(Use_NLCD){
       writeCDF(NLCD_Downscaled_Averaged_wetcharts[[B]],
-               paste0(output_directory,'/Wetcharts_NLCD_Downscaled_subset_',B,'.nc'),
+               paste0(Wetland_output_directory,'/Wetcharts_NLCD_Downscaled_subset_',B,'.nc'),
                force_v4=TRUE,
                varname='methane_emissions',
                unit='nmol/m2/s',
@@ -419,7 +430,7 @@ Disaggregate_Wetcharts <- function(input_directory,
     }
     if(Use_NALCMS){
       writeCDF(NALCMS_Downscaled_Averaged_wetcharts[[B]],
-               paste0(output_directory,'/Wetcharts_NALCMS_Downscaled_subset_',B,'.nc'),
+               paste0(Wetland_output_directory,'/Wetcharts_NALCMS_Downscaled_subset_',B,'.nc'),
                force_v4=TRUE,
                varname='methane_emissions',
                unit='nmol/m2/s',
