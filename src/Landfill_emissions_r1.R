@@ -185,6 +185,9 @@ Municipal_solid_waste <- function(input_directory,
   
   starttime <- Sys.time()
   cat("Starting landfill sector: Municipal_solid_waste\n")
+  
+  Landfill_output_directory <- paste0(output_directory,"Landfills/")
+  dir.create(Landfill_output_directory,showWarnings = F)
   ################################################################################
   #Download the relevant emissions data using the API
   #(https://www.epa.gov/enviro/envirofacts-data-service-api)
@@ -244,11 +247,11 @@ Municipal_solid_waste <- function(input_directory,
   
   ghgrp_landfill_only_emissions <- make_consistent(ghgrp_landfill_only_emissions)
   ghgrp_combustion_emissions <- make_consistent(ghgrp_combustion_emissions)
-
+  
   #rename so the columns are different
   colnames(ghgrp_landfill_only_emissions) <- gsub("ghg_quantity","HH_emissions",colnames(ghgrp_landfill_only_emissions))
   colnames(ghgrp_combustion_emissions) <- gsub("ghg_quantity","C_emissions",colnames(ghgrp_combustion_emissions))
-
+  
   #combine them into 1 dataframe - using landfill emissions as the base to get
   #ID/year matches from
   ghgrp_landfill_emissions=Reduce(function(dtf1, dtf2){merge(dtf1, dtf2, by = c("facility_id","year","facility_name","ghg_name"), all.x = TRUE)},
@@ -284,7 +287,7 @@ Municipal_solid_waste <- function(input_directory,
   # write.csv(big_GHGRP_errors,file = "GHGRP_landfill_errors.csv",row.names = F)
   # write.csv(GHGRP_errors,file = "GHGRP_landfill_minor_errors.csv",row.names = F)
   
-
+  
   #convert the relevant columns to numeric class
   ghgrp_landfill_emissions[,c("HH_emissions","C_emissions","HH_modeled","HH_collection_efficiency")] <- apply(ghgrp_landfill_emissions[,c("HH_emissions","C_emissions","HH_modeled","HH_collection_efficiency")],
                                                                                                               2,FUN = function(x){as.numeric(x)})
@@ -366,13 +369,13 @@ Municipal_solid_waste <- function(input_directory,
         ghgrp_crop <- ghgrp_crop[order(ghgrp_crop$facility_name.x),]
         
         # Save point sources as csv files - first just the raw dataframe
-        write.csv(ghgrp_crop, file.path(output_directory,'MSW_GHGRP_all.csv'))
+        write.csv(ghgrp_crop, file.path(Landfill_output_directory,'MSW_GHGRP_all.csv'))
       }
     }
     
     # Now write the raster as a netcdf files
     writeCDF(ghgrp_flux,
-             file.path(output_directory,outname),
+             file.path(Landfill_output_directory,outname),
              force_v4=TRUE,
              varname='methane_emissions',
              unit='nmol/m2/s',
@@ -453,7 +456,9 @@ Municipal_solid_waste <- function(input_directory,
   
   #Exclude those we already handled as they stopped reporting without a valid
   #reason.
-  LMOP_crop <- LMOP_crop[!(LMOP_crop$`GHGRP ID` %in% nonreporting_landfill_data$facility_id),]
+  if(length(nonreporting_landfill_data)>0){
+    LMOP_crop <- LMOP_crop[!(LMOP_crop$`GHGRP ID` %in% nonreporting_landfill_data$facility_id),]
+  }
   
   # Find avg emission per non-GHGRP LMOP landfill (including the ones with no coordinates)
   avg_non_ghgrp <- non_ghgrp_total/nrow(LMOP_non_ghgrp)
@@ -464,7 +469,7 @@ Municipal_solid_waste <- function(input_directory,
   #Gg CH4/yr to mol/s of CH4
   ################################################################################
   # Now rasterise and save
-
+  
   LMOP_rast <- rasterize(LMOP_crop, domain_template, field="emiss", fun=sum)
   # Calculate flux, mol/s to nmol/m2/s
   LMOP_flux <- LMOP_rast*1e9/(cellSize(LMOP_rast,unit="m"))
@@ -475,12 +480,12 @@ Municipal_solid_waste <- function(input_directory,
     if(nrow(LMOP_crop)>0){
       LMOP_crop <- LMOP_crop[order(LMOP_crop$`Landfill Name`),]
       
-      write.csv(LMOP_crop, file.path(output_directory,"MSW_LMOP_all.csv"))
+      write.csv(LMOP_crop, file.path(Landfill_output_directory,"MSW_LMOP_all.csv"))
     }
   }
   
   writeCDF(LMOP_flux,
-           file.path(output_directory,'MSW_LMOP.nc'),
+           file.path(Landfill_output_directory,'MSW_LMOP.nc'),
            force_v4=TRUE,
            varname='methane_emissions',
            unit='nmol/m2/s',
@@ -490,48 +495,92 @@ Municipal_solid_waste <- function(input_directory,
   
   
   ################################################################################
+  #Create a sector total, 1 per variant
+  
+  if(landfill_ghgrp_reported){
+    writeCDF(LMOP_flux+ghgrp_reported,
+             file.path(output_directory,paste0('Landfill_sector_total_GHGRP_reported.nc')),
+             force_v4=TRUE,
+             varname='methane_emissions',
+             unit='nmol/m2/s',
+             longname='Methane emissions from municipal solid waste landfills',
+             missval=-9999,
+             overwrite=TRUE)
+  }
+  
+  if(landfill_ghgrp_modeled){
+    writeCDF(LMOP_flux+ghgrp_modeled,
+             file.path(output_directory,paste0('Landfill_sector_total_GHGRP_modeled.nc')),
+             force_v4=TRUE,
+             varname='methane_emissions',
+             unit='nmol/m2/s',
+             longname='Methane emissions from municipal solid waste landfills',
+             missval=-9999,
+             overwrite=TRUE)
+  }
+  
+  if(landfill_ghgrp_collection_efficiency){
+    writeCDF(LMOP_flux+ghgrp_collection_efficiency,
+             file.path(output_directory,paste0('Landfill_sector_total_GHGRP_collection_efficiency.nc')),
+             force_v4=TRUE,
+             varname='methane_emissions',
+             unit='nmol/m2/s',
+             longname='Methane emissions from municipal solid waste landfills',
+             missval=-9999,
+             overwrite=TRUE)
+  }
+  
+  ################################################################################
   #Finally, load up some functions and plot up this output nicely
   
   if(verbose){
     LMOP_flux[LMOP_flux==0] <- NA
+    zlim_min <- global(LMOP_flux,min,na.rm=T)
+    zlim_max <- global(LMOP_flux,max,na.rm=T)
     
     if(landfill_ghgrp_reported){
       ghgrp_reported[ghgrp_reported==0] <- NA
+      zlim_max <- max(global(ghgrp_reported,max,na.rm=T),zlim_max,na.rm=T)
+      zlim_min <- min(global(ghgrp_reported,min,na.rm=T),zlim_min,na.rm=T)
     }
     
     if(landfill_ghgrp_modeled){
       ghgrp_modeled[ghgrp_modeled==0] <- NA
+      zlim_max <- max(global(ghgrp_modeled,max,na.rm=T),zlim_max,na.rm=T)
+      zlim_min <- min(global(ghgrp_modeled,min,na.rm=T),zlim_min,na.rm=T)
     }
     
     if(landfill_ghgrp_collection_efficiency){
       ghgrp_collection_efficiency[ghgrp_collection_efficiency==0] <- NA
+      zlim_max <- max(global(ghgrp_collection_efficiency,max,na.rm=T),zlim_max,na.rm=T)
+      zlim_min <- min(global(ghgrp_collection_efficiency,min,na.rm=T),zlim_min,na.rm=T)
     }
+    zlim_max <- log10(zlim_max)
+    zlim_min <- log10(zlim_min)
     
     
-    zlim_min <- log10(min(global(ghgrp_reported,min,na.rm=T),
-                          global(ghgrp_modeled,min,na.rm=T),
-                          global(ghgrp_collection_efficiency,min,na.rm=T),
-                          global(LMOP_flux,min,na.rm=T),na.rm=T))
-    zlim_max <- log10(max(global(ghgrp_reported,max,na.rm=T),
-                          global(ghgrp_modeled,max,na.rm=T),
-                          global(ghgrp_collection_efficiency,max,na.rm=T),
-                          global(LMOP_flux,max,na.rm=T),na.rm=T))
-    
-    log_plot(ghgrp_reported,filename="MSW_GHGRP_reported",
-             "Municipal Solid Waste -\n GHGRP reporters",
-             zlim_min=zlim_min,zlim_max=zlim_max,plot_directory=plot_directory,
-             domain=domain,County_Tigerlines=County_Tigerlines,
-             State_Tigerlines=State_Tigerlines)
-    log_plot(ghgrp_modeled,filename="MSW_GHGRP_modeled",
-             "Municipal Solid Waste -\n GHGRP reporters - decay model based emissions",
-             zlim_min=zlim_min,zlim_max=zlim_max,plot_directory=plot_directory,
-             domain=domain,County_Tigerlines=County_Tigerlines,
-             State_Tigerlines=State_Tigerlines)
-    log_plot(ghgrp_collection_efficiency,filename="MSW_GHGRP_collection_efficiency",
-             "Municipal Solid Waste -\n GHGRP reporters - collection efficiency based\nemissions",
-             zlim_min=zlim_min,zlim_max=zlim_max,plot_directory=plot_directory,
-             domain=domain,County_Tigerlines=County_Tigerlines,
-             State_Tigerlines=State_Tigerlines)
+    #now actually do the plotting
+    if(landfill_ghgrp_reported){
+      log_plot(ghgrp_reported,filename="MSW_GHGRP_reported",
+               "Municipal Solid Waste -\n GHGRP reporters",
+               zlim_min=zlim_min,zlim_max=zlim_max,plot_directory=plot_directory,
+               domain=domain,County_Tigerlines=County_Tigerlines,
+               State_Tigerlines=State_Tigerlines)
+    }
+    if(landfill_ghgrp_modeled){
+      log_plot(ghgrp_modeled,filename="MSW_GHGRP_modeled",
+               "Municipal Solid Waste -\n GHGRP reporters - decay model based emissions",
+               zlim_min=zlim_min,zlim_max=zlim_max,plot_directory=plot_directory,
+               domain=domain,County_Tigerlines=County_Tigerlines,
+               State_Tigerlines=State_Tigerlines)
+    }
+    if(landfill_ghgrp_collection_efficiency){
+      log_plot(ghgrp_collection_efficiency,filename="MSW_GHGRP_collection_efficiency",
+               "Municipal Solid Waste -\n GHGRP reporters - collection efficiency based\nemissions",
+               zlim_min=zlim_min,zlim_max=zlim_max,plot_directory=plot_directory,
+               domain=domain,County_Tigerlines=County_Tigerlines,
+               State_Tigerlines=State_Tigerlines)
+    }
     log_plot(LMOP_flux,filename="MSW_LMOP",
              "Municipal Solid Waste -\n (GHGI - GHGRP) distributed using \nLandfill Methane Outreach Program",
              zlim_min=zlim_min,zlim_max=zlim_max,plot_directory=plot_directory,
