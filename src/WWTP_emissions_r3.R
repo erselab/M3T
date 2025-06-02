@@ -361,7 +361,10 @@ Wastewater <- function(input_directory,
   starttime <- Sys.time()
   cat("Starting wastewater sector: Wastewater\n")
   
-  Wastewater_partial_output_directory <- paste0(output_directory,"Wastewater_NLCD_data/")
+  Wastewater_partial_output_directory <- paste0(output_directory,"Wastewater/processed_NLCD_data/")
+  
+  Wastewater_output_directory <- paste0(output_directory,"Wastewater/")
+  dir.create(Wastewater_output_directory,showWarnings = F)
   ################################################################################
   # First load in and prep the flow data
   
@@ -485,12 +488,12 @@ Wastewater <- function(input_directory,
         name_index <- grep("facility_name",colnames(input_crop_filt_df),ignore.case = T)
         
         #a small csv with only the relevant columns and another with all columns
-        write.csv(input_crop_filt, paste0(output_directory,'/',outputname,"_all.csv"),row.names = F)
+        write.csv(input_crop_filt, paste0(Wastewater_output_directory,'/',outputname,"_all.csv"),row.names = F)
         output <- data.frame(input_crop_filt_df[name_index],
                              geom(input_crop_filt)[,"x"],geom(input_crop_filt)[,"y"],
                              input_crop_filt_df$emiss)
         colnames(output) <- c('Site_Name','Longitude','Latitude','Emission_mol_per_s')
-        write.csv(output,paste0(output_directory,'/',outputname,'.csv'),row.names=FALSE)
+        write.csv(output,paste0(Wastewater_output_directory,'/',outputname,'.csv'),row.names=FALSE)
       }
     }
     
@@ -656,7 +659,7 @@ Wastewater <- function(input_directory,
     Wastewater_State_info$State_to_national_method_ratio <- Wastewater_State_info$State_based_septic_emissions_mol_per_s/Wastewater_State_info$National_based_septic_emissions_mol_per_s
     if(verbose){
       #now save the comparison across the methods
-      write.csv(Wastewater_State_info, file.path(output_directory,"WWTP_septic_method_comparison.csv"),row.names = F)
+      write.csv(Wastewater_State_info, file.path(Wastewater_output_directory,"WWTP_septic_method_comparison.csv"),row.names = F)
     }
   }
   cat("Finished calculating septic emissions at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
@@ -712,14 +715,14 @@ Wastewater <- function(input_directory,
   if(verbose){
     if(nrow(ghgrp_crop)>0){
       # Save point sources as csv files - first just the raw dataframe
-      write.csv(ghgrp_crop, file.path(output_directory,"WWTP_industrial_all.csv"))
+      write.csv(ghgrp_crop, file.path(Wastewater_output_directory,"WWTP_industrial_all.csv"))
       
       # Now just the names, coordinates and emissions
       ghgrp_crop_output <- data.frame(ghgrp_crop$facility_name.x,
                                       geom(ghgrp_crop)[,"x"],geom(ghgrp_crop)[,"y"],
                                       ghgrp_crop$emiss)
       names(ghgrp_crop_output) <- c('Site_Name','Longitude','Latitude','Emission_mol_per_s')
-      write.csv(ghgrp_crop_output, file.path(output_directory,"WWTP_industrial.csv"),row.names = F)
+      write.csv(ghgrp_crop_output, file.path(Wastewater_output_directory,"WWTP_industrial.csv"),row.names = F)
     }
   }
   cat("Finished calculating industrial treatment plant emissions at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
@@ -729,7 +732,7 @@ Wastewater <- function(input_directory,
   if(Wastewater_Municipal_Method_GHGI){
     if(Wastewater_use_CWNS){
       writeCDF(WWTP_CWNS_GHGI_municipal,
-               file.path(output_directory,'Wastewater_CWNS_GHGI_dom_central.nc'),
+               file.path(Wastewater_output_directory,'Wastewater_CWNS_GHGI_dom_central.nc'),
                force_v4=TRUE,
                varname='methane_emissions',
                unit='nmol/m2/s',
@@ -739,7 +742,7 @@ Wastewater <- function(input_directory,
     }
     if(Wastewater_use_DMR){
       writeCDF(WWTP_DMR_GHGI_municipal,
-               file.path(output_directory,'Wastewater_DMR_GHGI_dom_central.nc'),
+               file.path(Wastewater_output_directory,'Wastewater_DMR_GHGI_dom_central.nc'),
                force_v4=TRUE,
                varname='methane_emissions',
                unit='nmol/m2/s',
@@ -751,7 +754,7 @@ Wastewater <- function(input_directory,
   if(Wastewater_Municipal_Method_Moore_linear){
     if(Wastewater_use_CWNS){
       writeCDF(WWTP_CWNS_ML_municipal,
-               file.path(output_directory,'Wastewater_CWNS_ML_dom_central.nc'),
+               file.path(Wastewater_output_directory,'Wastewater_CWNS_ML_dom_central.nc'),
                force_v4=TRUE,
                varname='methane_emissions',
                unit='nmol/m2/s',
@@ -761,7 +764,7 @@ Wastewater <- function(input_directory,
     }
     if(Wastewater_use_DMR){
       writeCDF(WWTP_DMR_ML_municipal,
-               file.path(output_directory,'Wastewater_DMR_ML_dom_central.nc'),
+               file.path(Wastewater_output_directory,'Wastewater_DMR_ML_dom_central.nc'),
                force_v4=TRUE,
                varname='methane_emissions',
                unit='nmol/m2/s',
@@ -772,7 +775,7 @@ Wastewater <- function(input_directory,
   }
   if(Wastewater_national_septic){
     writeCDF(septic_flux,
-             file.path(output_directory,'Wastewater_dom_septic_national.nc'),
+             file.path(Wastewater_output_directory,'Wastewater_dom_septic_national.nc'),
              force_v4=TRUE,
              varname='methane_emissions',
              unit='nmol/m2/s',
@@ -782,7 +785,7 @@ Wastewater <- function(input_directory,
   }
   if(Wastewater_state_septic){
     writeCDF(septic_flux2,
-             file.path(output_directory,'Wastewater_dom_septic_bystate.nc'),
+             file.path(Wastewater_output_directory,'Wastewater_dom_septic_bystate.nc'),
              force_v4=TRUE,
              varname='methane_emissions',
              unit='nmol/m2/s',
@@ -792,13 +795,126 @@ Wastewater <- function(input_directory,
   }
   
   writeCDF(ghgrp_flux,
-           file.path(output_directory,'Wastewater_ind.nc'),
+           file.path(Wastewater_output_directory,'Wastewater_ind.nc'),
            force_v4=TRUE,
            varname='methane_emissions',
            unit='nmol/m2/s',
            longname='Methane emissions from industrial wastewater treatment plants',
            missval=-9999,
            overwrite=TRUE)
+  ################################################################################
+  #Create a sector total, 1 per variant
+  if(Wastewater_Municipal_Method_Moore_linear){
+    WWTP_method <- "ML_municipal"
+    WWTP_text <- "Moore et al. log-linear relationship combined with"
+  }else if(Wastewater_Municipal_Method_GHGI){
+    WWTP_method <- "GHGI_municipal"
+    WWTP_text <- "GHGI total distributed using"
+  }
+  
+  #just build all possible variations
+  if(Wastewater_use_CWNS){
+    if(Wastewater_state_septic){
+      if(Wastewater_Municipal_Method_GHGI){
+        Summed_wastewater_treatment_CWNS_GHGI_state = sum(WWTP_CWNS_GHGI_municipal,septic_flux2,ghgrp_flux,na.rm=T)
+        writeCDF(Summed_wastewater_treatment_CWNS_GHGI_state,
+                 file.path(output_directory,paste0('Wastewater_sector_total_CWNS_GHGI_state.nc')),
+                 force_v4=TRUE,
+                 varname='methane_emissions',
+                 unit='nmol/m2/s',
+                 longname='Methane emissions from municipal treatment plants, industrial treatment plants, and septic systems',
+                 missval=-9999,
+                 overwrite=TRUE)
+      }
+      if(Wastewater_Municipal_Method_Moore_linear){
+        Summed_wastewater_treatment_CWNS_ML_state = sum(WWTP_CWNS_ML_municipal,septic_flux2,ghgrp_flux,na.rm=T)
+        writeCDF(Summed_wastewater_treatment_CWNS_ML_state,
+                 file.path(output_directory,paste0('Wastewater_sector_total_CWNS_ML_state.nc')),
+                 force_v4=TRUE,
+                 varname='methane_emissions',
+                 unit='nmol/m2/s',
+                 longname='Methane emissions from municipal treatment plants, industrial treatment plants, and septic systems',
+                 missval=-9999,
+                 overwrite=TRUE)
+      }
+    }
+    if(Wastewater_national_septic){
+      if(Wastewater_Municipal_Method_GHGI){
+        Summed_wastewater_treatment_CWNS_GHGI_national = sum(WWTP_CWNS_GHGI_municipal,septic_flux,ghgrp_flux,na.rm=T)
+        writeCDF(Summed_wastewater_treatment_CWNS_GHGI_national,
+                 file.path(output_directory,paste0('Wastewater_sector_total_CWNS_GHGI_national.nc')),
+                 force_v4=TRUE,
+                 varname='methane_emissions',
+                 unit='nmol/m2/s',
+                 longname='Methane emissions from municipal treatment plants, industrial treatment plants, and septic systems',
+                 missval=-9999,
+                 overwrite=TRUE)
+      }
+      if(Wastewater_Municipal_Method_Moore_linear){
+        Summed_wastewater_treatment_CWNS_ML_national = sum(WWTP_CWNS_ML_municipal,septic_flux,ghgrp_flux,na.rm=T)
+        writeCDF(Summed_wastewater_treatment_CWNS_ML_national,
+                 file.path(output_directory,paste0('Wastewater_sector_total_CWNS_ML_national.nc')),
+                 force_v4=TRUE,
+                 varname='methane_emissions',
+                 unit='nmol/m2/s',
+                 longname='Methane emissions from municipal treatment plants, industrial treatment plants, and septic systems',
+                 missval=-9999,
+                 overwrite=TRUE)
+      }
+    }
+  }
+  if(Wastewater_use_DMR){
+    if(Wastewater_state_septic){
+      if(Wastewater_Municipal_Method_GHGI){
+        Summed_wastewater_treatment_DMR_GHGI_state = sum(WWTP_DMR_GHGI_municipal,septic_flux2,ghgrp_flux,na.rm=T)
+        writeCDF(Summed_wastewater_treatment_DMR_GHGI_state,
+                 file.path(output_directory,paste0('Wastewater_sector_total_DMR_GHGI_state.nc')),
+                 force_v4=TRUE,
+                 varname='methane_emissions',
+                 unit='nmol/m2/s',
+                 longname='Methane emissions from municipal treatment plants, industrial treatment plants, and septic systems',
+                 missval=-9999,
+                 overwrite=TRUE)
+      }
+      if(Wastewater_Municipal_Method_Moore_linear){
+        Summed_wastewater_treatment_DMR_ML_state = sum(WWTP_DMR_ML_municipal,septic_flux2,ghgrp_flux,na.rm=T)
+        writeCDF(Summed_wastewater_treatment_DMR_ML_state,
+                 file.path(output_directory,paste0('Wastewater_sector_total_DMR_ML_state.nc')),
+                 force_v4=TRUE,
+                 varname='methane_emissions',
+                 unit='nmol/m2/s',
+                 longname='Methane emissions from municipal treatment plants, industrial treatment plants, and septic systems',
+                 missval=-9999,
+                 overwrite=TRUE)
+      }
+    }
+    if(Wastewater_national_septic){
+      if(Wastewater_Municipal_Method_GHGI){
+        Summed_wastewater_treatment_DMR_GHGI_national = sum(WWTP_DMR_GHGI_municipal,septic_flux,ghgrp_flux,na.rm=T)
+        writeCDF(Summed_wastewater_treatment_DMR_GHGI_national,
+                 file.path(output_directory,paste0('Wastewater_sector_total_DMR_GHGI_national.nc')),
+                 force_v4=TRUE,
+                 varname='methane_emissions',
+                 unit='nmol/m2/s',
+                 longname='Methane emissions from municipal treatment plants, industrial treatment plants, and septic systems',
+                 missval=-9999,
+                 overwrite=TRUE)
+      }
+      if(Wastewater_Municipal_Method_Moore_linear){
+        Summed_wastewater_treatment_DMR_ML_national = sum(WWTP_DMR_ML_municipal,septic_flux,ghgrp_flux,na.rm=T)
+        writeCDF(Summed_wastewater_treatment_DMR_ML_national,
+                 file.path(output_directory,paste0('Wastewater_sector_total_DMR_ML_national.nc')),
+                 force_v4=TRUE,
+                 varname='methane_emissions',
+                 unit='nmol/m2/s',
+                 longname='Methane emissions from municipal treatment plants, industrial treatment plants, and septic systems',
+                 missval=-9999,
+                 overwrite=TRUE)
+      }
+    }
+  }
+
+  
   ################################################################################
   #Finally, plot up this output nicely
   
