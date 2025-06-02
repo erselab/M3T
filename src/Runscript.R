@@ -19,7 +19,10 @@ CH4_inventory_build(input_directory="~/../../Kristian/Desktop/testrun/in/",
                     ACES_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Large inventory files/ACES V2.0",
                     vulcan_directory="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Large inventory files/Vulcan_v3.0",
                     DMR_file = "~/../../Kristian/Desktop/methane_inventory/src/Data/DMR_2019_from_11_1_2024.csv",
-                    CWNS_file = "~/../../Kristian/Desktop/methane_inventory/src/Data/CWNS_merged_data_2012_KH.xlsx",
+                    CWNS_file = "~/../../Kristian/Desktop/methane_inventory/src/Data/2022CWNS_NATIONAL_APR2024/",
                     EIA_file = "~/../../Kristian/Desktop/methane_inventory/src/Data/EIA_company_report_2019.xlsx",
+                    PHMSA_file = "~/../../Kristian/Desktop/methane_inventory/src/Data/PHMSA_annual_gas_distribution_2010_present/annual_gas_distribution_2019.xlsx",
                     HIFLD_compressor_file="~/../../Kristian/Desktop/methane_inventory/src/Data/Natural_Gas_Compressor_Stations.csv",
-                    watershed_shapefile="~/../../Kristian/Desktop/methane_inventory/src/Data/watersheds_shapefile/watershed_p_v2.shp")
+                    watershed_shapefile="~/../../Kristian/Desktop/methane_inventory/src/Data/watersheds_shapefile/watershed_p_v2.shp",
+                    Wetcharts_file = "G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Large inventory files/WetCHARTs_v1_3_3_2019.nc")
+
