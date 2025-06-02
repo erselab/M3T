@@ -71,6 +71,10 @@ log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
   
   plot_type="continuous"
   
+  if(global(input,min,na.rm=T)<0){
+    stop("Results have negative values!  Some aspect of the calculation failed.")
+  }
+  
   #set filename to the proper path and use input data as filename if none was
   #provided
   if(missing(filename)){
