@@ -101,18 +101,38 @@ Prepare_GEPA <- function(inventory_year,
   ################################################################################
   #Zenodo API to download the appropriate GEPA v2 file.
   #https://zenodo.org/records/8367082
-  if(inventory_year>2011 & inventory_year<2019){
-    GEPA_filename <- paste0("Gridded_GHGI_Methane_v2_",inventory_year,".nc")
+  
+  #Identify the files available
+  File_list <- read_json("https://zenodo.org/api/records/8367082/files")
+  File_list <- sort(sapply(File_list$entries,"[[","key"))
+  
+  #filter out monthly scale factors and sort for consistency
+  year_list <- unique(gsub("\\.nc","",sapply(strsplit(File_list,"_"),tail,1)))
+  File_choice <- File_list[grep(inventory_year,File_list)]
+  File_choice <- File_choice[!grepl("Scale_Factors",File_choice)]
+  
+  #2 files = Express extension, gridded product; 1 file = just express
+  if(length(File_choice)==2){
+    GEPA_filename <- File_choice[2]
     GEPA_URL <- paste0("https://zenodo.org/api/records/8367082/files/",GEPA_filename,"/content")
-  }else if(inventory_year<2021){
-    GEPA_filename <- paste0("Express_Extension_Gridded_GHGI_Methane_v2_",inventory_year,".nc")
+  }else if(length(File_choice)==1){
+    GEPA_filename <- File_choice
     GEPA_URL <- paste0("https://zenodo.org/api/records/8367082/files/",GEPA_filename,"/content")
     cat("Using Express Extension - see https://zenodo.org/records/8367082 to understand the difference\n")
-  }else{
-    stop("No GEPA available for the chosen year, ",inventory_year)
+  }else if(inventory_year>max(year_list)){
+    File_choice <- File_list[grep(max(year_list),File_list)]
+    GEPA_filename <- File_choice[!grepl("Scale_Factors",File_choice)]
+    GEPA_URL <- paste0("https://zenodo.org/api/records/8367082/files/",GEPA_filename,"/content")
+    cat("No gridded EPA available for the chosen year,",inventory_year,"- it only extends from",min(year_list),"to",max(year_list),"so using",max(year_list))
+    cat("\nThis is from the Express Extension - see https://zenodo.org/records/8367082 to understand the difference\n")
+  }else if(inventory_year<min(year_list)){
+    File_choice <- File_list[grep(min(year_list),File_list)]
+    GEPA_filename <- File_choice[!grepl("Scale_Factors",File_choice)][2]
+    GEPA_URL <- paste0("https://zenodo.org/api/records/8367082/files/",GEPA_filename,"/content")
+    cat("No gridded EPA available for the chosen year,",inventory_year,"- it only extends from",min(year_list),"to",max(year_list),"so using",min(year_list),"\n")
   }
-  
-  #download the GEPA file.  for some reason failed without setting method.
+
+  #download the GEPA file.
   if(!file.exists(file.path(input_directory,GEPA_filename))){
     Trycatch_downloader(URL=GEPA_URL,output_location=paste0(input_directory,GEPA_filename),method="save")
   }
