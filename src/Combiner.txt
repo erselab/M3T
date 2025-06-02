@@ -1,0 +1,113 @@
+Create gridded methane emissions maps that include all sectors
+
+Description:
+
+     `Combine_inventories` writes a netcdf for every unique combination
+     of sectoral emissions estimates.  Optionally writes additional
+     netcdf with the thermogenic and nonthermogenic sectors separately.
+
+Usage:
+
+     Combine_inventories(output_directory, separate_thermo)
+     
+Arguments:
+
+output_directory: Character providing the full filepath to save
+          processed data
+
+separate_thermo: Logical.  Pulled from config file.  Indicating whether
+          or not to save partial inventories: one that is only
+          thermogenic sources, and one that is only non-thermogenic
+          sources.
+
+Details:
+
+     This function considers every possible output across all sectors
+     and filters to keep those that have been saved to the output
+     folder.  From there it creates a table of every possible unique
+     combination of sectors.  If many options have been enabled, this
+     can be over 1,000 combinations, so caution is warranted.
+     Additionally, if the config option is set, three inventories will
+     be created for each unique combination instead:
+
+        * One that is the total across all sectors
+
+        * One that is the total across only thermogenic sources
+
+            * stationary combustion of wood
+
+            * natural gas distribution
+
+            * natural gas transmission
+
+            * Gridded EPA mobile combustion
+
+            * Gridded EPA abandoned coal
+
+            * Gridded EPA surface coal
+
+            * Gridded EPA underground coal
+
+            * Gridded EPA petroleum systems exploration
+
+            * Gridded EPA petroleum systems production
+
+            * Gridded EPA petroleum systems refining
+
+            * Gridded EPA petroleum systems transport
+
+            * Gridded EPA abandoned oil gas
+
+            * Gridded EPA natural gas exploration
+
+            * Gridded EPA natural gas processing
+
+            * Gridded EPA natural gas production
+
+            * Gridded EPA industry petrochemical
+
+            * Gridded EPA industry ferroalloy
+
+        * One that is the total across only non-thermogenic sources
+
+            * landfills
+
+            * stationary combustion of fossil fuels
+
+            * wastewater
+
+            * wetlands
+
+            * Gridded EPA composting
+
+            * Gridded EPA enteric fermentation
+
+            * Gridded EPA manure management
+
+            * Gridded EPA rice cultivation
+
+            * Gridded EPA field burning
+
+Value:
+
+     Nothing is returned from the function, but the main outputs are
+     many netcdf files of the methane emissions across all sectors.
+     Given the large number of possible files and variations, they are
+     titled "Combined_inventory_combination_1.nc" increasing
+     numerically.  A csv is also saved that details what variations
+     were used for each sector for each inventory.
+
+Author(s):
+
+     Joe Pitt, <mailto:madeup@wisc.edu>
+
+     Kris Hajny, <mailto:blank@fake.edu>
+
+     Israel Lopez-Coto, <mailto:test@test.edu>
+
+Examples:
+
+     library(terra)
+     Combine_inventories <- function(output_directory="~/../Desktop/out/",
+                                    separate_thermo=T)
+     

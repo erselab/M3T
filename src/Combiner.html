@@ -1,0 +1,191 @@
+<!DOCTYPE html><html><head><title>R: Create gridded methane emissions maps that include all...</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.15.3/dist/katex.min.css">
+<script type="text/javascript">
+const macros = { "\\R": "\\textsf{R}", "\\code": "\\texttt"};
+function processMathHTML() {
+    var l = document.getElementsByClassName('reqn');
+    for (let e of l) { katex.render(e.textContent, e, { throwOnError: false, macros }); }
+    return;
+}</script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.15.3/dist/katex.min.js"
+    onload="processMathHTML();"></script>
+<link rel="stylesheet" type="text/css" href="R.css" />
+</head><body><div class="container"><main>
+
+<table style="width: 100%;"><tr><td>Combine_inventories</td><td style="text-align: right;">R Documentation</td></tr></table>
+
+<h2>Create gridded methane emissions maps that include all sectors</h2>
+
+<h3>Description</h3>
+
+<p>'Combine_inventories' writes a netcdf for every unique
+combination of sectoral emissions estimates.  Optionally writes additional
+netcdf with the thermogenic and nonthermogenic sectors separately.
+</p>
+
+
+<h3>Usage</h3>
+
+<pre><code class='language-R'>Combine_inventories(output_directory, separate_thermo)
+</code></pre>
+
+
+<h3>Arguments</h3>
+
+<table>
+<tr><td><code id="output_directory">output_directory</code></td>
+<td>
+<p>Character providing the full filepath to save
+processed data</p>
+</td></tr>
+<tr><td><code id="separate_thermo">separate_thermo</code></td>
+<td>
+<p>Logical.  Pulled from config file.  Indicating whether
+or not to save partial inventories: one that is only thermogenic sources,
+and one that is only non-thermogenic sources.</p>
+</td></tr>
+</table>
+
+
+<h3>Details</h3>
+
+<p>This function considers every possible output across all sectors and
+filters to keep those that have been saved to the output folder.  From there
+it creates a table of every possible unique combination of sectors.  If many
+options have been enabled, this can be over 1,000 combinations, so caution
+is warranted. Additionally, if the config option is set, three inventories
+will be created for each unique combination instead:
+</p>
+
+<ul>
+<li><p> One that is the total across all sectors
+</p>
+</li>
+<li><p> One that is the total across only thermogenic sources
+</p>
+
+<ul>
+<li><p> stationary combustion of wood
+</p>
+</li>
+<li><p> natural gas distribution
+</p>
+</li>
+<li><p> natural gas transmission
+</p>
+</li>
+<li><p> Gridded EPA mobile combustion
+</p>
+</li>
+<li><p> Gridded EPA abandoned coal
+</p>
+</li>
+<li><p> Gridded EPA surface coal
+</p>
+</li>
+<li><p> Gridded EPA underground coal
+</p>
+</li>
+<li><p> Gridded EPA petroleum systems exploration
+</p>
+</li>
+<li><p> Gridded EPA petroleum systems production
+</p>
+</li>
+<li><p> Gridded EPA petroleum systems refining
+</p>
+</li>
+<li><p> Gridded EPA petroleum systems transport
+</p>
+</li>
+<li><p> Gridded EPA abandoned oil gas
+</p>
+</li>
+<li><p> Gridded EPA natural gas exploration
+</p>
+</li>
+<li><p> Gridded EPA natural gas processing
+</p>
+</li>
+<li><p> Gridded EPA natural gas production
+</p>
+</li>
+<li><p> Gridded EPA industry petrochemical
+</p>
+</li>
+<li><p> Gridded EPA industry ferroalloy
+</p>
+</li></ul>
+
+</li>
+<li><p> One that is the total across only non-thermogenic sources
+</p>
+
+<ul>
+<li><p> landfills
+</p>
+</li>
+<li><p> stationary combustion of fossil fuels
+</p>
+</li>
+<li><p> wastewater
+</p>
+</li>
+<li><p> wetlands
+</p>
+</li>
+<li><p> Gridded EPA composting
+</p>
+</li>
+<li><p> Gridded EPA enteric fermentation
+</p>
+</li>
+<li><p> Gridded EPA manure management
+</p>
+</li>
+<li><p> Gridded EPA rice cultivation
+</p>
+</li>
+<li><p> Gridded EPA field burning
+</p>
+</li></ul>
+
+</li></ul>
+
+
+
+<h3>Value</h3>
+
+<p>Nothing is returned from the function, but the main outputs are many
+netcdf files of the methane emissions across all sectors.  Given the large
+number of possible files and variations, they are titled
+&quot;Combined_inventory_combination_1.nc&quot; increasing numerically.  A csv is also
+saved that details what variations were used for each sector for each
+inventory.
+</p>
+
+
+<h3>Author(s)</h3>
+
+<p>Joe Pitt, <a href="mailto:madeup@wisc.edu">madeup@wisc.edu</a>
+</p>
+<p>Kris Hajny, <a href="mailto:blank@fake.edu">blank@fake.edu</a>
+</p>
+<p>Israel Lopez-Coto, <a href="mailto:test@test.edu">test@test.edu</a>
+</p>
+
+
+<h3>Examples</h3>
+
+<pre><code class='language-R'>library(terra)
+Combine_inventories &lt;- function(output_directory="~/../Desktop/out/",
+                               separate_thermo=T)
+</code></pre>
+
+</main>
+
+</div>
+</body></html>
+
