@@ -76,8 +76,8 @@ NLCD_open_and_low_int <- function(NLCD_file,
   starttime <- Sys.time()
   cat("Starting wastewater sector: NLCD_open_and_low_int\n")
   
-  Wastewater_partial_output_directory <- paste0(output_directory,"Wastewater_NLCD_data/")
-  dir.create(Wastewater_partial_output_directory,showWarnings = F)
+  Wastewater_partial_output_directory <- paste0(output_directory,"Wastewater/processed_NLCD_data/")
+  dir.create(Wastewater_partial_output_directory,showWarnings = F,recursive = T)
   ################################################################################
   #load in the landcover - national land cover database (NLCD)
   
@@ -133,7 +133,7 @@ NLCD_open_and_low_int <- function(NLCD_file,
     NLCD_suburban_reprojected <- project(NLCD_suburban_subset,domain_template,method="average")
     
     #save
-    writeCDF(NLCD_suburban_reprojected,file.path(Wastewater_partial_output_directory,
+    writeCDF(NLCD_suburban_reprojected,paste0(Wastewater_partial_output_directory,
                                                  paste0(state_name_list[A],"_NLCD_suburban.nc")),
              force_v4=T,
              overwrite=T)
