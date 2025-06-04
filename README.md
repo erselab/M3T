@@ -4,7 +4,7 @@ This is an R package designed to help create an urban-focused gridded methane in
 
 The config allows a user to select the emitting sectors they want to include, emission factors to use, and methods for sectors where multiple are available.
 
-When running the main function you set the directories to save data, the year, resolution, and area you want an inventory for. Years should be between 2010 and 2022 (as of this writing) and the resolution should not be greater than 0.01 degrees or 1 square kilometer.
+When running the main function you set the directories to save data, the year, resolution, and area you want an inventory for. Years should be between 2011 and 2022 (as of this writing) and the resolution should not be greater than 0.01 degrees or 1 square kilometer.
 
 ## Background
 
