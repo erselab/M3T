@@ -503,34 +503,22 @@ Transmission <- function(input_directory,
   #emissions with the GHGRP ones for the specific facility.
   
   if(nrow(compressors_ghgrp_crop)>0){
-    location_matches=nearest(compressors_ghgrp_crop,compressors_crop_HIFLD)
-    
-    combined_data <- cbind(as.data.frame(compressors_ghgrp_crop),
-                           as.data.frame(compressors_crop_HIFLD)[location_matches$to_id,],
-                           round(location_matches$distance))
-    
-    combined_data <- combined_data[,c("facility_id","state","facility_name.x",
-                                      "ghg_quantity","STATE","NAME",
-                                      "round(location_matches$distance)")]
-    colnames(combined_data) <- c("GHGRP_ID","GHGRP_state","GHGRP_name",
-                                 "GHGRP_emissions","HIFLD_state","HIFLD_name",
-                                 "distance_m")
-    
-    # if(max(combined_data$distance)>1000){
-    #   View(combined_data)
-    #   plot(ext(domain))
-    #   lines(State_Tigerlines)
-    #   points(compressors_crop_HIFLD,cex=2)
-    #   points(compressors_ghgrp_crop,col="red")
-    #   add_legend("bottom",legend = c("HIFLD","GHGRP"),pt.cex = c(2,1),
-    #              horiz=T,col=c("black","red"),pch=16,xpd=T)
-    #   stop("some GHGRP compressors didn't have a HIFLD compressor within 1 km")
-    # }
-    
     #scale the GHGRP emissions so that the domain average is equal to the national
     #average and convert GHGRP from MT CH4/yr to mol/s
     GHGRP_scaling <- compressor_avg_emissions/mean(compressors_ghgrp_crop$ghg_quantity*1e6/(16.043*365*24*60*60))
-    compressors_final$emiss[location_matches$to_id] <- compressors_ghgrp_crop$ghg_quantity*1e6/(16.043*365*24*60*60)*GHGRP_scaling
+    compressors_ghgrp_crop$emiss <- compressors_ghgrp_crop$ghg_quantity*1e6/(16.043*365*24*60*60)*GHGRP_scaling
+    
+    #use already identified matches to grab emissions for GHGRP facilities in
+    #HIFLD
+    indx <- match(compressors_ghgrp_crop$facility_id,compressors_crop_HIFLD$GHGRP.ID)
+    GHGRP_in_HIFLD <- compressors_ghgrp_crop[!is.na(indx),]
+    GHGRP_missing_from_HIFLD <- compressors_ghgrp_crop[is.na(indx),]
+    indx <- indx[!is.na(indx)]
+    
+    #replace the HIFLD default with GHGRP values for those with a match, then
+    #add in those without a match
+    compressors_final$emiss[indx] <- GHGRP_in_HIFLD$ghg_quantity*1e6/(16.043*365*24*60*60)
+    compressors_final <- rbind(compressors_final,GHGRP_missing_from_HIFLD[,"emiss"])
   }
   
   compressor_rast <- rasterize(compressors_final, domain_template, "emiss", fun=sum) # in mol/s
