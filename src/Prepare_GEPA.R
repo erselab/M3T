@@ -249,25 +249,44 @@ Prepare_GEPA <- function(inventory_year,
                  plot_directory=plot_directory,
                  domain=domain,County_Tigerlines=County_Tigerlines,
                  State_Tigerlines=State_Tigerlines)
-    not_log_plot(GEPA_thermo,filename="GEPA_thermogenic",
+    not_log_plot(GEPA_thermo,filename="GEPA_inventory_thermogenic_subset",
                  "Gridded EPA Inventory -\nThermogenic Sectors",
                  zlim_min=zlim_min,zlim_max=zlim_max,
                  plot_directory=plot_directory,
                  domain=domain,County_Tigerlines=County_Tigerlines,
                  State_Tigerlines=State_Tigerlines)
-    not_log_plot(GEPA_non_thermo,filename="GEPA_non_thermogenic",
+    not_log_plot(GEPA_non_thermo,filename="GEPA_inventory_non_thermogenic_subset",
                  "Gridded EPA Inventory -\nNon-thermogenic Sectors",
                  zlim_min=zlim_min,zlim_max=zlim_max,
                  plot_directory=plot_directory,
                  domain=domain,County_Tigerlines=County_Tigerlines,
                  State_Tigerlines=State_Tigerlines)
     
-    Summed_GEPA <- sum(GEPA_landfill,GEPA_non_thermo,GEPA_thermo,na.rm=T)
-    not_log_plot(Summed_GEPA,
-                 "Gridded EPA Inventory -\nAll sectors pulled directly from the GEPA",
+    Summed_GEPA_inventory_subset <- sum(GEPA_landfill,GEPA_non_thermo,GEPA_thermo,na.rm=T)
+    not_log_plot(Summed_GEPA_inventory_subset,
+                 "Gridded EPA Inventory -\nOnly sectors used",
                  plot_directory=plot_directory,
                  domain=domain,County_Tigerlines=County_Tigerlines,
                  State_Tigerlines=State_Tigerlines)
+    
+    
+    
+    Summed_GEPA_saturated <- sum(GEPA,na.rm=T)
+    not_log_plot(Summed_GEPA_saturated,
+                 "Gridded EPA Inventory - \nAll sectors, saturated colorscale high end",
+                 plot_directory=plot_directory,
+                 zlim_min=as.numeric(global(Summed_GEPA_inventory_subset,min,na.rm=T)),
+                 zlim_max=as.numeric(global(Summed_GEPA_inventory_subset,max,na.rm=T)),
+                 domain=domain,County_Tigerlines=County_Tigerlines,
+                 State_Tigerlines=State_Tigerlines)
+    
+    Summed_GEPA <- Summed_GEPA_saturated
+    log_plot(Summed_GEPA,
+             "Gridded EPA Inventory - \nAll sectors\nSaturated low end",
+             plot_directory=plot_directory,
+             domain=domain,County_Tigerlines=County_Tigerlines,
+             zlim_min=-4,
+             State_Tigerlines=State_Tigerlines)
   }
   cat("Finished pulling remaining sectors from gridded EPA inventory: Prepare_GEPA in",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
 }
