@@ -71,10 +71,6 @@ log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
   
   plot_type="continuous"
   
-  if(global(input,min,na.rm=T)<0){
-    stop("Results have negative values!  Some aspect of the calculation failed.")
-  }
-  
   #set filename to the proper path and use input data as filename if none was
   #provided
   if(missing(filename)){
@@ -119,6 +115,10 @@ log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
            col=c("white","dimgrey"),lty=1,lwd=3,bg="black",xpd=T,
            text.col="white",cex=1.5)
   }else{
+    if(global(input,min,na.rm=T)<0){
+      stop("Results have negative values!  Some aspect of the calculation failed.")
+    }
+    
     input <- prep_plot_data(input)
     
     if(!is.null(zlim_min)){
@@ -143,7 +143,7 @@ log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
     }else{
       zlim_min=zlim_min*1.00001
     }
-    
+
     png(paste0(outputname,".png"),width = 480*2,height=480*2)
     plot(input,mar=c(3.1, 3.1, 2.1, 7.1)+c(0,0,7,2),
          type=plot_type,
