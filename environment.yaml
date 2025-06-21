@@ -1,0 +1,10 @@
+name: ch4_inv_env
+channels:
+  - defaults
+dependencies:
+  - proj
+  - gdal
+  - r-base
+  - r-essentials
+  - r-terra
+  - r-ncdf4
