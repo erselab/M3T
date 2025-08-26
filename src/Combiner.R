@@ -195,13 +195,14 @@ Combine_inventories <- function(output_directory,
     #sum across sectors, include the sectors that don't have options, save
     out_rast <- sum(c(variable_rast[[indx]],set_rast))
     if(verbose){
-      all_combinations_rast <- c(all_combinations_rast,out_rast)
+      all_combinations_rast <- sum(all_combinations_rast,out_rast)
     }
     
     writeCDF(out_rast,paste0(Combined_output_directory,"Combined_inventory_combination_",
                              sprintf(paste0("%0",nchar(nrow(Possible_combination_filenames)),"d"),A),
                              ".nc"),overwrite=T)
     cat("\rFinished creating unique inventory",A,"of",nrow(Possible_combinations),"   ")
+    out_rast <- NULL;gc()
   }
   
   ################################################################################
@@ -258,7 +259,7 @@ Combine_inventories <- function(output_directory,
   #plot average across all combinations
   
   if(verbose){
-    Summed_final_inventory <- mean(all_combinations_rast,na.rm=T)
+    Summed_final_inventory <- all_combinations_rast/nrow(Possible_combinations)
     log_plot(Summed_final_inventory,
              "Final Inventory -\nAveraged across all variations\nSaturated low end",
              plot_directory=plot_directory,
