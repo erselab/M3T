@@ -1,0 +1,22 @@
+Package: MMMT
+Title: Develop Reasonable Methane Inventories for Urban Areas
+Version: 0.0.0.9000
+Authors@R: 
+    person("Kristian", "Hajny", , "kris.hajny@gmail.com", role = c("aut", "cre"),   comment = c(ORCID = "0000-0003-3249-7157"))
+Description: The Modular Methane Mapping Tool (M3T) uses a user defined mix of a variety of literature based methods to estimate gridded methane emissions for several sectors relevant for urban areas.  Available only for the Continental United States with user specified resolution (minimum of 0.01 deg or 1 km2), year (> 2011), and domain.
+URL: GITHUB/vignette, publication
+BugReports: GITHUB
+Encoding: UTF-8
+Imports:
+    dplyr,
+    jsonlite,
+    ncdf4,
+    readxl,
+    terra,
+    utils
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
+License: CC BY 4.0
+Depends: 
+    R (>= 3.5)
+LazyData: true
