@@ -50,7 +50,8 @@
 #'  the North America Land Change Monitoring System (NALCMS) to downscale
 #'  Wetcharts.
 #'@param NLCD_file Character.  The NLCD land cover data as an img. Available at
-#'  \url{https://www.mrlc.gov/data?f%5B0%5D=category%3ALand%20Cover&f%5B1%5D=region%3Aconus}.
+#'  \url{https://www.mrlc.gov/data?f%5B0%5D=category%3ALand%20Cover&f%5B1%5D=region%3Aconus
+#'  }.
 #'@param NALCMS_file Character.  The NALCMS land cover data as a tif.  Available
 #'  at \url{http://www.cec.org/north-american-land-change-monitoring-system/}.
 #'@param Wetcharts_model_subset Numeric list. Pulled from config file. Indicates
@@ -68,7 +69,7 @@
 #'  shapefile.  Available at
 #'  \url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.
 #'  Only relevant if verbose=TRUE.
-#'@param State_Tigerlines SpatVector.  United States Census Bureau county
+#'@param State_CB SpatVector.  United States Census Bureau county
 #'  shapefile.  Available at
 #'  \url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.
 #'  Only relevant if verbose=TRUE.
@@ -101,7 +102,7 @@
 #'                        verbose=TRUE,
 #'                        inventory_year=2018,
 #'                        plot_directory="~/../Desktop/plots/",
-#'                        State_Tigerlines=vect("~/../Desktop/in/State_Tigerlines/tl_2018_us_state.shp"),
+#'                        State_CB=vect("~/../Desktop/in/State_CB/tl_2018_us_state.shp"),
 #'                        County_Tigerlines=vect("~/../Desktop/in/County_Tigerlines/tl_2018_us_county.shp"),
 #'                        Use_NLCD=TRUE,
 #'                        Use_NALCMS=TRUE,
@@ -115,6 +116,9 @@
 #'@author Kris Hajny, \email{blank@@fake.edu}
 #'@author Israel Lopez-Coto, \email{test@@test.edu}
 #'@export
+#'@seealso 
+#' * [CH4_inventory_build()] Calculates methane inventory using settings provided in config.
+#' * [SOCCR_Wetlands()] Calculates methane emissions for the wetland sector using the state of the carbon cycle report instead.
 
 
 
@@ -129,18 +133,15 @@ Disaggregate_Wetcharts <- function(input_directory,
                                    plot_directory,
                                    inventory_year,
                                    County_Tigerlines,
-                                   State_Tigerlines,
+                                   State_CB,
                                    Use_NLCD,
-                                   Use_NALCMS,
-                                   NLCD_file,
-                                   NALCMS_file,
-                                   Wetcharts_file,
+                                   Source_wetland_NLCD,
                                    Wetcharts_model_subset){
   
   starttime <- Sys.time()
   cat("Starting wetland sector: Disaggregate_Wetcharts\n")
   
-  Wetland_output_directory <- paste0(output_directory,"Wetlands/")
+  Wetland_output_directory <- file.path(output_directory,"Wetlands")
   dir.create(Wetland_output_directory,showWarnings = F)
   ################################################################################
   #download and load in  wetcharts
@@ -176,67 +177,66 @@ Disaggregate_Wetcharts <- function(input_directory,
   #                       error_message=paste0("\nFailed to download Wetcharts data from the DAAC THREDDS database at URL",data_URL))
   # }
   
-  Wetcharts <- rast(Wetcharts_file)
+  Wetcharts_file <- file.path(input_directory,paste0("User_supplied_WetCHARTs_v1_3_3.nc"))
+  invisible(file.copy(Source_wetcharts,Wetcharts_file,overwrite = T))
+  
+  Wetcharts <- terra::rast(Wetcharts_file)
   ################################################################################
   #define the domain of interest + a little buffer, crop wetcharts
   
-  Wetcharts <- crop(Wetcharts,ext(project(domain,crs(Wetcharts)))+0.5)
+  Wetcharts <- terra::crop(Wetcharts,terra::ext(terra::project(domain,terra::crs(Wetcharts)))+0.5)
   ################################################################################
-  #load in the landcover - national land cover database or North American Land
-  #Change Monitoring System (NLCD and NALCMS).  Crop both to just the extent of
-  #Wetcharts
+  #load in the landcover - national land cover database (NLCD)
+  NLCD_file <- file.path(input_directory,"NLCD")
+  dir.create(NLCD_file,showWarnings = F)
+  if(Source_wetland_NLCD=="default"){
+    #UPDATE TO ZENODO
+    NLCD_file <- file.path(input_directory,"NLCD","Annual_NLCD_LndCov_2024_CU_C1V1.tif")
+  }else{
+    invisible(file.copy(list.files(Source_wetland_NLCD,full.names=T),
+                        NLCD_file,overwrite = T,recursive=T))
+    NLCD_file <- list.files(NLCD_file,pattern="*.tif$",full.names=T)
+    # NLCD_file <- list.files(Source_wetland_NLCD,pattern="*.tif$",full.names=T)
+  }
+  NLCD <- terra::rast(NLCD_file)
   
-  if(Use_NLCD){
-    NLCD <- rast(NLCD_file)
-    NLCD <- crop(NLCD,
-                 project(x=ext(Wetcharts),from=crs(Wetcharts),to=crs(NLCD)))
-  }
-  if(Use_NALCMS){
-    NALCMS <- rast(NALCMS_file)
-    NALCMS <- crop(NALCMS,
-                   project(x=ext(Wetcharts),from=crs(Wetcharts),to=crs(NALCMS)))
-  }
+  #correct levels from the R interpreted ones (provided in manual)
+  NLCD_key <- data.frame("Value"=c(11,12,21:24,31,41:43,52,71,81:82,90,95),
+                         "Land_Class"=terra::levels(NLCD)[[1]][,2])
+  levels(NLCD) <- NLCD_key
+  
+  # reproject states to matching CRS
+  NLCD_states_trans <- terra::project(State_Tigerlines,terra::crs(NLCD))
+  
+  #Crop to just the extent of Wetcharts
+  NLCD <- terra::crop(NLCD,
+                      terra::project(x=terra::ext(Wetcharts),from=terra::crs(Wetcharts),to=terra::crs(NLCD)))
+  
   cat("Finished loading in all data at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start. Next step is time-consuming.\n")
   ################################################################################
   #set wetlands to a value of 1 and all other land cover to 0, then project to
   #domain CRS at 0.1 deg.
   
   #solely for the exact grid to project to
-  template <- disagg(Wetcharts[[1]],fact=5)
-  values(template) <- 1
-  template_poly <- as.polygons(template)
+  template <- terra::disagg(Wetcharts[[1]],fact=5)
+  terra::values(template) <- 1
+  template_poly <- terra::as.polygons(template)
   
-  if(Use_NLCD){
-    #force all values between 0 and 89 to 0.  values between 89 and 200 are forced
-    #to 1.  90 and 95 = wetland land cover for NLCD.
-    NLCD <- classify(NLCD,matrix(c(0,89,0,
-                                   89,200,1),
-                                 ncol=3,byrow=T))
-    
-    #project to a grid with the exact right resolution, extent and origin. First
-    #crop/mask to the proper extent, set NA's to 0, then project to the exact
-    #domain grid.  No need to extend given this is far higher resolution.
-    template_poly <- project(template_poly,crs(NLCD))
-    NLCD=crop(NLCD,template_poly,snap="out")
-    NLCD=mask(x=NLCD,mask=template_poly,touches=F)
-    NLCD[is.na(NLCD)] <- 0
-    NLCD=project(NLCD,template,method="sum")
-  }
-  if(Use_NALCMS){
-    #force all values between 0 and 13 or 14.6 to 5000 to 0.  values between 13.5
-    #and 14.5 are 1.  14 = wetland land cover for NALCMS.
-    NALCMS <- classify(NALCMS,matrix(c(0,13,0,
-                                       13.5,14.5,1,
-                                       14.6,5000,0),
-                                     ncol=3,byrow=T))
-    
-    
-    template_poly <- project(template_poly,crs(NALCMS))
-    NALCMS=crop(NALCMS,template_poly,snap="out")
-    NALCMS=mask(x=NALCMS,mask=template_poly,touches=F)
-    NALCMS[is.na(NALCMS)] <- 0
-    NALCMS=project(NALCMS,template,method="sum")
-  }
+  #force all values between 0 and 89 to 0.  values between 89 and 200 are forced
+  #to 1.  90 and 95 = wetland land cover for NLCD.
+  NLCD <- terra::classify(NLCD,matrix(c(0,89,0,
+                                        89,200,1),
+                                      ncol=3,byrow=T))
+  
+  #project to a grid with the exact right resolution, extent and origin. First
+  #crop/mask to the proper extent, set NA's to 0, then project to the exact
+  #domain grid.  No need to extend given this is far higher resolution.
+  template_poly <- terra::project(template_poly,terra::crs(NLCD))
+  NLCD=terra::crop(NLCD,template_poly,snap="out")
+  NLCD=terra::mask(x=NLCD,mask=template_poly,touches=F)
+  NLCD[is.na(NLCD)] <- 0
+  NLCD=terra::project(NLCD,template,method="sum")
+  
   cat("Finished reprojecting land cover data at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
   ################################################################################
   #now calculate the wetland fraction
@@ -244,38 +244,27 @@ Disaggregate_Wetcharts <- function(input_directory,
   #this process was taken in part from
   #https://gis.stackexchange.com/questions/262015/calculation-of-fractional-cover-for-each-vegetation-class-at-30-m-resolution-mat/262958#262958
   
-  if(Use_NLCD){
-    #aggregate to 0.5 degrees.  Each 0.5 deg pixel = sum of 30 m wetland
-    #pixels that are wetlands (i.e., the fraction of the land in the pixel that is
-    #wetlands).
-    NLCD_0.5_deg <- aggregate(NLCD,
-                              na.rm=T,
-                              fact=5,
-                              fun=sum)
-    
-    #convert the 0.5 deg version to the same resolution as domain.  This is just
-    #so pixels align and does NOT change the values in each pixel.
-    NLCD_0.5_deg <- disagg(NLCD_0.5_deg,fact=5)
-    
-    #now get the ratio of wetlands in each 0.1 deg pixel relative to the 0.5 deg
-    #pixels.  Note doing this and then projecting, rather than projecting first,
-    #will NOT conserve mass as the ratios within the 0.5 deg pixel will no longer
-    #sum exactly to 1.
-    NLCD_wetland_fraction <- NLCD/NLCD_0.5_deg
-    
-    #for any without a value, just distribute equally to the 25 pixels in each 0.5
-    #deg pixel (0/# or no data from landcover)
-    NLCD_wetland_fraction[is.na(NLCD_wetland_fraction)] <- 1/25
-  }
-  if(Use_NALCMS){
-    NALCMS_0.5_deg <- aggregate(NALCMS,
-                                na.rm=T,
-                                fact=5,
-                                fun=sum)
-    NALCMS_0.5_deg <- disagg(NALCMS_0.5_deg,fact=5)
-    NALCMS_wetland_fraction <- NALCMS/NALCMS_0.5_deg
-    NALCMS_wetland_fraction[is.na(NALCMS_wetland_fraction)] <- 1/25
-  }
+  #aggregate to 0.5 degrees.  Each 0.5 deg pixel = sum of 30 m wetland
+  #pixels that are wetlands (i.e., the fraction of the land in the pixel that is
+  #wetlands).
+  NLCD_0.5_deg <- terra::aggregate(NLCD,
+                                   na.rm=T,
+                                   fact=5,
+                                   fun=sum)
+  
+  #convert the 0.5 deg version to the same resolution as domain.  This is just
+  #so pixels align and does NOT change the values in each pixel.
+  NLCD_0.5_deg <- terra::disagg(NLCD_0.5_deg,fact=5)
+  
+  #now get the ratio of wetlands in each 0.1 deg pixel relative to the 0.5 deg
+  #pixels.  Note doing this and then projecting, rather than projecting first,
+  #will NOT conserve mass as the ratios within the 0.5 deg pixel will no longer
+  #sum exactly to 1.
+  NLCD_wetland_fraction <- NLCD/NLCD_0.5_deg
+  
+  #for any without a value, just distribute equally to the 25 pixels in each 0.5
+  #deg pixel (0/# or no data from landcover)
+  NLCD_wetland_fraction[is.na(NLCD_wetland_fraction)] <- 1/25
   
   ################################################################################
   #Subset to the user-set models and average monthly Wetcharts across models.
@@ -288,14 +277,14 @@ Disaggregate_Wetcharts <- function(input_directory,
                                  FUN = function(x){which(Wetcharts_models %in% x)})
   
   #Now create a list of the various wetcharts subsets
-  Wetcharts <- lapply(Wetcharts_model_indx,FUN=function(x){subset(Wetcharts,x)})
+  Wetcharts <- lapply(Wetcharts_model_indx,FUN=function(x){terra::subset(Wetcharts,x)})
   
   #pull the months from the names of wetcharts this time
   Wetcharts_months <- lapply(Wetcharts,FUN = function(x){
     as.numeric(sapply(strsplit(names(x),"_"),"[[",5))})
   
   #to run annually
-  Averaged_wetcharts <- lapply(Wetcharts,mean)
+  Averaged_wetcharts <- lapply(Wetcharts,terra::mean)
   
   #to run monthly
   # #initialize output, 1 per model subset with 12 blank layers each
@@ -333,111 +322,63 @@ Disaggregate_Wetcharts <- function(input_directory,
   
   #Disaggregate wetcharts to 0.1 deg and convert from nmol/m2s to nmol/s
   Downscaled_Averaged_wetcharts <- lapply(Averaged_wetcharts,
-                                          FUN=function(x){disagg(x*cellSize(x),fact=5)})
+                                          FUN=function(x){terra::disagg(x*terra::cellSize(x),fact=5)})
   
   #redistribute using wetland fraction, crop to domain, and reconvert to
   #nmol/m2s for the smaller pixels
-  if(Use_NLCD){
-    NLCD_Downscaled_Averaged_wetcharts <- lapply(Downscaled_Averaged_wetcharts,FUN=function(x){
-      crop(x*NLCD_wetland_fraction/cellSize(x),project(domain,crs(NLCD_wetland_fraction)),snap="out")})
-    
-    #for comparison later
-    NLCD_pixel_check <- NLCD_Downscaled_Averaged_wetcharts[[1]]
-  }
-  if(Use_NALCMS){
-    NALCMS_Downscaled_Averaged_wetcharts <- lapply(Downscaled_Averaged_wetcharts,FUN=function(x){
-      crop(x*NALCMS_wetland_fraction/cellSize(x),project(domain,crs(NALCMS_wetland_fraction)),snap="out")})
-    NALCMS_pixel_check <- NALCMS_Downscaled_Averaged_wetcharts[[1]]
-  }
+  NLCD_Downscaled_Averaged_wetcharts <- lapply(Downscaled_Averaged_wetcharts,FUN=function(x){
+    terra::crop(x*NLCD_wetland_fraction/terra::cellSize(x),terra::project(domain,terra::crs(NLCD_wetland_fraction)),snap="out")})
+  
+  #for comparison later
+  NLCD_pixel_check <- NLCD_Downscaled_Averaged_wetcharts[[1]]
   
   ################################################################################
   # reproject output to match domain exactly
   
   #aggregate/disaggregate to a similar resolution
-  domain_trans <- project(domain_template,crs(Downscaled_Averaged_wetcharts[[1]]))
-  domain_res <- res(domain_trans)
-  if(any(domain_res<res(Downscaled_Averaged_wetcharts[[1]]))){
-    if(Use_NLCD){
-      NLCD_Downscaled_Averaged_wetcharts <- lapply(NLCD_Downscaled_Averaged_wetcharts,FUN=function(x){disagg(x,round(res(x)/domain_res,3),"near")})
-      
-      #reproject to exact domain now.  Here using nearest neighbor to prevent
-      #only 1 row/column of higher res pixels on the border from being
-      #interpolated.
-      NLCD_Downscaled_Averaged_wetcharts <- lapply(NLCD_Downscaled_Averaged_wetcharts,FUN=function(x){mask(project(x,domain_template,method="near"),domain)})
-      
-      cover <- extract(NLCD_Downscaled_Averaged_wetcharts[[1]][[1]],
-                       project(domain,NLCD_Downscaled_Averaged_wetcharts[[1]]),
-                       weights=T,cells=T)
-      for(A in 1:length(NLCD_Downscaled_Averaged_wetcharts)){
-        NLCD_Downscaled_Averaged_wetcharts[[A]][cover[,'cell']] <- NLCD_Downscaled_Averaged_wetcharts[[A]][cover[,'cell']]*cover[,'weight']
-      }
+  domain_trans <- terra::project(domain_template,terra::crs(Downscaled_Averaged_wetcharts[[1]]))
+  domain_res <- terra::res(domain_trans)
+  if(any(domain_res<terra::res(Downscaled_Averaged_wetcharts[[1]]))){
+    NLCD_Downscaled_Averaged_wetcharts <- lapply(NLCD_Downscaled_Averaged_wetcharts,FUN=function(x){terra::disagg(x,round(terra::res(x)/domain_res,3),"near")})
+    
+    #reproject to exact domain now.  Here using nearest neighbor to prevent
+    #only 1 row/column of higher res pixels on the border from being
+    #interpolated.
+    NLCD_Downscaled_Averaged_wetcharts <- lapply(NLCD_Downscaled_Averaged_wetcharts,FUN=function(x){terra::mask(terra::project(x,domain_template,method="near"),domain)})
+    
+    cover <- terra::extract(NLCD_Downscaled_Averaged_wetcharts[[1]][[1]],
+                            terra::project(domain,NLCD_Downscaled_Averaged_wetcharts[[1]]),
+                            weights=T,cells=T)
+    for(A in 1:length(NLCD_Downscaled_Averaged_wetcharts)){
+      NLCD_Downscaled_Averaged_wetcharts[[A]][cover[,'cell']] <- NLCD_Downscaled_Averaged_wetcharts[[A]][cover[,'cell']]*cover[,'weight']
     }
-    if(Use_NALCMS){
-      NALCMS_Downscaled_Averaged_wetcharts <- lapply(NALCMS_Downscaled_Averaged_wetcharts,FUN=function(x){disagg(x,round(res(x)/domain_res,3),"near")})
-      NALCMS_Downscaled_Averaged_wetcharts <- lapply(NALCMS_Downscaled_Averaged_wetcharts,FUN=function(x){mask(project(x,domain_template,method="near"),domain)})
-      if(!Use_NLCD){
-        cover <- extract(NALCMS_Downscaled_Averaged_wetcharts[[1]][[1]],project(domain,NALCMS_Downscaled_Averaged_wetcharts[[1]]),weights=T,cells=T)
-      }
-      for(A in 1:length(NALCMS_Downscaled_Averaged_wetcharts)){
-        NALCMS_Downscaled_Averaged_wetcharts[[A]][cover[,'cell']] <- NALCMS_Downscaled_Averaged_wetcharts[[A]][cover[,'cell']]*cover[,'weight']
-      }
-    }
-    
-    
-    
-    
     
   }else if(any(domain_res>res(Downscaled_Averaged_wetcharts[[1]]))){
-    if(Use_NLCD){
-      domain_reproj <- project(domain,crs(NLCD_Downscaled_Averaged_wetcharts[[1]]))
-      
-      #reproject to exact domain now using an average to effectively aggregate
-      #while reprojecting.
-      NLCD_Downscaled_Averaged_wetcharts <- lapply(NLCD_Downscaled_Averaged_wetcharts,FUN=function(x){mask(crop(x,domain_reproj,snap="out"),domain_reproj,touches=T,updatevalue=0)})
-      cover <- extract(NLCD_Downscaled_Averaged_wetcharts[[1]][[1]],
-                       project(domain,NLCD_Downscaled_Averaged_wetcharts[[1]]),
-                       weights=T,cells=T)
-      for(A in 1:length(NLCD_Downscaled_Averaged_wetcharts)){
-        NLCD_Downscaled_Averaged_wetcharts[[A]][cover[,'cell']] <- NLCD_Downscaled_Averaged_wetcharts[[A]][cover[,'cell']]*cover[,'weight']
-      }
-      NLCD_Downscaled_Averaged_wetcharts <- lapply(NLCD_Downscaled_Averaged_wetcharts,FUN=function(x){project(extend(x,fill=0,ext(x)+(res(project(domain_template,crs(x)))*5)),domain_template,method="average")})
+    domain_reproj <- terra::project(domain,terra::crs(NLCD_Downscaled_Averaged_wetcharts[[1]]))
+    
+    #reproject to exact domain now using an average to effectively aggregate
+    #while reprojecting.
+    NLCD_Downscaled_Averaged_wetcharts <- lapply(NLCD_Downscaled_Averaged_wetcharts,FUN=function(x){terra::mask(terra::crop(x,domain_reproj,snap="out"),domain_reproj,touches=T,updatevalue=0)})
+    cover <- terra::extract(NLCD_Downscaled_Averaged_wetcharts[[1]][[1]],
+                            terra::project(domain,NLCD_Downscaled_Averaged_wetcharts[[1]]),
+                            weights=T,cells=T)
+    for(A in 1:length(NLCD_Downscaled_Averaged_wetcharts)){
+      NLCD_Downscaled_Averaged_wetcharts[[A]][cover[,'cell']] <- NLCD_Downscaled_Averaged_wetcharts[[A]][cover[,'cell']]*cover[,'weight']
     }
-    if(Use_NALCMS){
-      domain_reproj <- project(domain,crs(NALCMS_Downscaled_Averaged_wetcharts[[1]]))
-      NALCMS_Downscaled_Averaged_wetcharts <- lapply(NALCMS_Downscaled_Averaged_wetcharts,FUN=function(x){mask(crop(x,domain_reproj,snap="out"),domain_reproj,touches=T,updatevalue=0)})
-      cover <- extract(NALCMS_Downscaled_Averaged_wetcharts[[1]][[1]],
-                       project(domain,NALCMS_Downscaled_Averaged_wetcharts[[1]]),
-                       weights=T,cells=T)
-      for(A in 1:length(NALCMS_Downscaled_Averaged_wetcharts)){
-        NALCMS_Downscaled_Averaged_wetcharts[[A]][cover[,'cell']] <- NALCMS_Downscaled_Averaged_wetcharts[[A]][cover[,'cell']]*cover[,'weight']
-      }
-      NALCMS_Downscaled_Averaged_wetcharts <- lapply(NALCMS_Downscaled_Averaged_wetcharts,FUN=function(x){project(extend(x,fill=0,ext(x)+(res(project(domain_template,crs(x)))*5)),domain_template,method="average")})
-    }
+    NLCD_Downscaled_Averaged_wetcharts <- lapply(NLCD_Downscaled_Averaged_wetcharts,FUN=function(x){terra::project(terra::extend(x,fill=0,ext(x)+(terra::res(terra::project(domain_template,terra::crs(x)))*5)),domain_template,method="average")})
   }
   ################################################################################
   #write output
   
   for(B in 1:length(Downscaled_Averaged_wetcharts)){
-    if(Use_NLCD){
-      writeCDF(NLCD_Downscaled_Averaged_wetcharts[[B]],
-               paste0(Wetland_output_directory,'/Wetcharts_NLCD_Downscaled_subset_',B,'.nc'),
-               force_v4=TRUE,
-               varname='methane_emissions',
-               unit='nmol/m2/s',
-               longname=paste0('Methane emissions from Wetlands from the Wetcharts models, subset to models ',paste(Wetcharts_model_subset[[B]],collapse = ", ")),
-               missval=-9999,
-               overwrite=TRUE)
-    }
-    if(Use_NALCMS){
-      writeCDF(NALCMS_Downscaled_Averaged_wetcharts[[B]],
-               paste0(Wetland_output_directory,'/Wetcharts_NALCMS_Downscaled_subset_',B,'.nc'),
-               force_v4=TRUE,
-               varname='methane_emissions',
-               unit='nmol/m2/s',
-               longname=paste0('Methane emissions from Wetlands from the Wetcharts models, subset to models ',paste(Wetcharts_model_subset[[B]],collapse = ", ")),
-               missval=-9999,
-               overwrite=TRUE)
-    }
+    writeCDF_no_newline(NLCD_Downscaled_Averaged_wetcharts[[B]],
+                        paste0(Wetland_output_directory,'/Wetcharts_NLCD_Downscaled_subset_',B,'.nc'),
+                        force_v4=TRUE,
+                        varname='methane_emissions',
+                        unit='nmol/m2/s',
+                        longname=paste0('Methane emissions from Wetlands from the Wetcharts models, subset to models ',paste(Wetcharts_model_subset[[B]],collapse = ", ")),
+                        missval=-9999,
+                        overwrite=TRUE)
   }
   
   ################################################################################
@@ -447,15 +388,9 @@ Disaggregate_Wetcharts <- function(input_directory,
     #the minimum is a ~arbitrary value given the log scale can go quite negative.
     #the max is the max across wetcharts pre and post downscaling.
     zlim_min <- -3
-    zlim_max <- unlist(sapply(Averaged_wetcharts,FUN=function(x){global(x,max,na.rm=T)}))
-    if(Use_NLCD){
-      zlim_max <- max(unlist(sapply(NLCD_Downscaled_Averaged_wetcharts,FUN=function(x){global(x,max,na.rm=T)})),
-                      zlim_max)
-    }
-    if(Use_NALCMS){
-      zlim_max <- max(zlim_max,
-                      unlist(sapply(NALCMS_Downscaled_Averaged_wetcharts,FUN=function(x){global(x,max,na.rm=T)})))
-    }
+    zlim_max <- unlist(sapply(Averaged_wetcharts,FUN=function(x){terra::global(x,max,na.rm=T)}))
+    zlim_max <- max(unlist(sapply(NLCD_Downscaled_Averaged_wetcharts,FUN=function(x){terra::global(x,max,na.rm=T)})),
+                    zlim_max)
     zlim_max <- log10(zlim_max)
     
     
@@ -467,22 +402,12 @@ Disaggregate_Wetcharts <- function(input_directory,
       }
       
       #annual
-      if(Use_NLCD){
-        log_plot(input = NLCD_Downscaled_Averaged_wetcharts[[B]],zlim_min = zlim_min,
-                 zlim_max = zlim_max,filename = paste0('Wetcharts_NLCD_Downscaled_subset_',B,"_annual"),
-                 title = paste0("Annual NLCD downscaled Wetcharts CH4\nSaturated colorscale low end\nmodels ",
-                                model_list_string),plot_directory=plot_directory,
-                 domain=domain,County_Tigerlines=County_Tigerlines,
-                 State_Tigerlines=State_Tigerlines)
-      }
-      if(Use_NALCMS){
-        log_plot(input = NALCMS_Downscaled_Averaged_wetcharts[[B]],zlim_min = zlim_min,
-                 zlim_max = zlim_max,filename = paste0('Wetcharts_NALCMS_Downscaled_subset_',B,"_annual"),
-                 title = paste0("Annual NALCMS downscaled Wetcharts CH4\nSaturated colorscale low end\nmodels ",
-                                model_list_string),plot_directory=plot_directory,
-                 domain=domain,County_Tigerlines=County_Tigerlines,
-                 State_Tigerlines=State_Tigerlines)
-      }
+      log_plot(input = NLCD_Downscaled_Averaged_wetcharts[[B]],zlim_min = zlim_min,
+               zlim_max = zlim_max,filename = paste0('Wetcharts_NLCD_Downscaled_subset_',B,"_annual"),
+               title = paste0("Annual NLCD downscaled Wetcharts CH4\nSaturated colorscale low end\nmodels ",
+                              model_list_string),plot_directory=plot_directory,
+               domain=domain,County_Tigerlines=County_Tigerlines,
+               State_CB=State_CB)
       
       # Monthly
       # for(A in 1:12){
@@ -492,7 +417,7 @@ Disaggregate_Wetcharts <- function(input_directory,
       #              title = paste0(month.abb[A]," NLCD downscaled Wetcharts CH4\nSaturated colorscale low end\nmodels ",
       #                             model_list_string),plot_directory=plot_directory,
       #              domain=domain,County_Tigerlines=County_Tigerlines,
-      #              State_Tigerlines=State_Tigerlines)
+      #              State_CB=State_CB)
       #   }
       #   if(Use_NALCMS){
       #     log_plot(input = NALCMS_Downscaled_Averaged_wetcharts[[B]][[A]],zlim_min = zlim_min,
@@ -500,98 +425,12 @@ Disaggregate_Wetcharts <- function(input_directory,
       #              title = paste0(month.abb[A]," NALCMS downscaled Wetcharts CH4\nSaturated colorscale low end\nmodels ",
       #                             model_list_string),plot_directory=plot_directory,
       #              domain=domain,County_Tigerlines=County_Tigerlines,
-      #              State_Tigerlines=State_Tigerlines)
+      #              State_CB=State_CB)
       #   }
       # }
     }
   }
   
-  
-  
-  #not possible unless a square domain because the output has already been
-  #masked to exactly the domain polygon.  The coarser wetcharts data can't be
-  #masked to cover the same exact area and fractional cover weighting would not
-  #result in equivalent values as land cover based weighing.
-  
-  # ################################################################################
-  # #Quick sanity check.  The total emissions in the domain should be the same pre
-  # #and post downscaling regardless of land cover used.  Multiply by area to
-  # #cancel out the per area unit (flux -> emission rate).
-  # 
-  # #if the domain cuts off partial 0.5 deg pixels from Wetcharts, the domain-total
-  # #pre downscaling will not match.  So crop everything slightly to avoid this.
-  # comparable_domain <- crop(Averaged_wetcharts[[1]][[1]],project(domain,crs(Averaged_wetcharts[[1]])),snap="in")
-  # comparable_poly <- project(as.polygons(comparable_domain),domain)
-  # 
-  # colnamelist <- vector()
-  # if(Use_NLCD){
-  #   #combine the list into multiple layers (we don't care about separation here)
-  #   NLCD_check <- rast(NLCD_Downscaled_Averaged_wetcharts)
-  #   #crop to proper domain and sum
-  #   NLCD_check <- crop(NLCD_check*cellSize(NLCD_check),comparable_poly)
-  #   domain_total <- global(NLCD_check,sum,na.rm=T)
-  #   colnamelist <- c(colnamelist,"NLCD_downscaled")
-  # }
-  # 
-  # if(Use_NALCMS){
-  #   NALCMS_check <- rast(NALCMS_Downscaled_Averaged_wetcharts)
-  #   NALCMS_check <- crop(NALCMS_check*cellSize(NALCMS_check),comparable_poly)
-  #   if(Use_NLCD){
-  #     domain_total <- cbind(domain_total,global(NALCMS_check,sum,na.rm=T))
-  #   }else{
-  #     domain_total <- global(NALCMS_check,sum,na.rm=T)
-  #   }
-  #   colnamelist <- c(colnamelist,"NALCMS_downscaled")
-  # }
-  # 
-  # Averaged_wetcharts_check <- rast(Averaged_wetcharts)
-  # Averaged_wetcharts_check <- crop(Averaged_wetcharts_check*cellSize(Averaged_wetcharts_check),comparable_domain)
-  # domain_total <- cbind(domain_total,global(Averaged_wetcharts_check,sum,na.rm=T))
-  # colnamelist <- c(colnamelist,"not_downscaled")
-  # 
-  # domain_total <- as.data.frame(domain_total)
-  # colnames(domain_total) <- colnamelist
-  # 
-  # percent_change <- abs(domain_total - domain_total[,1])/domain_total[,1]*100
-  # if(!all(percent_change<1E-4,na.rm=T)){
-  #   View(domain_total)
-  #   stop("Something's gone wrong.  The total emissions (nmol/s) across the domain differs between the original and downscaled wetcharts.")
-  # }
-  # 
-  # 
-  # 
-  # 
-  # 
-  # 
-  # #NA's can't be used in math or the result is also an NA.  Force all NA's
-  # #across both wetcharts and downscaled wetcharts to 0 so we can be sure there
-  # #aren't any cases where there's an NA in one product, not the other
-  # 
-  # Averaged_wetcharts_check[is.na(Averaged_wetcharts_check)] <- 0
-  # 
-  # #can't really do this as it would depend on the domain projection.  Could
-  # #potentially use the value pre projection if saved...
-  # 
-  # if(Use_NLCD){
-  #   NLCD_pixel_check <- crop(NLCD_pixel_check*cellSize(NLCD_pixel_check),comparable_poly)
-  #   NLCD_pixel_check[is.na(NLCD_pixel_check)] <- 0
-  #   #given pixels can be > 1E11 mol/s, differing by < 1 is considered rounding
-  #   #error.
-  #   if(max(global(abs(aggregate(NLCD_pixel_check,fact=5,sum) -
-  #                     Averaged_wetcharts_check),max,na.rm=T))>1){
-  #     stop("Something's gone wrong.  There are pixels that differ between downscaled and original wetcharts when aggregating the NLCD downscaled values back to the original resolution.")
-  #   }
-  # }
-  # 
-  # if(Use_NALCMS){
-  #   NALCMS_pixel_check <- crop(NALCMS_pixel_check*cellSize(NALCMS_pixel_check),comparable_poly)
-  #   NALCMS_pixel_check[is.na(NALCMS_pixel_check)] <- 0
-  #   if(max(global(abs(aggregate(NALCMS_pixel_check,fact=5,sum) -
-  #                     Averaged_wetcharts_check),max,na.rm=T))>1){
-  #     stop("Something's gone wrong.  There are pixels that differ between downscaled and original wetcharts when aggregating the NALCMS downscaled values back to the original resolution.")
-  #   }
-  # }
-  # 
   cat("Finished wetland sector: Disaggregate_Wetcharts in",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
 }
 
