@@ -145,7 +145,7 @@
 #'  page.
 #'@param plot_directory Character providing the full filepath to save figures.
 #'  Only relevant if verbose = TRUE.
-#'@param State_Tigerlines SpatVector.  United States Census Bureau county
+#'@param State_CB SpatVector.  United States Census Bureau county
 #'  shapefile.  Available at
 #'  \url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.
 #'  Only relevant if verbose=TRUE.
@@ -214,13 +214,14 @@
 #'                         "ind_wood"=30,
 #'                         "elec_wood"=30),
 #'                       EIA_API_key=user_key,
-#'                       State_Tigerlines=vect("~/../Desktop/in/State_Tigerlines/tl_2018_us_state.shp"),
+#'                       State_CB=vect("~/../Desktop/in/State_CB/tl_2018_us_state.shp"),
 #'                       County_Tigerlines=vect("~/../Desktop/in/County_Tigerlines/tl_2018_us_county.shp"),
 #'                       plot_directory="~/../Desktop/plots/")
 #'@author Joe Pitt, \email{madeup@@wisc.edu}
 #'@author Kris Hajny, \email{blank@@fake.edu}
 #'@author Israel Lopez-Coto, \email{test@@test.edu}
 #'@export
+#'@seealso [CH4_inventory_build()] Calculates methane inventory using settings provided in config.
 
 
 ## stationary_combustion_r3.R
@@ -241,48 +242,76 @@ Stationary_combustion <- function(input_directory,
                                   County_Tigerlines,
                                   Use_ACES,
                                   Use_Vulcan,
-                                  ACES_directory,
-                                  vulcan_directory,
-                                  ACES_year,
-                                  vulcan_band,
+                                  aces_res,
+                                  aces_com,
+                                  aces_ind,
+                                  aces_elec,
+                                  vu_res,
+                                  vu_com,
+                                  vu_ind,
+                                  vu_elec,
                                   stationary_combustion_by_state,
                                   stationary_combustion_by_domain,
                                   stationary_combustion_GHGI_data,
                                   stationary_combustion_emission_factors,
+                                  Source_EIA_SEDS_data,
+                                  Source_NEI_data,
                                   EIA_API_key,
                                   plot_directory,
-                                  State_Tigerlines){
+                                  State_CB){
   
   starttime <- Sys.time()
   cat("Starting stationary combustion sector: Stationary_combustion\n")
   
   #because of how many subsectors this sector has, save it in it's own folder
-  stat_comb_output_directory <- paste0(output_directory,"stationary_combustion/")
+  stat_comb_output_directory <- file.path(output_directory,"stationary_combustion")
   dir.create(stat_comb_output_directory,showWarnings = F)
   
-  stat_comb_plot_directory <- paste0(plot_directory,"stationary_combustion/")
-  dir.create(stat_comb_plot_directory,showWarnings = F)
+  if(verbose){
+    stat_comb_plot_directory <- file.path(plot_directory,"stationary_combustion")
+    dir.create(stat_comb_plot_directory,showWarnings = F)
+  }
+  
   ################################################################################
-  #download and prepare SEDS data
+  #download SEDS data
   
   SEDS_state_name_list <- c(state_name_list,"US")
   SEDS_filename <- file.path(input_directory,"EIA","SEDS.csv")
   
-  if(!file.exists(SEDS_filename)){
+  if(Source_EIA_SEDS_data=="download"){
     #see https://www.eia.gov/opendata/browser/seds.  Filtered to only sectors,
     #states, and years of interest here.  All in billion BTU/yr units (last
     #digit B instead of P - short tons)
+    
+    #check for the most recent available - down to 2023, the newest available at
+    #the time of writing if inventory_year is newer
+    if(inventory_year>2023){
+      for(SEDS_yr in inventory_year:2023){
+        data_URL <- paste0("https://api.eia.gov/v2/seds/data/?frequency=annual&data[0]=value&facets[seriesId][]=CLCCB",
+                           "&facets[seriesId][]=CLEIB",
+                           paste0("&facets[stateId][]=AL",collapse = ""),
+                           "&start=",SEDS_yr,"&end=",SEDS_yr,
+                           "&sort[0][column]=seriesId&sort[0][direction]=asc&offset=0&api_key=",EIA_API_key)
+        test_url <- jsonlite::fromJSON(data_URL)
+        if(test_url$response$total>0){
+          break
+        }
+      }
+    }else{
+      SEDS_yr <- inventory_year
+    }
+    
     SEDS_URL <- paste0("https://api.eia.gov/v2/seds/data/?frequency=annual&data[0]=value&facets[seriesId][]=CLCCB",
                        "&facets[seriesId][]=CLEIB&facets[seriesId][]=CLICB&facets[seriesId][]=NGCCB&facets[seriesId][]=NGEIB&facets[seriesId][]=NGICB&facets[seriesId][]=PACCB&facets[seriesId][]=PAEIB&facets[seriesId][]=PAICB&facets[seriesId][]=PARCB&facets[seriesId][]=WDRCB&facets[seriesId][]=WWCCB&facets[seriesId][]=WWEIB&facets[seriesId][]=WWICB",
                        paste0("&facets[stateId][]=",SEDS_state_name_list,collapse = ""),
-                       "&start=",inventory_year-1,"&end=",inventory_year,
+                       "&start=",SEDS_yr,"&end=",SEDS_yr,
                        "&sort[0][column]=seriesId&sort[0][direction]=asc&offset=0&api_key=",EIA_API_key)
     
     #download directly into R and keep only the data table
     EIA_raw_data <- Trycatch_downloader(SEDS_URL,output_location=NULL,method="JSON",
                                         error_message=paste0("\nEIA State Energy Data System data could not be downloaded using API link: ",SEDS_URL,"\n\nmake sure you have an active EIA API key in the config!"))
     EIA_raw_data <- EIA_raw_data$response$data
-    if(any(EIA_raw_data$period!=inventory_year)){
+    if(any(EIA_raw_data$period!=SEDS_yr)){
       #frustratingly, the API seems to sometimes pull start - end assuming that if
       #the same year, it should grab that 1 year.  Other times, however, doing
       #that gives you no data, and you have to set to previous year - year desired
@@ -292,19 +321,25 @@ Stationary_combustion <- function(input_directory,
       SEDS_URL <- paste0("https://api.eia.gov/v2/seds/data/?frequency=annual&data[0]=value&facets[seriesId][]=CLCCB",
                          "&facets[seriesId][]=CLEIB&facets[seriesId][]=CLICB&facets[seriesId][]=NGCCB&facets[seriesId][]=NGEIB&facets[seriesId][]=NGICB&facets[seriesId][]=PACCB&facets[seriesId][]=PAEIB&facets[seriesId][]=PAICB&facets[seriesId][]=PARCB&facets[seriesId][]=WDRCB&facets[seriesId][]=WWCCB&facets[seriesId][]=WWEIB&facets[seriesId][]=WWICB",
                          paste0("&facets[stateId][]=",SEDS_state_name_list,collapse = ""),
-                         "&start=",inventory_year,"&end=",inventory_year,
+                         "&start=",SEDS_yr-1,"&end=",SEDS_yr,
                          "&sort[0][column]=seriesId&sort[0][direction]=asc&offset=0&api_key=",EIA_API_key)
       EIA_raw_data <- Trycatch_downloader(SEDS_URL,output_location=NULL,method="JSON",
                                           error_message=paste0("\nEIA State Energy Data System data could not be downloaded using API link: ",SEDS_URL,"\n\nmake sure you have an active EIA API key in the config!"))
       EIA_raw_data <- EIA_raw_data$response$data
     }
-    write.csv(file = SEDS_filename,x = EIA_raw_data,row.names = F)
+    utils::write.csv(file = SEDS_filename,x = EIA_raw_data,row.names = F)
+  }else if(Source_EIA_SEDS_data=="default"){
+    #UPDATE TO ZENODO
+  }else{
+    invisible(file.copy(Source_EIA_SEDS_data,SEDS_filename,overwrite = T))
   }
+  EIA_raw_data <- utils::read.csv(SEDS_filename,header=T)
   
-  EIA_raw_data <- read.csv(SEDS_filename,header=T)
+  ################################################################################
+  #prepare SEDS data
   
   #rearrange columns/rows to better mesh with EPA data
-  EIA_data=(reshape(EIA_raw_data[,c("seriesId","stateId","value")],idvar="stateId",timevar = "seriesId",direction="wide"))
+  EIA_data=(stats::reshape(EIA_raw_data[,c("seriesId","stateId","value")],idvar="stateId",timevar = "seriesId",direction="wide"))
   
   #rename to be consistent with EPA (matches SEDS webpage).  All in billion
   #BTU/yr.
@@ -327,7 +362,7 @@ Stationary_combustion <- function(input_directory,
   
   rm(EIA_raw_data,EIA_data)
   ################################################################################
-  #Prep EPA/SEDS data a little before use.  Scaling SEDS data to align with
+  #Prep SEDS data a little before use.  Scaling SEDS data to align with
   #national GHGI data.  Scaling = GHGI nationa/SEDS national.
   # Notes:
   # - there is no reported residential coal use in the US
@@ -372,10 +407,10 @@ Stationary_combustion <- function(input_directory,
                            stack(stat_comb_data_adj[grepl('_ER', names(stat_comb_data_adj))]))
   names(state_total_ch4) <- c('State', 'state_ch4_emiss', 'Sector')
   
-  # Also calculate domain totals (will be identical if only 1 state in domain)
-  domain_total_ch4 <- aggregate(state_total_ch4$state_ch4_emiss,
-                                list(Sector=state_total_ch4$Sector),
-                                sum)
+  # Also calculate domain totals
+  domain_total_ch4 <- stats::aggregate(state_total_ch4$state_ch4_emiss,
+                                       list(Sector=state_total_ch4$Sector),
+                                       sum)
   names(domain_total_ch4) <- c('Sector', 'domain_ch4_emiss')
   
   cat("Finished loading and preparing SEDS data at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
@@ -385,7 +420,7 @@ Stationary_combustion <- function(input_directory,
   
   NEI_filename <- file.path(input_directory,"NEI","CO_data.csv")
   
-  if(!file.exists(NEI_filename)){
+  if(Source_NEI_data=="download"){
     # data_URL <- "https://data.epa.gov/efservice/nei.county_sector_summary/pollutant_code=CO/JSON"
     data_URL <- "https://data.epa.gov/dmapservice/nei.county_sector_summary/pollutant_code/equals/CO/json"
     NEI_data_orig <- Trycatch_downloader(data_URL,output_location=NULL,method="JSON",
@@ -405,7 +440,6 @@ Stationary_combustion <- function(input_directory,
       cat(paste0("NEI is every 3 years and does not have an inventory for ",inventory_year,".  Using ",NEI_year," as the nearest available data.\n"))
     }
     NEI_data_orig <- NEI_data_orig[NEI_data_orig$inventory_year==NEI_year,]
-    # NEI_data_orig <- NEI_data_orig[NEI_data_orig$inventory_year==2017,]
     
     #Rewrite the sector codes from numeric to text descriptions.  Method from
     #(https://stackoverflow.com/a/50898694)
@@ -420,46 +454,17 @@ Stationary_combustion <- function(input_directory,
                                                       gsub("sector_code","SECTOR",
                                                            gsub("uom","unit of measure",colnames(NEI_data_orig)))))))
     
-    write.csv(NEI_data_orig,NEI_filename,row.names = F)
-    
-    # #ensure that the download is identical to the API download.  Some editing
-    # #needed as NEI formatting is slightly different downloaded vs API
-    # #downloaded.  Perfect agreement for the 5 states in the Philly domain and
-    # #Joe's domain (1 rounding difference as 0.5 -> 0 in R, 1 in the download).
-    # 
-    # #Joes 2017 file
-    # # NEI_file <- "G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Joe_data/NEI2017_combustion_CO.csv"
-    # # NEI_data_alt <- as.data.frame(read.csv(NEI_file,header=T))
-    # # NEI_data_alt$State.FIPS <- sprintf("%02d",NEI_data_alt$State.FIPS)
-    # # NEI_data_alt$County.FIPS <- sprintf("%03d",NEI_data_alt$County.FIPS)
-    # # colnames(NEI_data_alt) <- gsub("\\."," ",toupper(colnames(NEI_data_alt)))
-    # # NEI_data_orig$SECTOR <- gsub(","," ",NEI_data_orig$SECTOR)
-    # # NEI_data_orig <- NEI_data_orig[NEI_data_orig$SECTOR %in% NEI_data_alt$SECTOR,]
-    # # NEI_data_orig <- NEI_data_orig[NEI_data_orig$STATE %in% NEI_data_alt$STATE,]
-    # # NEI_data_alt$EMISSIONS <- round(NEI_data_alt$EMISSIONS)
-    # 
-    # #My 2017 file
-    # # NEI_file <- "G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Raw data/NEI_2017.xlsx"
-    # # NEI_data_alt <- as.data.frame(read_xlsx(NEI_file,skip=0,col_names = T))
-    # 
-    # NEI_data_orig <- NEI_data_orig[,colnames(NEI_data_alt)[-6]]
-    # NEI_data_orig <- NEI_data_orig[order(NEI_data_orig$SECTOR,NEI_data_orig$`STATE FIPS`,NEI_data_orig$`COUNTY FIPS`),]
-    # NEI_data_orig$SECTOR <- gsub("&","and",NEI_data_orig$SECTOR)
-    # 
-    # NEI_data_alt <- NEI_data_alt[,-6]
-    # NEI_data_alt <- NEI_data_alt[order(NEI_data_alt$SECTOR,NEI_data_alt$`STATE FIPS`,NEI_data_alt$`COUNTY FIPS`),]
-    # NEI_data_alt$SECTOR <- gsub("&","and",NEI_data_alt$SECTOR)
-    # NEI_data_alt$SECTOR <- gsub("On-Road Gasoline","On-Road non-Diesel",NEI_data_alt$SECTOR)
-    # 
-    # all(NEI_data_alt == NEI_data_orig)
-    # NEI_data_alt[which(NEI_data_alt != NEI_data_orig) %% nrow(NEI_data_alt),]
-    # NEI_data_orig[which(NEI_data_orig != NEI_data_alt) %% nrow(NEI_data_alt),]
+    utils::write.csv(NEI_data_orig,NEI_filename,row.names = F)
+  }else if(Source_NEI_data=="default"){
+    #UPDATE TO ZENODO
+  }else{
+    invisible(file.copy(Source_NEI_data,NEI_filename,overwrite = T))
   }
-  
+  ################################################################################
   #load and rename column names.  loading from csv replaces spaces with periods,
   #switch back (note this could cause errors in other cases as other special
   #characters may also be replaced by periods)
-  NEI_data_orig <- read.csv(NEI_filename,header=T)
+  NEI_data_orig <- utils::read.csv(NEI_filename,header=T)
   colnames(NEI_data_orig) <- gsub("\\."," ",colnames(NEI_data_orig))
   
   #convert all character columns to factor
@@ -472,14 +477,14 @@ Stationary_combustion <- function(input_directory,
   # Some county-sector combinations are missing, presumably because they are zero.
   # We want to list these as zero, otherwise it will cause trouble later.
   # Use reshape to do this (there is probably a neater way...)
-  NEI_data_wide <- reshape(NEI_data_orig[c('SECTOR', 'STATE', 'STATE FIPS', 'COUNTY FIPS', 'EMISSIONS')],
-                           idvar=c('STATE', 'STATE FIPS', 'COUNTY FIPS'),
-                           timevar='SECTOR',
-                           direction='wide')
+  NEI_data_wide <- stats::reshape(NEI_data_orig[c('SECTOR', 'STATE', 'STATE FIPS', 'COUNTY FIPS', 'EMISSIONS')],
+                                  idvar=c('STATE', 'STATE FIPS', 'COUNTY FIPS'),
+                                  timevar='SECTOR',
+                                  direction='wide')
   
-  NEI_data <- reshape(NEI_data_wide,
-                      idvar=c('STATE', 'STATE FIPS', 'COUNTY FIPS'),
-                      direction='long')
+  NEI_data <- stats::reshape(NEI_data_wide,
+                             idvar=c('STATE', 'STATE FIPS', 'COUNTY FIPS'),
+                             direction='long')
   names(NEI_data) <- c('STATE', 'STATE_FIPS', 'COUNTY_FIPS', 'SECTOR', 'CO_EMISSIONS')
   NEI_data$CO_EMISSIONS[which(is.na(NEI_data$CO_EMISSIONS))] <- 0
   
@@ -530,25 +535,25 @@ Stationary_combustion <- function(input_directory,
   
   # Calculate the fraction of state-sector-total CO emissions represented by
   # each county.  Repeat at the domain scale.
-  NEI_data$emiss_frac <- NEI_data$CO_EMISSIONS/ave(NEI_data$CO_EMISSIONS,
-                                                   NEI_data$SECTOR,
-                                                   NEI_data$STATE_FIPS,
-                                                   FUN=sum)
-  NEI_data$emiss_frac_domain <- NEI_data$CO_EMISSIONS/ave(NEI_data$CO_EMISSIONS,
+  NEI_data$emiss_frac <- NEI_data$CO_EMISSIONS/stats::ave(NEI_data$CO_EMISSIONS,
                                                           NEI_data$SECTOR,
+                                                          NEI_data$STATE_FIPS,
                                                           FUN=sum)
+  NEI_data$emiss_frac_domain <- NEI_data$CO_EMISSIONS/stats::ave(NEI_data$CO_EMISSIONS,
+                                                                 NEI_data$SECTOR,
+                                                                 FUN=sum)
   
   # In some cases the NEI state-sector-total CO emissions are zero, but the
   # state-sector-total CH4 emissions are not.  In these cases we want to
   # distribute within the state according to ACES/Vulcan only.  Calculate the
   # number of counties and assign equal fraction to each of them
-  NEI_data$state_county_count <- ave(NEI_data$CO_EMISSIONS,
-                                     NEI_data$SECTOR,
-                                     NEI_data$STATE_FIPS,
-                                     FUN=length)
-  NEI_data$domain_county_count <- ave(NEI_data$CO_EMISSIONS,
-                                      NEI_data$SECTOR,
-                                      FUN=length)
+  NEI_data$state_county_count <- stats::ave(NEI_data$CO_EMISSIONS,
+                                            NEI_data$SECTOR,
+                                            NEI_data$STATE_FIPS,
+                                            FUN=length)
+  NEI_data$domain_county_count <- stats::ave(NEI_data$CO_EMISSIONS,
+                                             NEI_data$SECTOR,
+                                             FUN=length)
   NEI_data$emiss_frac[which(is.na(NEI_data$emiss_frac))] <- 1/NEI_data$state_county_count[which(is.na(NEI_data$emiss_frac))]
   NEI_data$emiss_frac_domain[which(is.na(NEI_data$emiss_frac_domain))] <- 1/NEI_data$domain_county_count[which(is.na(NEI_data$emiss_frac_domain))]
   
@@ -594,51 +599,10 @@ Stationary_combustion <- function(input_directory,
   # Create an unstacked dataframe containing bystate and domain emissions for each
   # county, with sectors across columns
   df_long <- NEI_data_merge[c('SECTOR','STATE_FIPS','COUNTY_FIPS','county_ch4_emiss_bystate','county_ch4_emiss_bydomain')]
-  df_wide <- reshape(df_long, idvar=c('STATE_FIPS','COUNTY_FIPS'), timevar='SECTOR', direction='wide')
+  df_wide <- stats::reshape(df_long, idvar=c('STATE_FIPS','COUNTY_FIPS'), timevar='SECTOR', direction='wide')
   df_wide[is.na(df_wide)] <- 0
   
   rm(required_sectors)
-  ################################################################################
-  #Sanity check
-  
-  #Does the total per state downscaled to the counties match the total per
-  #state/domain initially used?
-  
-  if(stationary_combustion_by_state){
-    NEI_state_check <- tapply(NEI_data_merge$county_ch4_emiss_bystate,
-                              list(NEI_data_merge$STATE,NEI_data_merge$SECTOR),sum)
-    #sum per state
-    NEI_state_check <- as.data.frame.table(NEI_state_check)
-    colnames(NEI_state_check) <- c(colnames(state_total_ch4)[c(1,3)],"NEI_state_CH4_emiss")
-    #combine with state_total_ch4
-    NEI_state_check <- merge(state_total_ch4,NEI_state_check)
-    percent_change <- abs(NEI_state_check[,3] - NEI_state_check[,4])/NEI_state_check[,4]
-    if(!all(percent_change<0.001,na.rm=T)){
-      #Check if all values are within 0.1 percent of the first column (i.e.,
-      #all are ~identical other than minor rounding)
-      View(NEI_state_check[which(percent_change>0.001),])
-      stop("NEI total in some states doesn't match input state totals for some sectors.  Something wasn't distributed properly.")
-    }
-  }
-  
-  if(stationary_combustion_by_domain){
-    #repeat, domain scale
-    NEI_domain_check <- tapply(NEI_data_merge$county_ch4_emiss_bydomain,
-                               list(NEI_data_merge$SECTOR),sum,na.rm=T)
-    NEI_domain_check <- as.data.frame.table(NEI_domain_check)
-    colnames(NEI_domain_check) <- c(colnames(domain_total_ch4)[1],"NEI_domain_CH4_emiss")
-    NEI_domain_check <- merge(domain_total_ch4,NEI_domain_check)
-    percent_change <- abs(NEI_domain_check[,2] - NEI_domain_check[,3])/NEI_domain_check[,3]
-    if(!all(percent_change<0.001,na.rm=T)){
-      #Check if all values are within 0.1 percent of the first column (i.e.,
-      #all are ~identical other than minor rounding)
-      View(NEI_domain_check[which(percent_change>0.001),])
-      stop("NEI total in the domain doesn't match input domain totals for some sectors.  Something wasn't distributed properly.")
-    }
-  }
-  
-  suppressWarnings(rm(NEI_state_check,NEI_domain_check,percent_change))
-  cat("Finished loading and preparing NEI data at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
   ################################################################################
   #Now load in the shapefiles and ACES/Vulcan, merge geometries
   
@@ -681,47 +645,26 @@ Stationary_combustion <- function(input_directory,
                    'elec_petr_ER',
                    'elec_gas_ER',
                    'elec_wood_ER')
-  
-  if(Use_ACES){
-    #load in ACES files, set crs as it's not loaded in properly
-    aces_res <- rast(paste0(ACES_directory,"/Sectoral/",ACES_year,'_Annual_ACES_Residential.nc'))
-    crs(aces_res) <- "+proj=lcc +lat_0=40 +lon_0=-97 +lat_1=33 +lat_2=45 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
-    
-    aces_com <- rast(paste0(ACES_directory,"/Sectoral/",ACES_year,'_Annual_ACES_Commercial.nc'))
-    crs(aces_com) <- "+proj=lcc +lat_0=40 +lon_0=-97 +lat_1=33 +lat_2=45 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
-    
-    aces_ind <- rast(paste0(ACES_directory,"/Sectoral/",ACES_year,'_Annual_ACES_Industrial.nc'))
-    crs(aces_ind) <- "+proj=lcc +lat_0=40 +lon_0=-97 +lat_1=33 +lat_2=45 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
-    
-    aces_elec <- rast(paste0(ACES_directory,"/Sectoral/",ACES_year,'_Annual_ACES_Elec.nc'))
-    crs(aces_elec) <- "+proj=lcc +lat_0=40 +lon_0=-97 +lat_1=33 +lat_2=45 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
-  }
-  if(Use_Vulcan){
-    vu_res <- rast(paste0(vulcan_directory,"/Sectoral/","Vulcan_v3_US_annual_1km_residential_mn.nc4"), subds='carbon_emissions', lyrs=vulcan_band)
-    vu_com <- rast(paste0(vulcan_directory,"/Sectoral/",'Vulcan_v3_US_annual_1km_commercial_mn.nc4'), subds='carbon_emissions', lyrs=vulcan_band)
-    vu_ind <- rast(paste0(vulcan_directory,"/Sectoral/",'Vulcan_v3_US_annual_1km_industrial_mn.nc4'), subds='carbon_emissions', lyrs=vulcan_band)
-    vu_elec <- rast(paste0(vulcan_directory,"/Sectoral/",'Vulcan_v3_US_annual_1km_elec_prod_mn.nc4'), subds='carbon_emissions', lyrs=vulcan_band)
-  }
-  
+
   ################################################################################
   #process emissions at the state scale
   
   if(stationary_combustion_by_state){
-    cat("Disaggregating state total emissions to individual counties using Vulcan/ACES at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
+    cat("This step is memory intensive!  Disaggregating state total emissions to individual counties using Vulcan/ACES at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
     if(Use_ACES){
       #mask to only keep those counties that are at least partly within the domain
-      all_merge_LCC_state <- mask(all_merge_state,domain)
+      all_merge_LCC_state <- terra::mask(all_merge_state,domain)
       #convert state scale versions to the proper crs
-      all_merge_LCC_state <- project(all_merge_LCC_state,aces_res)
+      all_merge_LCC_state <- terra::project(all_merge_LCC_state,aces_res)
       #Calculate per-pixel coverage for each county separately.  First split by
       #unique state-county number, then calculate per-pixel coverage, output = list
       #of spatvectors
       if(length(unique(all_merge_LCC_state$COUNTYFP))==1){
-        cover_all_aces <- list(extract(aces_res,all_merge_LCC_state,weights=T,cells=T))
+        cover_all_aces <- list(terra::extract(aces_res,all_merge_LCC_state,weights=T,cells=T))
       }else{
         cover_all_aces <- all_merge_LCC_state %>% 
           split(f=paste0(all_merge_LCC_state$STATEFP,all_merge_LCC_state$COUNTYFP)) %>%
-          lapply(function(x){extract(aces_res,x,weights=T,cells=T)})
+          lapply(function(x){terra::extract(aces_res,x,weights=T,cells=T)})
         cover_all_aces <- cover_all_aces[paste0(all_merge_LCC_state$STATEFP,all_merge_LCC_state$COUNTYFP)]
       }
       
@@ -734,28 +677,28 @@ Stationary_combustion <- function(input_directory,
       
       #clear up memory from disaggregation as it can be quite significant for a
       #large domain
-      gc()
+      invisible(gc())
     }
     if(Use_Vulcan){
-      all_merge_LCC_state <- mask(all_merge_state,domain)
-      all_merge_LCC_state <- project(all_merge_LCC_state,vu_res)
+      all_merge_LCC_state <- terra::mask(all_merge_state,domain)
+      all_merge_LCC_state <- terra::project(all_merge_LCC_state,vu_res)
       if(length(unique(all_merge_LCC_state$COUNTYFP))==1){
-        cover_all_vulcan <- list(extract(vu_res,all_merge_LCC_state,weights=T,cells=T))
+        cover_all_vulcan <- list(terra::extract(vu_res,all_merge_LCC_state,weights=T,cells=T))
       }else{
         cover_all_vulcan <- all_merge_LCC_state %>% 
           split(f=paste0(all_merge_LCC_state$STATEFP,all_merge_LCC_state$COUNTYFP)) %>%
-          lapply(function(x){extract(vu_res,x,weights=T,cells=T)})
+          lapply(function(x){terra::extract(vu_res,x,weights=T,cells=T)})
         cover_all_vulcan <- cover_all_vulcan[paste0(all_merge_LCC_state$STATEFP,all_merge_LCC_state$COUNTYFP)]
       }
       disaggregation(vu_res,res_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_vulcan,out_envir=environment())
       disaggregation(vu_com,com_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_vulcan,out_envir=environment())
       disaggregation(vu_ind,ind_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_vulcan,out_envir=environment())
       disaggregation(vu_elec,elec_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_vulcan,out_envir=environment())
-      gc()
+      invisible(gc())
     }
     rm(all_merge_LCC_state)
     
-    cat("\nFinished disaggregating state-scale emissions using Vulcan/ACES at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
+    cat("\rFinished disaggregating state-scale emissions using Vulcan/ACES at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start                                 \n")
   }
   ################################################################################
   #now at the domain scale
@@ -764,18 +707,18 @@ Stationary_combustion <- function(input_directory,
     cat("Disaggregating domain total emissions to individual counties using Vulcan/ACES at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
     if(Use_ACES){
       #mask to only keep those counties that are at least partly within the domain
-      all_merge_LCC_domain <- mask(all_merge_domain,domain)
+      all_merge_LCC_domain <- terra::mask(all_merge_domain,domain)
       
-      all_merge_LCC_domain <- project(all_merge_LCC_domain,aces_res)
+      all_merge_LCC_domain <- terra::project(all_merge_LCC_domain,aces_res)
       
       #don't recalculate this, only calculate it if we have to
       if(!stationary_combustion_by_state){
         if(length(unique(all_merge_LCC_domain$COUNTYFP))==1){
-          cover_all_aces <- list(extract(aces_res,all_merge_LCC_domain,weights=T,cells=T))
+          cover_all_aces <- list(terra::extract(aces_res,all_merge_LCC_domain,weights=T,cells=T))
         }else{
           cover_all_aces <- all_merge_LCC_domain %>% 
             split(f=paste0(all_merge_LCC_domain$STATEFP,all_merge_LCC_domain$COUNTYFP)) %>%
-            lapply(function(x){extract(aces_res,x,weights=T,cells=T)})
+            lapply(function(x){terra::extract(aces_res,x,weights=T,cells=T)})
           cover_all_aces <- cover_all_aces[paste0(all_merge_LCC_domain$STATEFP,all_merge_LCC_domain$COUNTYFP)]
         }
       }
@@ -783,18 +726,18 @@ Stationary_combustion <- function(input_directory,
       disaggregation(aces_com,com_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_aces,out_envir=environment())
       disaggregation(aces_ind,ind_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_aces,out_envir=environment())
       disaggregation(aces_elec,elec_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_aces,out_envir=environment())
-      gc()
+      invisible(gc())
     }
     if(Use_Vulcan){
-      all_merge_LCC_domain <- mask(all_merge_domain,domain)
-      all_merge_LCC_domain <- project(all_merge_LCC_domain,vu_res)
+      all_merge_LCC_domain <- terra::mask(all_merge_domain,domain)
+      all_merge_LCC_domain <- terra::project(all_merge_LCC_domain,vu_res)
       if(!stationary_combustion_by_state){
         if(length(unique(all_merge_LCC_domain$COUNTYFP))==1){
-          cover_all_vulcan <- list(extract(vu_res,all_merge_LCC_domain,weights=T,cells=T))
+          cover_all_vulcan <- list(terra::extract(vu_res,all_merge_LCC_domain,weights=T,cells=T))
         }else{
           cover_all_vulcan <- all_merge_LCC_domain %>% 
             split(f=paste0(all_merge_LCC_domain$STATEFP,all_merge_LCC_domain$COUNTYFP)) %>%
-            lapply(function(x){extract(vu_res,x,weights=T,cells=T)})
+            lapply(function(x){terra::extract(vu_res,x,weights=T,cells=T)})
           cover_all_vulcan <- cover_all_vulcan[paste0(all_merge_LCC_domain$STATEFP,all_merge_LCC_domain$COUNTYFP)]
         }
       }
@@ -802,11 +745,11 @@ Stationary_combustion <- function(input_directory,
       disaggregation(vu_com,com_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_vulcan,out_envir=environment())
       disaggregation(vu_ind,ind_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_vulcan,out_envir=environment())
       disaggregation(vu_elec,elec_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_vulcan,out_envir=environment())
-      gc()
+      invisible(gc())
     }
     rm(all_merge_LCC_domain)
     
-    cat("\nFinished disaggregating domain-scale emissions using Vulcan/ACES at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
+    cat("\rFinished disaggregating domain-scale emissions using Vulcan/ACES at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start                                \n")
   }
   ################################################################################
   #write a function to save the output in an organized fashion
@@ -829,14 +772,14 @@ Stationary_combustion <- function(input_directory,
     #(building emissions partially from all counties a pixel is within).  Here
     #we account for pixels partially within the domain (excluding the fraction
     #of pixels outside the domain).
-    domain_reproj <- project(domain,crs(input))
-    input=crop(input,domain_reproj,snap="out")
-    input=mask(input,domain_reproj,touches=T,updatevalue=0)
-    cover <- extract(input,domain_reproj,weights=T,cells=T)
+    domain_reproj <- terra::project(domain,terra::crs(input))
+    input=terra::crop(input,domain_reproj,snap="out")
+    input=terra::mask(input,domain_reproj,touches=T,updatevalue=0)
+    cover <- terra::extract(input,domain_reproj,weights=T,cells=T)
     input[cover[,'cell']] <- input[cover[,'cell']]*cover[,'weight']
-    input=extend(input,fill=0,
-                 ext(input)+(res(project(domain_template,crs(input)))*5))
-    input=project(input,domain_template,method="average")
+    input=terra::extend(input,fill=0,
+                        terra::ext(input)+(terra::res(terra::project(domain_template,terra::crs(input)))*5))
+    input=terra::project(input,domain_template,method="average")
     
     #convert from mol/km2s to nmol/m2s
     input <- input*1000
@@ -874,17 +817,17 @@ Stationary_combustion <- function(input_directory,
       inventory_name <- "vulcan"
     }
     
-    writeCDF(input,
-             paste0(stat_comb_output_directory,'/',"stat_comb_",sub("_ER","",total),
-                    "_by",disaggregation_level,"_",inventory_name,'.nc'),
-             force_v4=TRUE,
-             varname='methane_emissions',
-             unit='nmol/m2/s',
-             longname=paste0('Methane emissions from ',sector_name,' sector stationary combustion of ',
-                             fuel_name,', spatially allocated from ',disaggregation_name,
-                             ' totals using NEI CO emissions and ',inventory_name,' ',sector_name,' CO2 emissions'),
-             missval=-9999,
-             overwrite=TRUE)
+    writeCDF_no_newline(input,
+                        file.path(stat_comb_output_directory,paste0("stat_comb_",sub("_ER","",total),
+                                                                    "_by",disaggregation_level,"_",inventory_name,'.nc')),
+                        force_v4=TRUE,
+                        varname='methane_emissions',
+                        unit='nmol/m2/s',
+                        longname=paste0('Methane emissions from ',sector_name,' sector stationary combustion of ',
+                                        fuel_name,', spatially allocated from ',disaggregation_name,
+                                        ' totals using NEI CO emissions and ',inventory_name,' ',sector_name,' CO2 emissions'),
+                        missval=-9999,
+                        overwrite=TRUE)
   }
   
   
@@ -968,218 +911,127 @@ Stationary_combustion <- function(input_directory,
     }
   }
   
-  # ################################################################################
-  # #Some sanity checks - no longer possible given cropping to counties within
-  # #domain
-  # 
-  # #find all processed residential files
-  # res_data_objects <- as.list(ls(pattern=glob2rx("*_res_ch4*")))
-  # #get the length, convert from a list of the names to the actual rasters
-  # res_data_length <- length(res_data_objects)
-  # res_data_list <- sapply(res_data_objects,get,envir=environment())
-  # #get the domain total for each raster, put into an organized df.  mol/km2/s in
-  # #1 km2 grids, so mol/s
-  # res_data <- as.data.frame(matrix(sapply(res_data_list,global,sum,na.rm=T),
-  #                                  ncol=res_data_length))
-  # #properly name its dimensions
-  # names(res_data) <- gsub("res_ch4","by",unlist(res_data_objects))
-  # rownames(res_data) <- names(res_data_list[,1])
-  # 
-  # com_data_objects <- as.list(ls(pattern=glob2rx("*_com_ch4*")))
-  # com_data_length <- length(com_data_objects)
-  # com_data_list <- sapply(com_data_objects,get,envir=environment())
-  # com_data <- as.data.frame(matrix(sapply(com_data_list,global,sum,na.rm=T),
-  #                                  ncol=com_data_length))
-  # names(com_data) <- gsub("com_ch4","by",unlist(com_data_objects))
-  # rownames(com_data) <- names(com_data_list[,1])
-  # 
-  # ind_data_objects <- as.list(ls(pattern=glob2rx("*_ind_ch4*")))
-  # ind_data_length <- length(ind_data_objects)
-  # ind_data_list <- sapply(ind_data_objects,get,envir=environment())
-  # ind_data <- as.data.frame(matrix(sapply(ind_data_list,global,sum,na.rm=T),
-  #                                  ncol=ind_data_length))
-  # names(ind_data) <- gsub("ind_ch4","by",unlist(ind_data_objects))
-  # rownames(ind_data) <- names(ind_data_list[,1])
-  # 
-  # elec_data_objects <- as.list(ls(pattern=glob2rx("*_elec_ch4*")))
-  # elec_data_length <- length(elec_data_objects)
-  # elec_data_list <- sapply(elec_data_objects,get,envir=environment())
-  # elec_data <- as.data.frame(matrix(sapply(elec_data_list,global,sum,na.rm=T),
-  #                                   ncol=elec_data_length))
-  # names(elec_data) <- gsub("elec_ch4","by",unlist(elec_data_objects))
-  # rownames(elec_data) <- names(elec_data_list[,1])
-  # 
-  # #combine into 1 dataframe
-  # ch4_totals_df <- rbind(com_data,elec_data,ind_data,res_data)
-  # 
-  # #original data that was distributed in the rasters.  The totals should still
-  # #match.
-  # input_totals <- values(merge_with_poly[,grep(glob2rx("county_ch4_emiss*"),names(merge_with_poly))])
-  # input_totals <- colSums(input_totals)
-  # input_totals_state <- input_totals[grep("bystate",names(input_totals))]
-  # input_totals_domain <- input_totals[grep("bydomain",names(input_totals))]
-  # names(input_totals_state) <- gsub("county_ch4_emiss_bystate.","",names(input_totals_state))
-  # names(input_totals_domain) <- gsub("county_ch4_emiss_bydomain.","",names(input_totals_domain))
-  # 
-  # #combine all 3 now
-  # ch4_totals_df <- data.frame(ch4_totals_df,
-  #                             "bystate_input"=input_totals_state[rownames(ch4_totals_df)],
-  #                             "bydomain_input"=input_totals_domain[rownames(ch4_totals_df)])
-  # 
-  # #save the rownames
-  # ch4_rowname_df <- rownames(ch4_totals_df)
-  # 
-  # #rewrite to numeric and rename the rows
-  # ch4_totals_df <- apply(ch4_totals_df, 2, FUN=function(x){as.numeric(x)})
-  # rownames(ch4_totals_df) <- ch4_rowname_df
-  # 
-  # #split into bystate and bydomain
-  # if(stationary_combustion_by_state){
-  #   ch4_bystate_df <- ch4_totals_df[,grep("bystate",colnames(ch4_totals_df))]
-  # 
-  #   #compare every column to the first, rounded to 7 digits.  All values should be
-  #   #true
-  #   percent_change <- abs(ch4_bystate_df - ch4_bystate_df[,1])/ch4_bystate_df[,1]
-  #   if(!all(percent_change<0.001,na.rm=T)){
-  #     #Check if all values are within 0.1 percent of the first column (i.e.,
-  #     #all are ~identical other than minor rounding)
-  #     View(ch4_bystate_df)
-  #     stop("Domain totals differ when distributed using a different inventory at the state")
-  #   }
-  # }
-  # 
-  # if(stationary_combustion_by_domain){
-  #   ch4_bydomain_df <- ch4_totals_df[,grep("bydomain",colnames(ch4_totals_df))]
-  #   percent_change <- abs(ch4_bydomain_df - ch4_bydomain_df[,1])/ch4_bydomain_df[,1]
-  #   if(!all(percent_change<0.001,na.rm=T)){
-  #     #Check if all values are within 0.1 percent of the first column (i.e.,
-  #     #all are ~identical other than minor rounding)
-  #     View(ch4_bydomain_df)
-  #     stop("Domain totals differ when distributed using a different inventory at the domain level")
-  #   }
-  # }
-  # 
   ################################################################################
   #Create a sector total, 1 per variant
   
   if(Use_ACES){
     if(stationary_combustion_by_state){
       #use regex to load in all but wood fuels for ACES, bystate, all sectors
-      Summed_stationary_combustion_FF_ACES_bystate <- rast(list.files(stat_comb_output_directory,
-                                                                      pattern="stat_comb_[[:alnum:]]+_[coal|gas|petr]+_bystate_aces",
-                                                                      full.names = T))
+      Summed_stationary_combustion_FF_ACES_bystate <- terra::rast(list.files(stat_comb_output_directory,
+                                                                             pattern="stat_comb_[[:alnum:]]+_[coal|gas|petr]+_bystate_aces",
+                                                                             full.names = T))
       Summed_stationary_combustion_FF_ACES_bystate <- sum(Summed_stationary_combustion_FF_ACES_bystate,na.rm=T)
-
-      Summed_stationary_combustion_wood_ACES_bystate <- rast(list.files(stat_comb_output_directory,
-                                                                        pattern="stat_comb_[[:alnum:]]+_wood_bystate_aces",
-                                                                        full.names = T))
+      
+      Summed_stationary_combustion_wood_ACES_bystate <- terra::rast(list.files(stat_comb_output_directory,
+                                                                               pattern="stat_comb_[[:alnum:]]+_wood_bystate_aces",
+                                                                               full.names = T))
       Summed_stationary_combustion_wood_ACES_bystate <- sum(Summed_stationary_combustion_wood_ACES_bystate,na.rm=T)
       
-      writeCDF(Summed_stationary_combustion_FF_ACES_bystate,
-               file.path(output_directory,"Stationary_combustion_sector_fossil_fuel_total_ACES_bystate.nc"),
-               force_v4=TRUE,
-               varname='methane_emissions',
-               unit='nmol/m2/s',
-               longname=paste0('Methane emissions from coal, natural gas, and petroleum stationary combustion, spatially allocated from state totals using NEI CO emissions and ACES sectoral CO2 emissions'),
-               missval=-9999,
-               overwrite=TRUE)
-      writeCDF(Summed_stationary_combustion_wood_ACES_bystate,
-               file.path(output_directory,"Stationary_combustion_sector_wood_total_ACES_bystate.nc"),
-               force_v4=TRUE,
-               varname='methane_emissions',
-               unit='nmol/m2/s',
-               longname=paste0('Methane emissions from wood stationary combustion, spatially allocated from state totals using NEI CO emissions and ACES sectoral CO2 emissions'),
-               missval=-9999,
-               overwrite=TRUE)
+      writeCDF_no_newline(Summed_stationary_combustion_FF_ACES_bystate,
+                          file.path(output_directory,"Stationary_combustion_sector_fossil_fuel_total_ACES_bystate.nc"),
+                          force_v4=TRUE,
+                          varname='methane_emissions',
+                          unit='nmol/m2/s',
+                          longname=paste0('Methane emissions from coal, natural gas, and petroleum stationary combustion, spatially allocated from state totals using NEI CO emissions and ACES sectoral CO2 emissions'),
+                          missval=-9999,
+                          overwrite=TRUE)
+      writeCDF_no_newline(Summed_stationary_combustion_wood_ACES_bystate,
+                          file.path(output_directory,"Stationary_combustion_sector_wood_total_ACES_bystate.nc"),
+                          force_v4=TRUE,
+                          varname='methane_emissions',
+                          unit='nmol/m2/s',
+                          longname=paste0('Methane emissions from wood stationary combustion, spatially allocated from state totals using NEI CO emissions and ACES sectoral CO2 emissions'),
+                          missval=-9999,
+                          overwrite=TRUE)
     }
     if(stationary_combustion_by_domain){
-      Summed_stationary_combustion_FF_ACES_bydomain <- rast(list.files(stat_comb_output_directory,
-                                                                       pattern="stat_comb_[[:alnum:]]+_[coal|gas|petr]+_bydomain_aces",
-                                                                       full.names = T))
+      Summed_stationary_combustion_FF_ACES_bydomain <- terra::rast(list.files(stat_comb_output_directory,
+                                                                              pattern="stat_comb_[[:alnum:]]+_[coal|gas|petr]+_bydomain_aces",
+                                                                              full.names = T))
       Summed_stationary_combustion_FF_ACES_bydomain <- sum(Summed_stationary_combustion_FF_ACES_bydomain,na.rm=T)
-
-      Summed_stationary_combustion_wood_ACES_bydomain <- rast(list.files(stat_comb_output_directory,
-                                                                         pattern="stat_comb_[[:alnum:]]+_wood_bydomain_aces",
-                                                                         full.names = T))
+      
+      Summed_stationary_combustion_wood_ACES_bydomain <- terra::rast(list.files(stat_comb_output_directory,
+                                                                                pattern="stat_comb_[[:alnum:]]+_wood_bydomain_aces",
+                                                                                full.names = T))
       Summed_stationary_combustion_wood_ACES_bydomain <- sum(Summed_stationary_combustion_wood_ACES_bydomain,na.rm=T)
       
-      writeCDF(Summed_stationary_combustion_FF_ACES_bydomain,
-               file.path(output_directory,"Stationary_combustion_sector_fossil_fuel_total_ACES_bydomain.nc"),
-               force_v4=TRUE,
-               varname='methane_emissions',
-               unit='nmol/m2/s',
-               longname=paste0('Methane emissions from coal, natural gas, and petroleum stationary combustion, spatially allocated from domain totals using NEI CO emissions and ACES sectoral CO2 emissions'),
-               missval=-9999,
-               overwrite=TRUE)
-      writeCDF(Summed_stationary_combustion_wood_ACES_bydomain,
-               file.path(output_directory,"Stationary_combustion_sector_wood_total_ACES_bydomain.nc"),
-               force_v4=TRUE,
-               varname='methane_emissions',
-               unit='nmol/m2/s',
-               longname=paste0('Methane emissions from wood stationary combustion, spatially allocated from domain totals using NEI CO emissions and ACES sectoral CO2 emissions'),
-               missval=-9999,
-               overwrite=TRUE)
+      writeCDF_no_newline(Summed_stationary_combustion_FF_ACES_bydomain,
+                          file.path(output_directory,"Stationary_combustion_sector_fossil_fuel_total_ACES_bydomain.nc"),
+                          force_v4=TRUE,
+                          varname='methane_emissions',
+                          unit='nmol/m2/s',
+                          longname=paste0('Methane emissions from coal, natural gas, and petroleum stationary combustion, spatially allocated from domain totals using NEI CO emissions and ACES sectoral CO2 emissions'),
+                          missval=-9999,
+                          overwrite=TRUE)
+      writeCDF_no_newline(Summed_stationary_combustion_wood_ACES_bydomain,
+                          file.path(output_directory,"Stationary_combustion_sector_wood_total_ACES_bydomain.nc"),
+                          force_v4=TRUE,
+                          varname='methane_emissions',
+                          unit='nmol/m2/s',
+                          longname=paste0('Methane emissions from wood stationary combustion, spatially allocated from domain totals using NEI CO emissions and ACES sectoral CO2 emissions'),
+                          missval=-9999,
+                          overwrite=TRUE)
     }
   }
   if(Use_Vulcan){
     if(stationary_combustion_by_state){
-      Summed_stationary_combustion_FF_Vulcan_bystate <- rast(list.files(stat_comb_output_directory,
-                                                                        pattern="stat_comb_[[:alnum:]]+_[coal|gas|petr]+_bystate_vulcan",
-                                                                        full.names = T))
+      Summed_stationary_combustion_FF_Vulcan_bystate <- terra::rast(list.files(stat_comb_output_directory,
+                                                                               pattern="stat_comb_[[:alnum:]]+_[coal|gas|petr]+_bystate_vulcan",
+                                                                               full.names = T))
       Summed_stationary_combustion_FF_Vulcan_bystate <- sum(Summed_stationary_combustion_FF_Vulcan_bystate,na.rm=T)
-
-      Summed_stationary_combustion_wood_Vulcan_bystate <- rast(list.files(stat_comb_output_directory,
-                                                                          pattern="stat_comb_[[:alnum:]]+_wood_bystate_vulcan",
-                                                                          full.names = T))
+      
+      Summed_stationary_combustion_wood_Vulcan_bystate <- terra::rast(list.files(stat_comb_output_directory,
+                                                                                 pattern="stat_comb_[[:alnum:]]+_wood_bystate_vulcan",
+                                                                                 full.names = T))
       Summed_stationary_combustion_wood_Vulcan_bystate <- sum(Summed_stationary_combustion_wood_Vulcan_bystate,na.rm=T)
       
-      writeCDF(Summed_stationary_combustion_FF_Vulcan_bystate,
-               file.path(output_directory,"Stationary_combustion_sector_fossil_fuel_total_Vulcan_bystate.nc"),
-               force_v4=TRUE,
-               varname='methane_emissions',
-               unit='nmol/m2/s',
-               longname=paste0('Methane emissions from coal, natural gas, and petroleum stationary combustion, spatially allocated from state totals using NEI CO emissions and vulcan sectoral CO2 emissions'),
-               missval=-9999,
-               overwrite=TRUE)
-      writeCDF(Summed_stationary_combustion_wood_Vulcan_bystate,
-               file.path(output_directory,"Stationary_combustion_sector_wood_total_Vulcan_bystate.nc"),
-               force_v4=TRUE,
-               varname='methane_emissions',
-               unit='nmol/m2/s',
-               longname=paste0('Methane emissions from wood stationary combustion, spatially allocated from state totals using NEI CO emissions and vulcan sectoral CO2 emissions'),
-               missval=-9999,
-               overwrite=TRUE)
+      writeCDF_no_newline(Summed_stationary_combustion_FF_Vulcan_bystate,
+                          file.path(output_directory,"Stationary_combustion_sector_fossil_fuel_total_Vulcan_bystate.nc"),
+                          force_v4=TRUE,
+                          varname='methane_emissions',
+                          unit='nmol/m2/s',
+                          longname=paste0('Methane emissions from coal, natural gas, and petroleum stationary combustion, spatially allocated from state totals using NEI CO emissions and vulcan sectoral CO2 emissions'),
+                          missval=-9999,
+                          overwrite=TRUE)
+      writeCDF_no_newline(Summed_stationary_combustion_wood_Vulcan_bystate,
+                          file.path(output_directory,"Stationary_combustion_sector_wood_total_Vulcan_bystate.nc"),
+                          force_v4=TRUE,
+                          varname='methane_emissions',
+                          unit='nmol/m2/s',
+                          longname=paste0('Methane emissions from wood stationary combustion, spatially allocated from state totals using NEI CO emissions and vulcan sectoral CO2 emissions'),
+                          missval=-9999,
+                          overwrite=TRUE)
     }
     if(stationary_combustion_by_domain){
-      Summed_stationary_combustion_FF_Vulcan_bydomain <- rast(list.files(stat_comb_output_directory,
-                                                                         pattern="stat_comb_[[:alnum:]]+_[coal|gas|petr]+_bydomain_vulcan",
-                                                                         full.names = T))
+      Summed_stationary_combustion_FF_Vulcan_bydomain <- terra::rast(list.files(stat_comb_output_directory,
+                                                                                pattern="stat_comb_[[:alnum:]]+_[coal|gas|petr]+_bydomain_vulcan",
+                                                                                full.names = T))
       Summed_stationary_combustion_FF_Vulcan_bydomain <- sum(Summed_stationary_combustion_FF_Vulcan_bydomain,na.rm=T)
-
-      Summed_stationary_combustion_wood_Vulcan_bydomain <- rast(list.files(stat_comb_output_directory,
-                                                                           pattern="stat_comb_[[:alnum:]]+_wood_bydomain_vulcan",
-                                                                           full.names = T))
+      
+      Summed_stationary_combustion_wood_Vulcan_bydomain <- terra::rast(list.files(stat_comb_output_directory,
+                                                                                  pattern="stat_comb_[[:alnum:]]+_wood_bydomain_vulcan",
+                                                                                  full.names = T))
       Summed_stationary_combustion_wood_Vulcan_bydomain <- sum(Summed_stationary_combustion_wood_Vulcan_bydomain,na.rm=T)
       
-      writeCDF(Summed_stationary_combustion_FF_Vulcan_bydomain,
-               file.path(output_directory,"Stationary_combustion_sector_fossil_fuel_total_Vulcan_bydomain.nc"),
-               force_v4=TRUE,
-               varname='methane_emissions',
-               unit='nmol/m2/s',
-               longname=paste0('Methane emissions from coal, natural gas, and petroleum stationary combustion, spatially allocated from domain totals using NEI CO emissions and vulcan sectoral CO2 emissions'),
-               missval=-9999,
-               overwrite=TRUE)
-      writeCDF(Summed_stationary_combustion_wood_Vulcan_bydomain,
-               file.path(output_directory,"Stationary_combustion_sector_wood_total_Vulcan_bydomain.nc"),
-               force_v4=TRUE,
-               varname='methane_emissions',
-               unit='nmol/m2/s',
-               longname=paste0('Methane emissions from wood stationary combustion, spatially allocated from domain totals using NEI CO emissions and vulcan sectoral CO2 emissions'),
-               missval=-9999,
-               overwrite=TRUE)
+      writeCDF_no_newline(Summed_stationary_combustion_FF_Vulcan_bydomain,
+                          file.path(output_directory,"Stationary_combustion_sector_fossil_fuel_total_Vulcan_bydomain.nc"),
+                          force_v4=TRUE,
+                          varname='methane_emissions',
+                          unit='nmol/m2/s',
+                          longname=paste0('Methane emissions from coal, natural gas, and petroleum stationary combustion, spatially allocated from domain totals using NEI CO emissions and vulcan sectoral CO2 emissions'),
+                          missval=-9999,
+                          overwrite=TRUE)
+      writeCDF_no_newline(Summed_stationary_combustion_wood_Vulcan_bydomain,
+                          file.path(output_directory,"Stationary_combustion_sector_wood_total_Vulcan_bydomain.nc"),
+                          force_v4=TRUE,
+                          varname='methane_emissions',
+                          unit='nmol/m2/s',
+                          longname=paste0('Methane emissions from wood stationary combustion, spatially allocated from domain totals using NEI CO emissions and vulcan sectoral CO2 emissions'),
+                          missval=-9999,
+                          overwrite=TRUE)
     }
   }
-
+  
   ################################################################################
   # plot up the data
   
@@ -1195,8 +1047,8 @@ Stationary_combustion <- function(input_directory,
     #function. input_data=list of all data for that sector, total=coded
     #shorthand for sector-fuel combo
     wrapper_plot_plus <- function(input_data,total,logscale){
-      combined_data <- rast(input_data)
-      combined_range=global(combined_data,range,na.rm=T)
+      combined_data <- terra::rast(input_data)
+      combined_range=terra::global(combined_data,range,na.rm=T)
       zmin <- floor(min(combined_range[,1])*100)/100
       zmax <- ceiling(max(combined_range[,2])*100)/100
       
@@ -1242,7 +1094,7 @@ Stationary_combustion <- function(input_directory,
                           inventory_name," ",tolower(sector_long)," CO2 emissions")[A],
                    zlim_min = zmin,zlim_max = log10(zmax),plot_directory=stat_comb_plot_directory,
                    domain=domain,County_Tigerlines=County_Tigerlines,
-                   State_Tigerlines=State_Tigerlines)
+                   State_CB=State_CB)
         }
       }else{
         for(A in 1:nlyr(combined_data)){
@@ -1255,7 +1107,7 @@ Stationary_combustion <- function(input_directory,
                               inventory_name," ",tolower(sector_long)," CO2 emissions")[A],
                        zlim_min = zmin,zlim_max = zmax,plot_directory=stat_comb_plot_directory,
                        domain=domain,County_Tigerlines=County_Tigerlines,
-                       State_Tigerlines=State_Tigerlines)
+                       State_CB=State_CB)
         }
       }
     }
@@ -1293,37 +1145,37 @@ Stationary_combustion <- function(input_directory,
     stat_comb_wood_max <- 0
     if(Use_ACES){
       if(stationary_combustion_by_state){
-        if(!all(is.na(values(Summed_stationary_combustion_FF_ACES_bystate)))){
-          stat_comb_FF_max <- max(stat_comb_FF_max,as.numeric(log10(global(Summed_stationary_combustion_FF_ACES_bystate,max,na.rm=T))))
+        if(!all(is.na(terra::values(Summed_stationary_combustion_FF_ACES_bystate)))){
+          stat_comb_FF_max <- max(stat_comb_FF_max,as.numeric(log10(terra::global(Summed_stationary_combustion_FF_ACES_bystate,max,na.rm=T))))
         }
-        if(!all(is.na(values(Summed_stationary_combustion_wood_ACES_bystate)))){
-          stat_comb_wood_max <- max(stat_comb_wood_max,as.numeric(log10(global(Summed_stationary_combustion_wood_ACES_bystate,max,na.rm=T))))
+        if(!all(is.na(terra::values(Summed_stationary_combustion_wood_ACES_bystate)))){
+          stat_comb_wood_max <- max(stat_comb_wood_max,as.numeric(log10(terra::global(Summed_stationary_combustion_wood_ACES_bystate,max,na.rm=T))))
         }
       }
       if(stationary_combustion_by_domain){
-        if(!all(is.na(values(Summed_stationary_combustion_FF_ACES_bydomain)))){
-          stat_comb_FF_max <- max(stat_comb_FF_max,as.numeric(log10(global(Summed_stationary_combustion_FF_ACES_bydomain,max,na.rm=T))))
+        if(!all(is.na(terra::values(Summed_stationary_combustion_FF_ACES_bydomain)))){
+          stat_comb_FF_max <- max(stat_comb_FF_max,as.numeric(log10(terra::global(Summed_stationary_combustion_FF_ACES_bydomain,max,na.rm=T))))
         }
-        if(!all(is.na(values(Summed_stationary_combustion_wood_ACES_bydomain)))){
-          stat_comb_wood_max <- max(stat_comb_wood_max,as.numeric(log10(global(Summed_stationary_combustion_wood_ACES_bydomain,max,na.rm=T))))
+        if(!all(is.na(terra::values(Summed_stationary_combustion_wood_ACES_bydomain)))){
+          stat_comb_wood_max <- max(stat_comb_wood_max,as.numeric(log10(terra::global(Summed_stationary_combustion_wood_ACES_bydomain,max,na.rm=T))))
         }
       }
     }
     if(Use_Vulcan){
       if(stationary_combustion_by_state){
-        if(!all(is.na(values(Summed_stationary_combustion_FF_Vulcan_bystate)))){
-          stat_comb_FF_max <- max(stat_comb_FF_max,as.numeric(log10(global(Summed_stationary_combustion_FF_Vulcan_bystate,max,na.rm=T))))
+        if(!all(is.na(terra::values(Summed_stationary_combustion_FF_Vulcan_bystate)))){
+          stat_comb_FF_max <- max(stat_comb_FF_max,as.numeric(log10(terra::global(Summed_stationary_combustion_FF_Vulcan_bystate,max,na.rm=T))))
         }
-        if(!all(is.na(values(Summed_stationary_combustion_wood_Vulcan_bystate)))){
-          stat_comb_wood_max <- max(stat_comb_wood_max,as.numeric(log10(global(Summed_stationary_combustion_wood_Vulcan_bystate,max,na.rm=T))))
+        if(!all(is.na(terra::values(Summed_stationary_combustion_wood_Vulcan_bystate)))){
+          stat_comb_wood_max <- max(stat_comb_wood_max,as.numeric(log10(terra::global(Summed_stationary_combustion_wood_Vulcan_bystate,max,na.rm=T))))
         }
       }
       if(stationary_combustion_by_domain){
-        if(!all(is.na(values(Summed_stationary_combustion_FF_Vulcan_bydomain)))){
-          stat_comb_FF_max <- max(stat_comb_FF_max,as.numeric(log10(global(Summed_stationary_combustion_FF_Vulcan_bydomain,max,na.rm=T))))
+        if(!all(is.na(terra::values(Summed_stationary_combustion_FF_Vulcan_bydomain)))){
+          stat_comb_FF_max <- max(stat_comb_FF_max,as.numeric(log10(terra::global(Summed_stationary_combustion_FF_Vulcan_bydomain,max,na.rm=T))))
         }
-        if(!all(is.na(values(Summed_stationary_combustion_wood_Vulcan_bydomain)))){
-          stat_comb_wood_max <- max(stat_comb_wood_max,as.numeric(log10(global(Summed_stationary_combustion_wood_Vulcan_bydomain,max,na.rm=T))))
+        if(!all(is.na(terra::values(Summed_stationary_combustion_wood_Vulcan_bydomain)))){
+          stat_comb_wood_max <- max(stat_comb_wood_max,as.numeric(log10(terra::global(Summed_stationary_combustion_wood_Vulcan_bydomain,max,na.rm=T))))
         }
       }
     }
@@ -1337,13 +1189,13 @@ Stationary_combustion <- function(input_directory,
                  zlim_min=stat_comb_min,zlim_max=stat_comb_FF_max,
                  plot_directory=plot_directory,
                  domain=domain,County_Tigerlines=County_Tigerlines,
-                 State_Tigerlines=State_Tigerlines)
+                 State_CB=State_CB)
         log_plot(Summed_stationary_combustion_wood_ACES_bystate,
                  "Stationary Combustion Wood Sector\nSEDS state data scaled to match GHGI national data distributed\nto the county level via NEI, then distributed using ACES\nsectoral CO2 emissions",
                  zlim_min=stat_comb_min,zlim_max=stat_comb_wood_max,
                  plot_directory=plot_directory,
                  domain=domain,County_Tigerlines=County_Tigerlines,
-                 State_Tigerlines=State_Tigerlines)
+                 State_CB=State_CB)
       }
       if(stationary_combustion_by_domain){
         log_plot(Summed_stationary_combustion_FF_ACES_bydomain,
@@ -1351,13 +1203,13 @@ Stationary_combustion <- function(input_directory,
                  zlim_min=stat_comb_min,zlim_max=stat_comb_FF_max,
                  plot_directory=plot_directory,
                  domain=domain,County_Tigerlines=County_Tigerlines,
-                 State_Tigerlines=State_Tigerlines)
+                 State_CB=State_CB)
         log_plot(Summed_stationary_combustion_wood_ACES_bydomain,
                  "Stationary Combustion Wood Sector\nSEDS domain-summed data scaled to match GHGI national data distributed\nto the county level via NEI, then distributed using ACES\nsectoral CO2 emissions",
                  zlim_min=stat_comb_min,zlim_max=stat_comb_wood_max,
                  plot_directory=plot_directory,
                  domain=domain,County_Tigerlines=County_Tigerlines,
-                 State_Tigerlines=State_Tigerlines)
+                 State_CB=State_CB)
       }
     }
     if(Use_Vulcan){
@@ -1367,13 +1219,13 @@ Stationary_combustion <- function(input_directory,
                  zlim_min=stat_comb_min,zlim_max=stat_comb_FF_max,
                  plot_directory=plot_directory,
                  domain=domain,County_Tigerlines=County_Tigerlines,
-                 State_Tigerlines=State_Tigerlines)
+                 State_CB=State_CB)
         log_plot(Summed_stationary_combustion_wood_Vulcan_bystate,
                  "Stationary Combustion Wood Sector\nSEDS state data scaled to match GHGI national data distributed\nto the county level via NEI, then distributed using Vulcan\nsectoral CO2 emissions",
                  zlim_min=stat_comb_min,zlim_max=stat_comb_wood_max,
                  plot_directory=plot_directory,
                  domain=domain,County_Tigerlines=County_Tigerlines,
-                 State_Tigerlines=State_Tigerlines)
+                 State_CB=State_CB)
       }
       if(stationary_combustion_by_domain){
         log_plot(Summed_stationary_combustion_FF_Vulcan_bydomain,
@@ -1381,13 +1233,13 @@ Stationary_combustion <- function(input_directory,
                  zlim_min=stat_comb_min,zlim_max=stat_comb_FF_max,
                  plot_directory=plot_directory,
                  domain=domain,County_Tigerlines=County_Tigerlines,
-                 State_Tigerlines=State_Tigerlines)
+                 State_CB=State_CB)
         log_plot(Summed_stationary_combustion_wood_Vulcan_bydomain,
                  "Stationary Combustion Wood Sector\nSEDS domain-summed data scaled to match GHGI national data distributed\nto the county level via NEI, then distributed using Vulcan\nsectoral CO2 emissions",
                  zlim_min=stat_comb_min,zlim_max=stat_comb_wood_max,
                  plot_directory=plot_directory,
                  domain=domain,County_Tigerlines=County_Tigerlines,
-                 State_Tigerlines=State_Tigerlines)
+                 State_CB=State_CB)
       }
     }
   }
