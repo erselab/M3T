@@ -14,11 +14,10 @@
 #'@author Joe Pitt, \email{madeup@@wisc.edu}
 #'@author Kris Hajny, \email{blank@@fake.edu}
 #'@author Israel Lopez-Coto, \email{test@@test.edu}
+#'@seealso [log_plot()] plots the data in simple log-scale visuals.
 #'@examples
 #'prep_plot_data(central_flux)
 #'@export
-#'
-
 
 #build functions to plot up most sectors as they finish running.  
 
@@ -59,6 +58,9 @@ prep_plot_data <- function(input){
 #'@author Joe Pitt, \email{madeup@@wisc.edu}
 #'@author Kris Hajny, \email{blank@@fake.edu}
 #'@author Israel Lopez-Coto, \email{test@@test.edu}
+#'@seealso 
+#' * [prep_plot_data()] calculate the log base 10 and remove infinities (i.e., 0's).
+#' * [not_log_plot()] plots the data in simple linear-scale visuals.
 #'@examples
 #'log_plot(central_flux,filename="Wastewater_dom_central",
 #'title="Domestic Wastewater -\n EPA total distributed using \nClean Watersheds Needs Survey")
@@ -67,7 +69,7 @@ prep_plot_data <- function(input){
 #plot for log scale
 log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
                      filename,plot_directory,domain,County_Tigerlines,
-                     State_Tigerlines,Urban_Tigerlines){
+                     State_CB,Urban_Tigerlines){
   
   plot_type="continuous"
   
@@ -76,46 +78,46 @@ log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
   if(missing(filename)){
     #save to a separate folder if the input is a summed_sector
     if(grepl(pattern="Summed",x=substitute(input))){
-      outputname <- paste0(plot_directory,"Summed_Sectors/",substitute(input))
+      outputname <- file.path(plot_directory,"Summed_Sectors",substitute(input))
     }else{
-      outputname <- paste0(plot_directory,substitute(input))
+      outputname <- file.path(plot_directory,substitute(input))
     }
   }else{
-    outputname <- paste0(plot_directory,filename)
+    outputname <- file.path(plot_directory,filename)
   }
   
   #can't plot an all NA plot.  Would rather plot it as all 0 (not log) than not
   #plot it.
-  if(all(is.na(values(input)) | values(input)==0)){
+  if(all(is.na(terra::values(input)) | terra::values(input)==0)){
     plot_type="classes"
-    values(input) <- 0
+    terra::values(input) <- 0
     
-    png(paste0(outputname,".png"),width = 480*2,height=480*2)
-    plot(mask(input,domain),mar=c(3.1, 3.1, 2.1, 7.1)+c(0,0,7,2),
-         type=plot_type,
-         colNA="black",
-         main=title,
-         plg=list(cex=2,title="nmol/m2/s",title.cex=2),
-         pax=list(cex.axis=2,line=2),
-         # xlab="Longitude",ylab="Latitude",
-         cex.main=2,cex.axis=2,cex.lab=2)
-    mtext("Latitude",side = 2,line = 0,cex = 2)
-    mtext("Longitude",side = 1,line = 3.75,cex = 2)
-    plot(County_Tigerlines,add=T,border="dimgrey",col=NA)
-    plot(State_Tigerlines,add=T,border="white",lwd=2,col=NA)
+    grDevices::png(paste0(outputname,".png"),width = 480*2,height=480*2)
+    terra::plot(terra::mask(input,domain),mar=c(3.1, 3.1, 2.1, 7.1)+c(0,0,7,2),
+                type=plot_type,
+                colNA="black",
+                main=title,
+                plg=list(cex=2,title="nmol/m2/s",title.cex=2),
+                pax=list(cex.axis=2,line=2),
+                # xlab="Longitude",ylab="Latitude",
+                cex.main=2,cex.axis=2,cex.lab=2)
+    graphics::mtext("Latitude",side = 2,line = 0,cex = 2)
+    graphics::mtext("Longitude",side = 1,line = 3.75,cex = 2)
+    terra::plot(County_Tigerlines,add=T,border="dimgrey",col=NA)
+    terra::plot(State_CB,add=T,border="white",lwd=2,col=NA)
     # plot(Urban_Tigerlines,add=T,border="darkgrey",col=NA)
-    # legend(x=par('usr')[1] - diff(par('usr')[1:2])*0.05,
-    #        y=quantile(par('usr')[3:4],0.85),
+    # legend(x=graphics::par('usr')[1] - diff(graphics::par('usr')[1:2])*0.05,
+    #        y=stats::quantile(graphics::par('usr')[3:4],0.85),
     #        legend=c("State","County","Urban"),
     #        col=c("white","dimgrey","darkgrey"),lty=1,lwd=3,bg="black",xpd=T,
     #        text.col="white",cex=1.5)
-    legend(x=par('usr')[1] - diff(par('usr')[1:2])*0.05,
-           y=quantile(par('usr')[3:4],0.85),
-           legend=c("State","County"),
-           col=c("white","dimgrey"),lty=1,lwd=3,bg="black",xpd=T,
-           text.col="white",cex=1.5)
+    graphics::legend(x=graphics::par('usr')[1] - diff(graphics::par('usr')[1:2])*0.05,
+                     y=stats::quantile(graphics::par('usr')[3:4],0.85),
+                     legend=c("State","County"),
+                     col=c("white","dimgrey"),lty=1,lwd=3,bg="black",xpd=T,
+                     text.col="white",cex=1.5)
   }else{
-    if(global(input,min,na.rm=T)<0){
+    if(terra::global(input,min,na.rm=T)<0){
       stop("Results have negative values!  Some aspect of the calculation failed.")
     }
     
@@ -124,12 +126,12 @@ log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
     if(!is.null(zlim_min)){
       input[input<zlim_min] <- zlim_min
     }else{
-      zlim_min <- unlist(global(input,min,na.rm=T))
+      zlim_min <- unlist(terra::global(input,min,na.rm=T))
     }
     if(!is.null(zlim_max)){
       input[input>zlim_max] <- zlim_max
     }else{
-      zlim_max <- unlist(global(input,max,na.rm=T))
+      zlim_max <- unlist(terra::global(input,max,na.rm=T))
     }
     
     if(zlim_max>0){
@@ -143,9 +145,9 @@ log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
     }else{
       zlim_min=zlim_min*1.00001
     }
-
-    png(paste0(outputname,".png"),width = 480*2,height=480*2)
-    plot(input,mar=c(3.1, 3.1, 2.1, 7.1)+c(0,0,7,2),
+    
+    grDevices::png(paste0(outputname,".png"),width = 480*2,height=480*2)
+    terra::plot(input,mar=c(3.1, 3.1, 2.1, 7.1)+c(0,0,7,2),
          type=plot_type,
          colNA="black",
          main=title,
@@ -154,23 +156,23 @@ log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
          # xlab="Longitude",ylab="Latitude",
          cex.main=2,cex.axis=2,cex.lab=2,
          range=c(zlim_min,zlim_max))
-    mtext("Latitude",side = 2,line = 0,cex = 2)
-    mtext("Longitude",side = 1,line = 3.75,cex = 2)
-    plot(County_Tigerlines,add=T,border="dimgrey",col=NA)
-    plot(State_Tigerlines,add=T,border="white",lwd=2,col=NA)
+    graphics::mtext("Latitude",side = 2,line = 0,cex = 2)
+    graphics::mtext("Longitude",side = 1,line = 3.75,cex = 2)
+    terra::plot(County_Tigerlines,add=T,border="dimgrey",col=NA)
+    terra::plot(State_CB,add=T,border="white",lwd=2,col=NA)
     # plot(Urban_Tigerlines,add=T,border="darkgrey",col=NA)
-    # legend(x=par('usr')[1] - diff(par('usr')[1:2])*0.05,
-    #        y=quantile(par('usr')[3:4],0.85),
+    # legend(x=graphics::par('usr')[1] - diff(graphics::par('usr')[1:2])*0.05,
+    #        y=stats::quantile(graphics::par('usr')[3:4],0.85),
     #        legend=c("State","County","Urban"),
     #        col=c("white","dimgrey","darkgrey"),lty=1,lwd=3,bg="black",xpd=T,
     #        text.col="white",cex=1.5)
-    legend(x=par('usr')[1] - diff(par('usr')[1:2])*0.05,
-           y=quantile(par('usr')[3:4],0.85),
+    graphics::legend(x=graphics::par('usr')[1] - diff(graphics::par('usr')[1:2])*0.05,
+           y=stats::quantile(graphics::par('usr')[3:4],0.85),
            legend=c("State","County"),
            col=c("white","dimgrey"),lty=1,lwd=3,bg="black",xpd=T,
            text.col="white",cex=1.5)
   }
-  dev.off()
+  invisible(grDevices::dev.off())
   
 }
 
@@ -203,6 +205,7 @@ log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
 #'@author Joe Pitt, \email{madeup@@wisc.edu}
 #'@author Kris Hajny, \email{blank@@fake.edu}
 #'@author Israel Lopez-Coto, \email{test@@test.edu}
+#'@seealso [log_plot()] plots the data in simple log-scale visuals.
 #'@examples
 #' not_log_plot(septic_flux,filename="Wastewater_dom_septic_national",
 #'              "Domestic Wastewater - Septic\n national EPA septic distributed using \ndeveloped open space/low intensity land cover",
@@ -213,26 +216,26 @@ log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
 #plot for linear scale - mostly identical
 not_log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
                          filename,plot_directory,domain,County_Tigerlines,
-                         State_Tigerlines,Urban_Tigerlines){
+                         State_CB,Urban_Tigerlines){
   
   plot_type="continuous"
   
   if(missing(filename)){
     if(grepl(pattern="Summed",x=substitute(input))){
-      outputname <- paste0(plot_directory,"Summed_Sectors/",substitute(input))
+      outputname <- file.path(plot_directory,"Summed_Sectors",substitute(input))
     }else{
-      outputname <- paste0(plot_directory,substitute(input))
+      outputname <- file.path(plot_directory,substitute(input))
     }
   }else{
-    outputname <- paste0(plot_directory,filename)
+    outputname <- file.path(plot_directory,filename)
   }
   
-  if(all(is.na(values(input)) | values(input)==0)){
+  if(all(is.na(terra::values(input)) | terra::values(input)==0)){
     plot_type="classes"
-    values(input) <- 0
+    terra::values(input) <- 0
     
-    png(paste0(outputname,".png"),width = 480*2,height=480*2)
-    plot(mask(input,domain),mar=c(3.1, 3.1, 2.1, 7.1)+c(0,0,7,2),
+    grDevices::png(paste0(outputname,".png"),width = 480*2,height=480*2)
+    terra::plot(terra::mask(input,domain),mar=c(3.1, 3.1, 2.1, 7.1)+c(0,0,7,2),
          type=plot_type,
          colNA="black",
          main=title,
@@ -240,18 +243,18 @@ not_log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
          pax=list(cex.axis=2,line=2),
          # xlab="Longitude",ylab="Latitude",
          cex.main=2,cex.axis=2,cex.lab=2)
-    mtext("Latitude",side = 2,line = 0,cex = 2)
-    mtext("Longitude",side = 1,line = 3.75,cex = 2)
-    plot(County_Tigerlines,add=T,border="dimgrey",col=NA)
-    plot(State_Tigerlines,add=T,border="white",lwd=2,col=NA)
+    graphics::mtext("Latitude",side = 2,line = 0,cex = 2)
+    graphics::mtext("Longitude",side = 1,line = 3.75,cex = 2)
+    terra::plot(County_Tigerlines,add=T,border="dimgrey",col=NA)
+    terra::plot(State_CB,add=T,border="white",lwd=2,col=NA)
     # plot(Urban_Tigerlines,add=T,border="darkgrey",col=NA)
-    # legend(x=par('usr')[1] - diff(par('usr')[1:2])*0.05,
-    #        y=quantile(par('usr')[3:4],0.85),
+    # legend(x=graphics::par('usr')[1] - diff(graphics::par('usr')[1:2])*0.05,
+    #        y=stats::quantile(graphics::par('usr')[3:4],0.85),
     #        legend=c("State","County","Urban"),
     #        col=c("white","dimgrey","darkgrey"),lty=1,lwd=3,bg="black",xpd=T,
     #        text.col="white",cex=1.5)
-    legend(x=par('usr')[1] - diff(par('usr')[1:2])*0.05,
-           y=quantile(par('usr')[3:4],0.85),
+    graphics::legend(x=graphics::par('usr')[1] - diff(graphics::par('usr')[1:2])*0.05,
+           y=stats::quantile(graphics::par('usr')[3:4],0.85),
            legend=c("State","County"),
            col=c("white","dimgrey"),lty=1,lwd=3,bg="black",xpd=T,
            text.col="white",cex=1.5)
@@ -259,12 +262,12 @@ not_log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
     if(!is.null(zlim_min)){
       input[input<zlim_min] <- zlim_min
     }else{
-      zlim_min <- unlist(global(input,min,na.rm=T))
+      zlim_min <- unlist(terra::global(input,min,na.rm=T))
     }
     if(!is.null(zlim_max)){
       input[input>zlim_max] <- zlim_max
     }else{
-      zlim_max <- unlist(global(input,max,na.rm=T))
+      zlim_max <- unlist(terra::global(input,max,na.rm=T))
     }
     
     if(zlim_max>0){
@@ -280,11 +283,11 @@ not_log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
     }
     
     #Here just set 0 values to NA so that colNA applies
-    input[values(input)==0] <- NA
+    input[terra::values(input)==0] <- NA
     
     
-    png(paste0(outputname,".png"),width = 480*2,height=480*2)
-    plot(input,mar=c(3.1, 3.1, 2.1, 7.1)+c(0,0,7,2),
+    grDevices::png(paste0(outputname,".png"),width = 480*2,height=480*2)
+    terra::plot(input,mar=c(3.1, 3.1, 2.1, 7.1)+c(0,0,7,2),
          # col=timPalette(),
          type=plot_type,
          colNA="black",
@@ -294,22 +297,22 @@ not_log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
          # xlab="Longitude",ylab="Latitude",
          cex.main=2,cex.axis=2,cex.lab=2,
          range=c(zlim_min,zlim_max))
-    mtext("Latitude",side = 2,line = 0,cex = 2)
-    mtext("Longitude",side = 1,line = 3.75,cex = 2)
-    plot(County_Tigerlines,add=T,border="dimgrey",col=NA)
-    plot(State_Tigerlines,add=T,border="white",lwd=2,col=NA)
+    graphics::mtext("Latitude",side = 2,line = 0,cex = 2)
+    graphics::mtext("Longitude",side = 1,line = 3.75,cex = 2)
+    terra::plot(County_Tigerlines,add=T,border="dimgrey",col=NA)
+    terra::plot(State_CB,add=T,border="white",lwd=2,col=NA)
     # plot(Urban_Tigerlines,add=T,border="darkgrey",col=NA)
-    # legend(x=par('usr')[1] - diff(par('usr')[1:2])*0.05,
-    #        y=quantile(par('usr')[3:4],0.85),
+    # legend(x=graphics::par('usr')[1] - diff(graphics::par('usr')[1:2])*0.05,
+    #        y=stats::quantile(graphics::par('usr')[3:4],0.85),
     #        legend=c("State","County","Urban"),
     #        col=c("white","dimgrey","darkgrey"),lty=1,lwd=3,bg="black",xpd=T,
     #        text.col="white",cex=1.5)
-    legend(x=par('usr')[1] - diff(par('usr')[1:2])*0.05,
-           y=quantile(par('usr')[3:4],0.85),
+    graphics::legend(x=graphics::par('usr')[1] - diff(graphics::par('usr')[1:2])*0.05,
+           y=stats::quantile(graphics::par('usr')[3:4],0.85),
            legend=c("State","County"),
            col=c("white","dimgrey"),lty=1,lwd=3,bg="black",xpd=T,
            text.col="white",cex=1.5)
   }
-  dev.off()
+  invisible(grDevices::dev.off())
 }
 
