@@ -60,12 +60,15 @@
 #'@author Kris Hajny, \email{blank@@fake.edu}
 #'@author Israel Lopez-Coto, \email{test@@test.edu}
 #'@export
+#'@seealso 
+#' * [CH4_inventory_build()] Calculates methane inventory using settings provided in config.
+#' * [Wastewater()] Calculates methane emissions for the wastewater sector.
 
 
 # Calculate NLCD fractions for the states in the d03 domain
 ## Finalized: 2023-02-03
 
-NLCD_open_and_low_int <- function(NLCD_file,
+NLCD_open_and_low_int <- function(Source_wastewater_NLCD,
                                   domain,
                                   domain_template,
                                   State_Tigerlines,
@@ -76,26 +79,41 @@ NLCD_open_and_low_int <- function(NLCD_file,
   starttime <- Sys.time()
   cat("Starting wastewater sector: NLCD_open_and_low_int\n")
   
-  Wastewater_partial_output_directory <- paste0(output_directory,"Wastewater/processed_NLCD_data/")
+  Wastewater_partial_output_directory <- file.path(output_directory,"Wastewater","processed_NLCD_data")
   dir.create(Wastewater_partial_output_directory,showWarnings = F,recursive = T)
   ################################################################################
   #load in the landcover - national land cover database (NLCD)
+  NLCD_file <- file.path(input_directory,"NLCD")
+  dir.create(NLCD_file,showWarnings = F)
+  if(Source_wastewater_NLCD=="default"){
+    #UPDATE TO ZENODO
+    NLCD_file <- file.path(input_directory,"NLCD","Annual_NLCD_LndCov_2024_CU_C1V1.tif")
+  }else{
+    invisible(file.copy(list.files(Source_wastewater_NLCD,full.names=T),
+                        NLCD_file,overwrite = T,recursive=T))
+    NLCD_file <- list.files(NLCD_file,pattern="*.tif$",full.names=T)
+  }
+  NLCD <- terra::rast(NLCD_file)
   
-  NLCD <- rast(NLCD_file)
-  # reproject states to proper CRS
-  NLCD_states_trans <- project(State_Tigerlines,crs(NLCD))
+  #correct levels from the R interpreted ones (provided in manual)
+  NLCD_key <- data.frame("Value"=c(11,12,21:24,31,41:43,52,71,81:82,90,95),
+                         "Land_Class"=terra::levels(NLCD)[[1]][,2])
+  levels(NLCD) <- NLCD_key
+  
+  # reproject states to matching CRS
+  NLCD_states_trans <- terra::project(State_Tigerlines,terra::crs(NLCD))
   #crop to the states in the domain so that it's a bit more
   #manageable in size from the get-go.  Add a slight buffer.
-  NLCD <- crop(NLCD,1.01*ext(NLCD_states_trans))
+  NLCD <- terra::crop(NLCD,1.01*terra::ext(NLCD_states_trans))
   
   ################################################################################
   #Make a new raster for only Developed, Open Space, and Developed, Low
   #Intensity (21 and 22 of NLCD)
   
   NLCD_suburban <- NLCD
-  NLCD_suburban <- classify(NLCD_suburban,matrix(ncol=3,c(0,20.5,0,
-                                                          20.5,22.5,1,
-                                                          22.5,1000,0),byrow=T))
+  NLCD_suburban <- terra::classify(NLCD_suburban,matrix(ncol=3,c(0,20.5,0,
+                                                                 20.5,22.5,1,
+                                                                 22.5,1000,0),byrow=T))
   ################################################################################
   #calculate the total for each state and project/crop/mask to exactly the
   #domain, then save
@@ -107,66 +125,42 @@ NLCD_open_and_low_int <- function(NLCD_file,
   for(A in 1:length(state_name_list)){
     #separate states
     state_sub_poly <- subset(NLCD_states_trans, NLCD_states_trans$STUSPS==state_name_list[A])
-    NLCD_suburban_subset <- crop(NLCD_suburban,state_sub_poly,snap='out')
-    NLCD_suburban_subset <- mask(NLCD_suburban_subset,state_sub_poly,touches=F)
+    NLCD_suburban_subset <- terra::crop(NLCD_suburban,state_sub_poly,snap='out')
+    NLCD_suburban_subset <- terra::mask(NLCD_suburban_subset,state_sub_poly,touches=F)
     NLCD_suburban_subset[is.na(NLCD_suburban_subset)] <- 0
     
     #calculate total septic-relevant area per state.  State total, not just the
     #part of the state in the domain (if it's only partially within the domain)
-    NLCD_subset_area <- global(NLCD_suburban_subset*cellSize(NLCD_suburban_subset,unit="km",transform=F),sum,na.rm=T)
+    NLCD_subset_area <- terra::global(NLCD_suburban_subset*terra::cellSize(NLCD_suburban_subset,unit="km",transform=F),sum,na.rm=T)
     area_df <- rbind(area_df,NLCD_subset_area)
     rownames(area_df)[A] <- state_name_list[A]
     
     #Add a few pixels worth of buffer (at the domain resolution) filled with
     #0's.  Average would otherwise ignore these NA values in calculations.
-    NLCD_suburban_subset <- extend(NLCD_suburban_subset,fill=0,
-                                   ext(NLCD_suburban_subset)+(res(project(domain_template,crs(NLCD_suburban)))*5))
+    NLCD_suburban_subset <- terra::extend(NLCD_suburban_subset,fill=0,
+                                          terra::ext(NLCD_suburban_subset)+
+                                            (terra::res(terra::project(domain_template,terra::crs(NLCD_suburban)))*20))
     
     #save/load the raster (help with memory limitations, rather than holding
     #everything in memory)
-    writeRaster(NLCD_suburban_subset,subset_tmpfile)
-    NLCD_suburban_subset <- rast(subset_tmpfile)
+    terra::writeRaster(NLCD_suburban_subset,subset_tmpfile)
+    NLCD_suburban_subset <- terra::rast(subset_tmpfile)
     
     #project to the exact domain (resolution, origin, extent, etc.) using an
     #average.  Represents the fractional coverage of wetlands in each pixel (0 -
     #1).
-    NLCD_suburban_reprojected <- project(NLCD_suburban_subset,domain_template,method="average")
+    NLCD_suburban_reprojected <- terra::project(NLCD_suburban_subset,domain_template,method="average")
     
     #save
-    writeCDF(NLCD_suburban_reprojected,paste0(Wastewater_partial_output_directory,
-                                                 paste0(state_name_list[A],"_NLCD_suburban.nc")),
-             force_v4=T,
-             overwrite=T)
+    terra::writeRaster(NLCD_suburban_reprojected,file.path(Wastewater_partial_output_directory,
+                                                           paste0(state_name_list[A],"_NLCD_suburban.tif")),
+                       overwrite=T)
     unlink(subset_tmpfile)
     cat("Finished processing",state_name_list[A],"landcover at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
   }
   colnames(area_df) <- c("open_or_low_int_area")
   #save state-level totals
-  write.csv(area_df,file.path(Wastewater_partial_output_directory,'NLCD_state_total_areas.csv'))
+  utils::write.csv(area_df,file.path(Wastewater_partial_output_directory,'NLCD_state_total_areas.csv'))
   cat("Finished wastewater sector: NLCD_open_and_low_int in",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
 }
-
-
-# #simple check that splitting into states was done properly.
-# NLCD_state_total <- crop(NLCD_suburban,NLCD_states_trans,snap='out')
-# NLCD_state_total <- mask(NLCD_state_total,NLCD_states_trans,touches=F)
-# NLCD_state_total[is.na(NLCD_state_total)] <- 0
-# NLCD_state_total <- project(NLCD_state_total,domain_template,method="average")
-# 
-# NLCD_state_sum <- NLCD_state_total
-# NLCD_state_sum[] <- 0
-# for(A in 1:length(state_name_list)){
-#   temp <- rast(file.path(Wastewater_partial_output_directory,
-#                  paste0(state_name_list[A],"_NLCD_suburban.nc")))
-#   temp[is.na(temp)] <- 0
-#   NLCD_state_sum <- NLCD_state_sum + temp
-# }
-# delta <- NLCD_state_total - NLCD_state_sum
-# global(delta,range)
-
-
-
-
-
-
 
