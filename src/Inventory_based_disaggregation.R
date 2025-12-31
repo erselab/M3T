@@ -46,8 +46,8 @@
 #'@author Joe Pitt, \email{madeup@@wisc.edu}
 #'@author Kris Hajny, \email{blank@@fake.edu}
 #'@author Israel Lopez-Coto, \email{test@@test.edu}
-#'@reference \href{https://doi.org/10.1029/2020JD032974}{Vulcan}
-#'@reference \href{https://doi.org/10.1002/2017JD027359}{ACES}
+#'@references \href{https://doi.org/10.1029/2020JD032974}{Vulcan}
+#'@references \href{https://doi.org/10.1002/2017JD027359}{ACES}
 #'@examples
 #' aces_res <- rast(paste0(ACES_directory,"/Sectoral/",ACES_year,'_Annual_ACES_Residential.nc'))
 #' res_totals <- c('mains_ER_total_res',
@@ -64,7 +64,9 @@
 #'                cover_all,
 #'                out_envir=environment())
 #'@export
-
+#'@seealso 
+#' * [NG_distribution()] Calculates methane emissions for the natural gas distribution sector.
+#' * [Transmission()] Calculates methane emissions for the natural gas transmission sector.
 
 #Write a function to disaggregate total emissions using ACES/Vulcan or both
 #within sub domain bounds (states, Local Distribution Companies, Counties)
@@ -96,7 +98,7 @@ disaggregation <- function(input_inventory,totals,agg_level,NEI_input,cover_all,
     input_inventory_temp <- template
     input_inventory_temp[cover[,'cell']] <- input_inventory[cover[,'cell']]*cover[,'weight']
     
-    if(global(input_inventory_temp,sum) == 0){
+    if(terra::global(input_inventory_temp,sum) == 0){
       #if there are no inventory emissions in this polygon, equally distribute
       #emissions across the polygon, just accounting for fractional coverage of
       #the pixels.  I.e., if there are 81.2 pixels in the polygon (due to some
@@ -104,11 +106,11 @@ disaggregation <- function(input_inventory,totals,agg_level,NEI_input,cover_all,
       #weighted coverage / 81.2 (such that pixels within the polygon are 1/81.2,
       #those partially within are less than 1/81.2)
       input_inventory_temp[cover[,'cell']] <- cover[,'weight']
-      input_inventory_frac <- input_inventory_temp/unlist(global(input_inventory_temp, sum))
+      input_inventory_frac <- input_inventory_temp/unlist(terra::global(input_inventory_temp, sum))
     }else{
       # Calculate the fraction of the polygon-total cover-weighted CO2 emissions
       # within each pixel
-      input_inventory_frac <- input_inventory_temp/unlist(global(input_inventory_temp, sum))
+      input_inventory_frac <- input_inventory_temp/unlist(terra::global(input_inventory_temp, sum))
     }
     
     # Loop through the different subsectors, and add the CH4 emissions map to
@@ -127,4 +129,4 @@ disaggregation <- function(input_inventory,totals,agg_level,NEI_input,cover_all,
   #E.g., aces_res_ch4_state or vu_com_ch4_domain
   assign(x=paste0(input_name,"_ch4_by",agg_level),input_inventory_ch4,envir = out_envir)
   
-}#function
+}
