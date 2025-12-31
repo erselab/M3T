@@ -77,6 +77,9 @@
 #'@author Kris Hajny, \email{blank@@fake.edu}
 #'@author Israel Lopez-Coto, \email{test@@test.edu}
 #'@export
+#'@seealso 
+#' * [CH4_inventory_build()] Calculates methane inventory using settings provided in config.
+#' * [SOCCR_Wetlands()] Calculates methane emissions for the wetland sector using the state of the carbon cycle report.
 
 NWI_Wetland_fraction <- function(input_directory,
                                  output_directory,
@@ -84,15 +87,14 @@ NWI_Wetland_fraction <- function(input_directory,
                                  domain_template,
                                  state_name_list,
                                  Use_SOCCR1,
-                                 Use_SOCCR2,
-                                 Include_freshwater){
+                                 Use_SOCCR2){
   
   # Calculate wetland fraction using NWI state wetland cover data
   
   starttime <- Sys.time()
   cat("Starting wetland sector: NWI_Wetland_fraction\n")
   
-  NWI_output_directory <- paste0(output_directory,"Wetlands/processed_NWI_data/")
+  NWI_output_directory <- file.path(output_directory,"Wetlands","processed_NWI_data")
   dir.create(NWI_output_directory,showWarnings = F,recursive = T)
   ################################################################################
   #Some settings
@@ -103,9 +105,9 @@ NWI_Wetland_fraction <- function(input_directory,
   ################################################################################
   #create input folder for raw NWI data
   
-  dir.create(paste0(input_directory,"NWI"),showWarnings = F)
-  NWI_input_directory <- paste0(input_directory,"NWI/")
-
+  NWI_input_directory <- file.path(input_directory,"NWI")
+  dir.create(NWI_input_directory,showWarnings = F)
+  
   ################################################################################
   #Create a function that will reproject to the proper CRS and then rasterize,
   #and account for invalid polygons if they exist
@@ -118,18 +120,18 @@ NWI_Wetland_fraction <- function(input_directory,
       cat(input_name,"already processed for",state_name_list[i],"\n")
     }else{
       cat("Starting",input_name,"for",state_name_list[i],"at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
-
+      
       #identify any invalid polygons (errors such as too few vertices or
       #self-intersection).  Has to be done in multiple steps or it doesn't seem to
       #work.
-      invalid_polygons <- !is.valid(input)
+      invalid_polygons <- !terra::is.valid(input)
       if(any(invalid_polygons)){
         valid_polygons <- input[!invalid_polygons]
         invalid_polygons <- input[invalid_polygons]
-        invalid_polygons <- makeValid(invalid_polygons)
+        invalid_polygons <- terra::makeValid(invalid_polygons)
         if(all(is.valid(invalid_polygons))){
           #if successful, just recombine
-          validated_input <- vect(c(valid_polygons,invalid_polygons))
+          validated_input <- terra::vect(c(valid_polygons,invalid_polygons))
         }else{
           stop('failed to fix some polygons')
         }
@@ -138,16 +140,16 @@ NWI_Wetland_fraction <- function(input_directory,
       }
       
       #rasterize cover=true is significantly faster than extract
-      output_rast <- rasterize(validated_input, state_template, fun=sum,
-                               cover=TRUE)
+      output_rast <- terra::rasterize(validated_input, state_template, fun=sum,
+                                      cover=TRUE)
       output_rast[is.na(output_rast)] <- 0
       
       #extend to the domain + some buffer, crop out any other excess and save
-      output_rast <- extend(output_rast,ext(domain)+res(domain_template)*5,fill=0)
-      output_rast <- crop(output_rast,ext(domain)+res(domain_template)*5)
-      writeRaster(output_rast,
-                  paste0(NWI_output_directory,state_name_list[i],'_',input_name,'.tiff'),
-                  overwrite=T)
+      output_rast <- terra::extend(output_rast,terra::ext(domain)+terra::res(domain_template)*20,fill=0)
+      output_rast <- terra::crop(output_rast,terra::ext(domain)+terra::res(domain_template)*20)
+      terra::writeRaster(output_rast,
+                         file.path(NWI_output_directory,paste0(state_name_list[i],'_',input_name,'.tiff')),
+                         overwrite=T)
     }
   }
   ################################################################################
@@ -184,22 +186,22 @@ NWI_Wetland_fraction <- function(input_directory,
                           error_message=paste0("\nFailed to download National Wetland Inventory data using url: ",data_URL))
       
       #unzip the downloaded file and delete the zip file
-      unzip(NWI_full_filename,
-            exdir=NWI_input_directory)
+      utils::unzip(NWI_full_filename,
+                   exdir=NWI_input_directory)
       unlink(NWI_full_filename, recursive=TRUE)
     }
     
     #The filename switches here from the .zip to the unzipped filename
     if(state_name_list[i]=="MN"){
       NWI_full_filename <- file.path(NWI_input_directory,"MN_geodatabase_wetlands.gdb")
-      wetlands <- vect(NWI_full_filename,layer="MN_wetlands")
+      wetlands <- terra::vect(NWI_full_filename,layer="MN_wetlands")
       wetlands <- wetlands[,"ATTRIBUTE"]
     }else{
-      NWI_full_filename <- file.path(NWI_input_directory,paste0(state_name_list[i],"_Wetlands_Geopackage.gpkg"))
+      NWI_full_filename <- file.path(NWI_input_directory,paste0(state_name_list[i],"_Geopackage_Wetlands.gpkg"))
       
       #load and subset to just the "attribute" variable that provides the wetland
       #type and subtype (we won't need other variables).
-      wetlands <- vect(NWI_full_filename,layer=paste0(state_name_list[i],"_Wetlands"))
+      wetlands <- terra::vect(NWI_full_filename,layer=paste0(state_name_list[i],"_Wetlands"))
       wetlands <- wetlands[,"ATTRIBUTE"]
     }
     
@@ -209,21 +211,20 @@ NWI_Wetland_fraction <- function(input_directory,
     
     #reproject and create a template for output, slightly larger than the
     #wetland shapefile to avoid losing any data
-    wetlands <- project(wetlands,crs(domain))
+    wetlands <- terra::project(wetlands,terra::crs(domain))
     state_template <- domain_template
-    values(state_template) <- 0
-    state_template <- extend(state_template,ext(wetlands)+0.5,snap="out")
+    terra::values(state_template) <- 0
+    state_template <- terra::extend(state_template,terra::ext(wetlands)+0.5,snap="out")
     
     #split the wetlands file into the relevant wetland types
     Attribute_text <- wetlands$ATTRIBUTE
-    if(Include_freshwater){
-      R1 <- wetlands[startsWith(Attribute_text, 'R1'),]
-      R2 <- wetlands[startsWith(Attribute_text, 'R2'),]
-      R3 <- wetlands[startsWith(Attribute_text, 'R3'),]
-      R4 <- wetlands[startsWith(Attribute_text, 'R4'),]
-      L1 <- wetlands[startsWith(Attribute_text, 'L1'),]
-      L2 <- wetlands[startsWith(Attribute_text, 'L2'),]
-    }
+    #freshwater
+    R1 <- wetlands[startsWith(Attribute_text, 'R1'),]
+    R2 <- wetlands[startsWith(Attribute_text, 'R2'),]
+    R3 <- wetlands[startsWith(Attribute_text, 'R3'),]
+    R4 <- wetlands[startsWith(Attribute_text, 'R4'),]
+    L1 <- wetlands[startsWith(Attribute_text, 'L1'),]
+    L2 <- wetlands[startsWith(Attribute_text, 'L2'),]
     if(Use_SOCCR1 | Use_SOCCR2){
       M2 <- wetlands[startsWith(Attribute_text, 'M2'),]
       E2 <- wetlands[startsWith(Attribute_text, 'E2'),]
@@ -231,31 +232,29 @@ NWI_Wetland_fraction <- function(input_directory,
       PNF <- wetlands[startsWith(Attribute_text, 'P')&!startsWith(Attribute_text, 'PFO'),]
     }
     
-    if(Include_freshwater){
-      # if there is some of category R1
-      if(dim(R1)[1]!=0){
-        rasterize_plus(R1)
-      }
-      
-      if(dim(R2)[1]!=0){
-        rasterize_plus(R2)
-      }
-      
-      if(dim(R3)[1]!=0){
-        rasterize_plus(R3)
-      }
-      
-      if(dim(R4)[1]!=0){
-        rasterize_plus(R4)
-      }
-      
-      if(dim(L1)[1]!=0){
-        rasterize_plus(L1)
-      }
-      
-      if(dim(L2)[1]!=0){
-        rasterize_plus(L2)
-      }
+    # if there is some of category R1
+    if(dim(R1)[1]!=0){
+      rasterize_plus(R1)
+    }
+    
+    if(dim(R2)[1]!=0){
+      rasterize_plus(R2)
+    }
+    
+    if(dim(R3)[1]!=0){
+      rasterize_plus(R3)
+    }
+    
+    if(dim(R4)[1]!=0){
+      rasterize_plus(R4)
+    }
+    
+    if(dim(L1)[1]!=0){
+      rasterize_plus(L1)
+    }
+    
+    if(dim(L2)[1]!=0){
+      rasterize_plus(L2)
     }
     if(Use_SOCCR1 | Use_SOCCR2){
       if(dim(M2)[1]!=0){
