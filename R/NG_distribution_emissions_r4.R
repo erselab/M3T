@@ -1497,5 +1497,5 @@ NG_distribution <- function(domain,
     
   }
   
-  cat("Finished natural gas distribution sector: NG_distribution_emissions in",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
+  cat("\nFinished natural gas distribution sector: NG_distribution_emissions in",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
 }
