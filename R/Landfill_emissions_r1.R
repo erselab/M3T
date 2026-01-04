@@ -164,6 +164,7 @@ Municipal_solid_waste <- function(input_directory,
                                   state_name_list,
                                   output_directory,
                                   inventory_year,
+                                  GHGI_data_yr,
                                   verbose,
                                   GHGI_landfill_total,
                                   GHGRP_facility_data,
@@ -236,13 +237,10 @@ Municipal_solid_waste <- function(input_directory,
   colnames(GHGRP_landfills) <- gsub("equation_hh6_result","HH_modeled",colnames(GHGRP_landfills))
   colnames(GHGRP_landfills) <- gsub("equation_hh8_result","HH_collection_efficiency",colnames(GHGRP_landfills))
   ################################################################################
-  #Determine nearest year available
+  #Use yr determined in CH4 inventory build - closest to inventory year with
+  #both GHGI and GHGRP
   
-  GHGRP_year <- unique(GHGRP_landfills$year)
-  GHGRP_year <- GHGRP_year[which.min(abs(GHGRP_year - inventory_year))]
-  if(inventory_year!=GHGRP_year){
-    cat("GHGRP does not include",inventory_year,"using",GHGRP_year,"as the nearest data available\n")
-  }
+  GHGRP_year <- GHGI_data_yr
   
   ################################################################################
   #Combine the combustion emissions data and put them all together

@@ -238,6 +238,7 @@ Stationary_combustion <- function(input_directory,
                                   state_name_list,
                                   output_directory,
                                   inventory_year,
+                                  GHGI_data_yr,
                                   verbose,
                                   County_Tigerlines,
                                   Use_ACES,
@@ -273,6 +274,12 @@ Stationary_combustion <- function(input_directory,
   }
   
   ################################################################################
+  #Use yr determined in CH4 inventory build - closest to inventory year with
+  #both GHGI and SEDS
+  
+  SEDS_yr <- GHGI_data_yr
+  
+  ################################################################################
   #download SEDS data
   
   SEDS_state_name_list <- c(state_name_list,"US")
@@ -282,25 +289,7 @@ Stationary_combustion <- function(input_directory,
     #see https://www.eia.gov/opendata/browser/seds.  Filtered to only sectors,
     #states, and years of interest here.  All in billion BTU/yr units (last
     #digit B instead of P - short tons)
-    
-    #check for the most recent available - down to 2023, the newest available at
-    #the time of writing if inventory_year is newer
-    if(inventory_year>2023){
-      for(SEDS_yr in inventory_year:2023){
-        data_URL <- paste0("https://api.eia.gov/v2/seds/data/?frequency=annual&data[0]=value&facets[seriesId][]=CLCCB",
-                           "&facets[seriesId][]=CLEIB",
-                           paste0("&facets[stateId][]=AL",collapse = ""),
-                           "&start=",SEDS_yr,"&end=",SEDS_yr,
-                           "&sort[0][column]=seriesId&sort[0][direction]=asc&offset=0&api_key=",EIA_API_key)
-        test_url <- jsonlite::fromJSON(data_URL)
-        if(test_url$response$total>0){
-          break
-        }
-      }
-    }else{
-      SEDS_yr <- inventory_year
-    }
-    
+
     SEDS_URL <- paste0("https://api.eia.gov/v2/seds/data/?frequency=annual&data[0]=value&facets[seriesId][]=CLCCB",
                        "&facets[seriesId][]=CLEIB&facets[seriesId][]=CLICB&facets[seriesId][]=NGCCB&facets[seriesId][]=NGEIB&facets[seriesId][]=NGICB&facets[seriesId][]=PACCB&facets[seriesId][]=PAEIB&facets[seriesId][]=PAICB&facets[seriesId][]=PARCB&facets[seriesId][]=WDRCB&facets[seriesId][]=WWCCB&facets[seriesId][]=WWEIB&facets[seriesId][]=WWICB",
                        paste0("&facets[stateId][]=",SEDS_state_name_list,collapse = ""),
