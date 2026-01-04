@@ -117,8 +117,10 @@
 #' * [NWI_Wetland_fraction()] Calculates the fraction of wetland land cover by wetland type in each pixel.
 
 
-SOCCR_Wetlands <- function(output_directory,
+SOCCR_Wetlands <- function(input_directory,
+                           output_directory,
                            plot_directory,
+                           state_name_list,
                            domain,
                            domain_template,
                            Use_SOCCR1,
@@ -213,6 +215,12 @@ SOCCR_Wetlands <- function(output_directory,
   #coverage to wetland emissions
   
   NWI_files <- list.files(paste0(Wetland_output_directory,"/processed_NWI_data/"),".tiff",full.names = T)
+  
+  #just in case this is a rerun with more output here than the states being run
+  #now
+  NWI_files <- NWI_files[sapply(strsplit(basename(NWI_files),"_"),"[[",1) %in% state_name_list]
+  
+  
   NWI_filetypes <- sapply(strsplit(basename(gsub(".tiff","",(NWI_files))),"_"),"[[",2)
   
   SOCCR_wetland_types <- c("M2","E2","PFO","PNF")
