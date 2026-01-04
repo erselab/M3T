@@ -57,14 +57,14 @@ define_custom_domain <- function(input_directory,State_CB){
   terra::plot(domain,add=T,col="red")
   input <- readline("Carefully review - does this look as desired (yes/no)?")
   if(input=="no"){
-    invisible(dev.off())
+    invisible(grDevices::dev.off())
     stop("incorrectly drawn domain, stopping run")
   }
   
   #close new window of domain plot
-  invisible(dev.off())
+  invisible(grDevices::dev.off())
   
-  crs(domain) <- crs(State_CB)
+  terra::crs(domain) <- terra::crs(State_CB)
   
   #save to input directory for future reference
   terra::writeVector(domain,file.path(input_directory,"custom_domain.gpkg"),overwrite=T)

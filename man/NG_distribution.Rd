@@ -11,6 +11,7 @@ NG_distribution(
   input_directory,
   output_directory,
   inventory_year,
+  GHGI_data_yr,
   verbose,
   GHGRP_facility_data,
   GHGRP_subpartW_emissions,

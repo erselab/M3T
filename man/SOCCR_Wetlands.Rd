@@ -5,8 +5,10 @@
 \title{Create SOCCR based wetland methane maps}
 \usage{
 SOCCR_Wetlands(
+  input_directory,
   output_directory,
   plot_directory,
+  state_name_list,
   domain,
   domain_template,
   Use_SOCCR1,

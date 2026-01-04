@@ -567,8 +567,8 @@ NG_distribution <- function(domain,
     #most of these have - name or (name) or similar.  Some specific cases don't
     #quite fit.  Split the text to get just the name.
     splittext <- sapply(strsplit(GHGRP_csv$facility_name,
-                                 "- |\\(|of |NorthWestern Energy.? |Summit Utilities Inc., |Duke Energy "),tail,1)
-    splittext <- sapply(strsplit(splittext,"-"),tail,1)
+                                 "- |\\(|of |NorthWestern Energy.? |Summit Utilities Inc., |Duke Energy "),utils::tail,1)
+    splittext <- sapply(strsplit(splittext,"-"),utils::tail,1)
     splittext <- gsub("\\)","",
                       gsub(" Gas Distribution","",
                            gsub(" Gas Operation","",
@@ -579,11 +579,11 @@ NG_distribution <- function(domain,
     abb_match <- match(splittext,datasets::state.abb)
     name_match <- match(tolower(splittext),tolower(datasets::state.name))
     
-    GHGRP_csv[!is.na(abb_match),"operating_state"]=datasets::state.abb[na.omit(abb_match)]
-    GHGRP_csv[!is.na(abb_match),"operating_state_name"]=datasets::state.name[na.omit(abb_match)]
+    GHGRP_csv[!is.na(abb_match),"operating_state"]=datasets::state.abb[stats::na.omit(abb_match)]
+    GHGRP_csv[!is.na(abb_match),"operating_state_name"]=datasets::state.name[stats::na.omit(abb_match)]
     
-    GHGRP_csv[!is.na(name_match),"operating_state"]=datasets::state.abb[na.omit(name_match)]
-    GHGRP_csv[!is.na(name_match),"operating_state_name"]=datasets::state.name[na.omit(name_match)]
+    GHGRP_csv[!is.na(name_match),"operating_state"]=datasets::state.abb[stats::na.omit(name_match)]
+    GHGRP_csv[!is.na(name_match),"operating_state_name"]=datasets::state.name[stats::na.omit(name_match)]
     
     #filter to the states in the domain
     GHGRP_csv <- GHGRP_csv[GHGRP_csv$operating_state %in% state_name_list,]
@@ -999,6 +999,16 @@ NG_distribution <- function(domain,
                         missval=-9999,
                         overwrite=TRUE)
   }
+  ################################################################################
+  #these are assigned in the below sections from the disaggregation function,
+  #but R doesn't see them being created explicitly, so do so here just to make
+  #usethis::check() happy for package building.
+  aces_res_ch4_byLDC <- vu_res_ch4_byLDC <- 
+    aces_res_ch4_bystate <- vu_res_ch4_bystate <- 
+    aces_res_ch4_bydomain <- vu_res_ch4_bydomain <- 
+    aces_com_ch4_byLDC <- vu_com_ch4_byLDC <- 
+    aces_com_ch4_bystate <- vu_com_ch4_bystate <- 
+    aces_com_ch4_bydomain <- vu_com_ch4_bydomain <- NULL
   ################################################################################
   #use ACES/Vulcan to redistribute residential/commercial emissions at the LDC
   #level

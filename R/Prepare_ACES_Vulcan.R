@@ -61,9 +61,9 @@
 #'@author Joe Pitt, \email{madeup@@wisc.edu}
 #'@author Kris Hajny, \email{blank@@fake.edu}
 #'@author Israel Lopez-Coto, \email{test@@test.edu}
-#'@reference \href{https://doi.org/10.1002/2017JD027359}{Gately et
+#'@references \href{https://doi.org/10.1002/2017JD027359}{Gately et
 #'  al.}
-#'@reference \href{https://doi.org/10.1029/2020JD032974}{Gurney et al.}
+#'@references \href{https://doi.org/10.1029/2020JD032974}{Gurney et al.}
 #'@export
 
 

@@ -93,7 +93,7 @@
 #'                     verbose=TRUE)
 #'@author Kris Hajny, \email{kris.hajny@gmail.com}
 #'@author Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
-#'@seealso [Set_config()] Generates the config function with user-editable
+#'@seealso [M3T_config] Generates the config function with user-editable
 #'  settings used throughout processing.
 
 
@@ -164,13 +164,13 @@ CH4_inventory_build <- function(run_directory,
     #only include row names if they exist, not just row numbers (confusing to
     #read).  Use print for tables/lists (outputs ~formatted) and cat for
     #number/text.
-    if(class(temp_data)=="data.frame"){
+    if(methods::is(temp_data,"data.frame")){
       if(rownames(temp_data)[1]=="1"){
         print(temp_data,quote = FALSE,row.names=F,width=300)
       }else{
         print(temp_data,quote = FALSE,width=300)
       }
-    }else if(class(temp_data)=="list"){
+    }else if(methods::is(temp_data,"list")){
       print(temp_data,quote = FALSE,width=300)
     }else{
       cat(temp_data)
@@ -188,13 +188,13 @@ CH4_inventory_build <- function(run_directory,
     #only include row names if they exist, not just row numbers (confusing to
     #read).  Use print for tables/lists (outputs ~formatted) and cat for
     #number/text.
-    if(class(temp_data)=="data.frame"){
+    if(methods::is(temp_data,"data.frame")){
       if(rownames(temp_data)[1]=="1"){
         print(temp_data,quote = FALSE,row.names=F,width=300)
       }else{
         print(temp_data,quote = FALSE,width=300)
       }
-    }else if(class(temp_data)=="list"){
+    }else if(methods::is(temp_data,"list")){
       print(temp_data,quote = FALSE,width=300)
     }else{
       cat(temp_data)
@@ -301,14 +301,14 @@ CH4_inventory_build <- function(run_directory,
   #ID any source options that are 0 characters or not text
   problem_source_entries <- names(M3T_config)[grepl(names(M3T_config),pattern="Source_.*")]
   problem_source_entries <- problem_source_entries[sapply(problem_source_entries,M3T_get_config)==0 | 
-                                                     sapply(problem_source_entries,function(x){class(M3T_get_config(x))})!="character"]
+                                                     sapply(problem_source_entries,function(x){!methods::is(M3T_get_config(x),"character")})]
   if(length(problem_source_entries)>0){
     error_found <- TRUE
     problem_source_entries <- paste(problem_source_entries,collapse=", ")
     error_text <- paste0(error_text,"\n\nMust set all data sources to \"default\", \"download\", or a file path. ",problem_source_entries," are set incorrectly (either not text in \"\" or empty).")
   }
   
-  if(M3T_config$Process_landfills & !(class(M3T_config$GHGI_landfill_total)=="numeric" | M3T_config$GHGI_landfill_total=="GHGI")){
+  if(M3T_config$Process_landfills & !(methods::is(M3T_config$GHGI_landfill_total,"numeric") | M3T_config$GHGI_landfill_total=="GHGI")){
     error_found <- TRUE
     error_text <- paste0(error_text,"\n\nMust set M3T_config$Process_landfills to FALSE or set M3T_config$GHGI_landfill_total in config to a number or \"GHGI\"")
   }
@@ -512,14 +512,14 @@ CH4_inventory_build <- function(run_directory,
     domain_res <- rep(domain_res,2)
   }
   
-  if(class(domain)=="data.frame"){
+  if(methods::is(domain,"data.frame")){
     domain <- terra::rast(nrows=diff(range(domain[,2]))/domain_res[2],
                           ncols=diff(range(domain[,1]))/domain_res[1],
                           xmin=min(domain[,1]), xmax=max(domain[,1]),
                           ymin=min(domain[,2]), ymax=max(domain[,2]),
                           vals=1)
     domain <- terra::as.polygons(terra::ext(domain),crs=domain_crs)
-  }else if(class(domain)=="character"){
+  }else if(methods::is(domain,"character")){
     #if multiple entries, focus on just 1 for simpler comparisons (must all be
     #the same type anyway)
     test_domain <- domain[1]
@@ -546,9 +546,9 @@ CH4_inventory_build <- function(run_directory,
         #full name of state
         State_Tigerlines <- State_Tigerlines[State_Tigerlines$NAME %in% domain,]
         domain <- State_Tigerlines[State_Tigerlines$NAME %in% domain,]
-      }else if(test_domain %in% unlist(values(Urban_Tigerlines[,3]))){
+      }else if(test_domain %in% unlist(terra::values(Urban_Tigerlines[,3]))){
         #full name of an urban area
-        domain <- Urban_Tigerlines[unlist(values(Urban_Tigerlines[,3])) %in% domain,]
+        domain <- Urban_Tigerlines[unlist(terra::values(Urban_Tigerlines[,3])) %in% domain,]
       }else{
         #assume it's a filepath - otherwise it's been incorrectly supplied
         domain <- terra::vect(domain)
@@ -648,7 +648,7 @@ CH4_inventory_build <- function(run_directory,
         invisible(file.copy(M3T_config$Source_GHGRP_NG,ghgrp_oil_and_gas_file,overwrite = T))
       }
     }
-    GHGRP_subpartW_emissions <- read.csv(ghgrp_oil_and_gas_file)
+    GHGRP_subpartW_emissions <- utils::read.csv(ghgrp_oil_and_gas_file)
     
     
     

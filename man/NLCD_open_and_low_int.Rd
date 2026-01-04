@@ -5,6 +5,7 @@
 \title{Process the National Land Cover Database for \code{Wastewater} function}
 \usage{
 NLCD_open_and_low_int(
+  input_directory,
   Source_wastewater_NLCD,
   domain,
   domain_template,

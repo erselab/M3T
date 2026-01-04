@@ -385,7 +385,7 @@ Stationary_combustion <- function(input_directory,
   
   # Stack these emissions to make it easier to merge with NEI data
   state_total_ch4 <- cbind(stat_comb_data_adj$State,
-                           stack(stat_comb_data_adj[grepl('_ER', names(stat_comb_data_adj))]))
+                           utils::stack(stat_comb_data_adj[grepl('_ER', names(stat_comb_data_adj))]))
   names(state_total_ch4) <- c('State', 'state_ch4_emiss', 'Sector')
   
   # Also calculate domain totals
@@ -460,7 +460,7 @@ Stationary_combustion <- function(input_directory,
   
   #convert all character columns to factor
   for(A in 1:ncol(NEI_data_orig)){
-    if(class(NEI_data_orig[,A])=="character"){
+    if(methods::is(NEI_data_orig[,A],"character")){
       NEI_data_orig[,A] <- factor(NEI_data_orig[,A])
     }
   }
@@ -637,6 +637,14 @@ Stationary_combustion <- function(input_directory,
                    'elec_gas_ER',
                    'elec_wood_ER')
   
+  ################################################################################
+  #these are assigned in the below sections from the disaggregation function,
+  #but R doesn't see them being created explicitly, so do so here just to make
+  #usethis::check() happy for package building.
+  aces_res_ch4_bystate <- aces_res_ch4_bydomain <- vu_res_ch4_bystate <- vu_res_ch4_bydomain <- 
+    aces_com_ch4_bystate <- aces_com_ch4_bydomain <- vu_com_ch4_bystate <- vu_com_ch4_bydomain <- 
+    aces_ind_ch4_bystate <- aces_ind_ch4_bydomain <- vu_ind_ch4_bystate <- vu_ind_ch4_bydomain <- 
+    aces_elec_ch4_bystate <- aces_elec_ch4_bydomain <- vu_elec_ch4_bystate <- vu_elec_ch4_bydomain <- NULL
   ################################################################################
   #process emissions at the state scale
   

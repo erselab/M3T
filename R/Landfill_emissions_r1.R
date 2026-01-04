@@ -287,6 +287,11 @@ Municipal_solid_waste <- function(input_directory,
   nonreporting_landfills <- nonreporting_landfills[!(nonreporting_landfills %in% unique(ghgrp$facility_id))]
   
   ################################################################################
+  #this is assigned in the below function, but R doesn't see it being created
+  #explicitly, so do so here just to make usethis::check() happy for package
+  #building.
+  nonreporting_landfill_data <- NULL
+  ################################################################################
   #write a function to take the data and process into raster
   
   Finalize_ghgrp <- function(outname,longname){
@@ -421,7 +426,7 @@ Municipal_solid_waste <- function(input_directory,
   LMOP <- readxl::read_xlsx(LMOP_file,sheet="LMOP Database",col_names = T)
   
   #This has some nans in, remove those
-  LMOP <- subset(LMOP,!is.na(Latitude))
+  LMOP <- subset(LMOP,!is.na(LMOP$Latitude))
   
   LMOP_non_ghgrp <- LMOP[!(LMOP$`GHGRP ID` %in% ghgrp$facility_id),]
   

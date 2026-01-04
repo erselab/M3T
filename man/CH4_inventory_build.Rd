@@ -8,16 +8,10 @@ sector according to the config file.}
 CH4_inventory_build(
   run_directory,
   inventory_year,
-  domain = "custom",
-  domain_res = 0.01,
+  domain,
+  domain_res,
   domain_crs = "epsg:4326",
-  verbose = FALSE,
-  EIA_file = "default",
-  HIFLD_compressor_file = "default",
-  DMR_file = "default",
-  CWNS_file = "default",
-  PHMSA_file = "default",
-  Wetcharts_file = "default"
+  verbose = FALSE
 )
 }
 \arguments{
@@ -85,17 +79,17 @@ this should be a folder with multiple csv's. The 2012 CWNS is available at
 CWNS is available at
 \url{https://sdwis.epa.gov/ords/sfdw_pub/r/sfdw/cwns_pub/data-download?session=8491118346746}.}
 
+\item{Wetcharts_file}{Character providing the full filepath to the Wetcharts
+file to be used in .nc format available at
+\url{https://doi.org/10.3334/ORNLDAAC/2346} or "default" to use assets built
+into the package or it's companion Zenodo.}
+
 \item{PHMSA_file}{Character providing the full filepath to the PHMSA Gas
 Distribution Annual Data xlsx file available at
 \url{https://www.phmsa.dot.gov/data-and-statistics/pipeline/gas-distribution-gas-gathering-gas-transmission-hazardous-liquids}
 or "default" to use assets built into the package or it's companion Zenodo.
 Zip files for groups of years are available via links at the bottom of the
 page.  The default cannot be used to run at the LDC level.}
-
-\item{Wetcharts_file}{Character providing the full filepath to the Wetcharts
-file to be used in .nc format available at
-\url{https://doi.org/10.3334/ORNLDAAC/2346} or "default" to use assets built
-into the package or it's companion Zenodo.}
 }
 \value{
 Nothing is returned from the function, but there will be frequent
@@ -128,7 +122,7 @@ CH4_inventory_build(run_directory="~/../Desktop/methane_inventory_2025_NE_run/",
                     verbose=TRUE)
 }
 \seealso{
-\code{\link[=Set_config]{Set_config()}} Generates the config function with user-editable
+\link{M3T_config} Generates the config function with user-editable
 settings used throughout processing.
 }
 \author{

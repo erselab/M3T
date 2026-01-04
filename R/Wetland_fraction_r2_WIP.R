@@ -129,7 +129,7 @@ NWI_Wetland_fraction <- function(input_directory,
         valid_polygons <- input[!invalid_polygons]
         invalid_polygons <- input[invalid_polygons]
         invalid_polygons <- terra::makeValid(invalid_polygons)
-        if(all(is.valid(invalid_polygons))){
+        if(all(terra::is.valid(invalid_polygons))){
           #if successful, just recombine
           validated_input <- terra::vect(c(valid_polygons,invalid_polygons))
         }else{

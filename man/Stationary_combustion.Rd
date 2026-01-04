@@ -11,6 +11,7 @@ Stationary_combustion(
   state_name_list,
   output_directory,
   inventory_year,
+  GHGI_data_yr,
   verbose,
   County_Tigerlines,
   Use_ACES,

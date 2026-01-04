@@ -11,6 +11,7 @@ Municipal_solid_waste(
   state_name_list,
   output_directory,
   inventory_year,
+  GHGI_data_yr,
   verbose,
   GHGI_landfill_total,
   GHGRP_facility_data,

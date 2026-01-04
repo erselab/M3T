@@ -430,7 +430,7 @@ Wastewater <- function(input_directory,
     
     #remove those without location data and vect as lat/long assuming WGS
     #(didn't see one explicitly mentioned, little impact on location)
-    DMR_data <- subset(DMR,!is.na(Facility_Latitude) & !is.na(Facility_Longitude))
+    DMR_data <- subset(DMR,!is.na(DMR$Facility_Latitude) & !is.na(DMR$Facility_Longitude))
   }
   
   #vect as lat/long assuming WGS
@@ -446,9 +446,9 @@ Wastewater <- function(input_directory,
       # Nearly all the entries are NAD83, but some aren't
       # Convert everything over to WGS84
       # Assume blank or unknown entries are NAD83
-      CWNS_wgs84 <- subset(CWNS, HORIZONTAL_COORDINATE_DATUM=="World Geodetic System of 1984")
-      CWNS_nad27 <- subset(CWNS, HORIZONTAL_COORDINATE_DATUM=="North American Datum of 1927")
-      CWNS_nad83 <- subset(CWNS, HORIZONTAL_COORDINATE_DATUM!="North American Datum of 1927" & HORIZONTAL_COORDINATE_DATUM!="World Geodetic System of 1984")
+      CWNS_wgs84 <- subset(CWNS, CWNS$HORIZONTAL_COORDINATE_DATUM=="World Geodetic System of 1984")
+      CWNS_nad27 <- subset(CWNS, CWNS$HORIZONTAL_COORDINATE_DATUM=="North American Datum of 1927")
+      CWNS_nad83 <- subset(CWNS, CWNS$HORIZONTAL_COORDINATE_DATUM!="North American Datum of 1927" & CWNS$HORIZONTAL_COORDINATE_DATUM!="World Geodetic System of 1984")
       
       CWNS_wgs84 <- terra::vect(CWNS_wgs84,geom=c("LONGITUDE","LATITUDE"))
       CWNS_nad27 <- terra::vect(CWNS_nad27,geom=c("LONGITUDE","LATITUDE"))
@@ -483,6 +483,12 @@ Wastewater <- function(input_directory,
   
   cat("Finished loading in municipal treatment plant data at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
   
+  ################################################################################
+  #these are assigned by the below function, but R doesn't see them being
+  #created explicitly, so do so here just to make usethis::check() happy for
+  #package building.
+  WWTP_CWNS_GHGI_municipal <- WWTP_DMR_GHGI_municipal <- 
+    WWTP_CWNS_Moore_municipal <- WWTP_DMR_Moore_municipal <- NULL
   ################################################################################
   #write a small helper function.  Creates a raster of emissions, cropped to the
   #domain, converted to proper units, and saved as 2 csvs.
@@ -632,7 +638,7 @@ Wastewater <- function(input_directory,
   
   if(nrow(Wastewater_reported_State_info)!=0){
     #average across years if both years around the inventory year are available
-    Wastewater_reported_State_info <- suppressWarnings(aggregate(Wastewater_reported_State_info,by=list(Wastewater_reported_State_info$State),mean)[,-2])
+    Wastewater_reported_State_info <- suppressWarnings(stats::aggregate(Wastewater_reported_State_info,by=list(Wastewater_reported_State_info$State),mean)[,-2])
     colnames(Wastewater_reported_State_info)[1] <- "State"
     #update using the reported info
     Wastewater_State_info$Septic_Fraction[match(Wastewater_reported_State_info$State,Wastewater_State_info$State)] <- Wastewater_reported_State_info$Septic_Fraction
@@ -671,8 +677,8 @@ Wastewater <- function(input_directory,
   #Now load in output from NLCD_fractions_by_state
   
   #output from NLCD_fractions_by_state - rasters have been reprojected
-  Suburbia_rasterfile <- list.files(pattern=glob2rx("*NLCD_suburban.tif"),path=Wastewater_partial_output_directory,full.names = T)
-  nlcd_state_total_areas <- read.table(file.path(Wastewater_partial_output_directory,"NLCD_state_total_areas.csv"),header=T,sep=",")
+  Suburbia_rasterfile <- list.files(pattern="NLCD_suburban.tif",path=Wastewater_partial_output_directory,full.names = T)
+  nlcd_state_total_areas <- utils::read.table(file.path(Wastewater_partial_output_directory,"NLCD_state_total_areas.csv"),header=T,sep=",")
   
   #just in case this is a rerun with more output here than the states being run
   #now
@@ -777,7 +783,7 @@ Wastewater <- function(input_directory,
     Wastewater_State_info$State_to_national_method_ratio <- Wastewater_State_info$State_based_septic_emissions_mol_per_s/Wastewater_State_info$National_based_septic_emissions_mol_per_s
     if(verbose){
       #now save the comparison across the methods
-      write.csv(Wastewater_State_info, file.path(Wastewater_output_directory,"WWTP_septic_method_comparison.csv"),row.names = F)
+      utils::write.csv(Wastewater_State_info, file.path(Wastewater_output_directory,"WWTP_septic_method_comparison.csv"),row.names = F)
     }
   }
   cat("Finished calculating septic emissions at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")

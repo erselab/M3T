@@ -133,6 +133,15 @@ Combine_inventories <- function(output_directory,
   
   #1 character vector with all options that can be referenced
   all_options <- ls(pattern="options")
+  
+  ################################################################################
+  #these are assigned in the below section, but R doesn't see them being created
+  #explicitly, so do so here just to make usethis::check() happy for package
+  #building.
+  Landfill_options_filenames <- NG_dist_options_filenames <- 
+    stat_comb_options_filenames <- Wastewater_options_filenames <- 
+    Wetland_options_filenames <- NULL
+  
   ################################################################################
   #look at the output that actually exists and filter out options that weren't
   #used
@@ -151,7 +160,6 @@ Combine_inventories <- function(output_directory,
     subset_options <- sapply(subset_options,function(x){output_files[grep(x,output_files)]})
     assign(paste0(all_options[A],"_filenames"),subset_options)
   }
-  
   ################################################################################
   #load in all of the options - will pull from these to get the unique
   #combinations
@@ -182,7 +190,7 @@ Combine_inventories <- function(output_directory,
   #since the wood and fossil fuel are 2 files for 1 variant, this will be a
   #matrix if there are more than 2.  Need to combine into a single entry for
   #later
-  if(class(stat_comb_options_filenames)[1]=="matrix"){
+  if(methods::is(stat_comb_options_filenames[1],"matrix")){
     stat_comb_options_filenames <- apply(stat_comb_options_filenames,2,FUN=function(x){paste0(x,collapse = ",")})
   }
   
@@ -190,7 +198,7 @@ Combine_inventories <- function(output_directory,
   #subset was set.  These are each unique variations, so just unlist.  Dealing
   #with the subset number here in this way simplifies things compared to
   #alternatives (e.g., save as input to this function)
-  if(class(Wetland_options_filenames)=="list"){
+  if(methods::is(Wetland_options_filenames,"list")){
     Wetland_options_filenames <- unlist(Wetland_options_filenames)
     Wetland_options <- gsub("Wetland_sector_total_","",
                             gsub(".nc","",Wetland_options_filenames))

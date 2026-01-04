@@ -355,7 +355,7 @@ Disaggregate_Wetcharts <- function(input_directory,
       NLCD_Downscaled_Averaged_wetcharts[[A]][cover[,'cell']] <- NLCD_Downscaled_Averaged_wetcharts[[A]][cover[,'cell']]*cover[,'weight']
     }
     
-  }else if(any(domain_res>res(Downscaled_Averaged_wetcharts[[1]]))){
+  }else if(any(domain_res>terra::res(Downscaled_Averaged_wetcharts[[1]]))){
     domain_reproj <- terra::project(domain,terra::crs(NLCD_Downscaled_Averaged_wetcharts[[1]]))
     
     #reproject to exact domain now using an average to effectively aggregate
@@ -367,7 +367,7 @@ Disaggregate_Wetcharts <- function(input_directory,
     for(A in 1:length(NLCD_Downscaled_Averaged_wetcharts)){
       NLCD_Downscaled_Averaged_wetcharts[[A]][cover[,'cell']] <- NLCD_Downscaled_Averaged_wetcharts[[A]][cover[,'cell']]*cover[,'weight']
     }
-    NLCD_Downscaled_Averaged_wetcharts <- lapply(NLCD_Downscaled_Averaged_wetcharts,FUN=function(x){terra::project(terra::extend(x,fill=0,ext(x)+(terra::res(terra::project(domain_template,terra::crs(x)))*5)),domain_template,method="average")})
+    NLCD_Downscaled_Averaged_wetcharts <- lapply(NLCD_Downscaled_Averaged_wetcharts,FUN=function(x){terra::project(terra::extend(x,fill=0,terra::ext(x)+(terra::res(terra::project(domain_template,terra::crs(x)))*5)),domain_template,method="average")})
   }
   ################################################################################
   #write output
