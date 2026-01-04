@@ -189,6 +189,11 @@ NWI_Wetland_fraction <- function(input_directory,
       utils::unzip(NWI_full_filename,
                    exdir=NWI_input_directory)
       unlink(NWI_full_filename, recursive=TRUE)
+      
+      #in some cases, the file name in the zip differs.  Force it to match
+      #expected.
+      new_file <- list.files(NWI_input_directory,full.names = T)[grep(state_name_list[i],list.files(NWI_input_directory,full.names = T))]
+      file.rename(new_file,file.path(NWI_input_directory,paste0(state_name_list[i],"_Wetlands_Geopackage.gpkg")))
     }
     
     #The filename switches here from the .zip to the unzipped filename
@@ -197,7 +202,7 @@ NWI_Wetland_fraction <- function(input_directory,
       wetlands <- terra::vect(NWI_full_filename,layer="MN_wetlands")
       wetlands <- wetlands[,"ATTRIBUTE"]
     }else{
-      NWI_full_filename <- file.path(NWI_input_directory,paste0(state_name_list[i],"_Geopackage_Wetlands.gpkg"))
+      NWI_full_filename <- file.path(NWI_input_directory,paste0(state_name_list[i],"_Wetlands_Geopackage.gpkg"))
       
       #load and subset to just the "attribute" variable that provides the wetland
       #type and subtype (we won't need other variables).
