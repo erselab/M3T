@@ -68,7 +68,8 @@
 # Calculate NLCD fractions for the states in the d03 domain
 ## Finalized: 2023-02-03
 
-NLCD_open_and_low_int <- function(Source_wastewater_NLCD,
+NLCD_open_and_low_int <- function(input_directory,
+                                  Source_wastewater_NLCD,
                                   domain,
                                   domain_template,
                                   State_Tigerlines,
@@ -89,8 +90,13 @@ NLCD_open_and_low_int <- function(Source_wastewater_NLCD,
     #UPDATE TO ZENODO
     NLCD_file <- file.path(input_directory,"NLCD","Annual_NLCD_LndCov_2024_CU_C1V1.tif")
   }else{
-    invisible(file.copy(list.files(Source_wastewater_NLCD,full.names=T),
-                        NLCD_file,overwrite = T,recursive=T))
+    if(dir.exists(Source_wastewater_NLCD)){
+      invisible(file.copy(list.files(Source_wastewater_NLCD,full.names=T),
+                          NLCD_file,overwrite = T,recursive=T))
+    }else{
+      invisible(file.copy(list.files(dirname(Source_wastewater_NLCD),full.names=T),
+                          NLCD_file,overwrite = T,recursive=T))
+    }
     NLCD_file <- list.files(NLCD_file,pattern="*.tif$",full.names=T)
   }
   NLCD <- terra::rast(NLCD_file)
