@@ -358,6 +358,7 @@ Wastewater <- function(input_directory,
                        GHGI_data_yr,
                        Total_national_open_or_low_int_area,
                        State_Tigerlines,
+                       state_name_list,
                        County_Tigerlines,
                        plot_directory,
                        State_CB,
@@ -580,24 +581,20 @@ Wastewater <- function(input_directory,
   
   if(Source_State_population_data=="download"){
     #Download the state population dataset needed
-    if(inventory_year < 2020){
-      if(!file.exists(State_pop_file)){
+    if(!file.exists(State_pop_file)){
+      if(inventory_year < 2020){
         data_URL <- "https://www2.census.gov/programs-surveys/popest/datasets/2010-2020/state/totals/nst-est2020-alldata.csv"
         Trycatch_downloader(URL = data_URL,method = "save",output_location = State_pop_file,
                             error_message = paste0("State population data could not be downloaded using FTP link: ",data_URL))
-      }
-    }else if(inventory_year <= 2024){
-      if(!file.exists(State_pop_file)){
+      }else if(inventory_year <= 2024){
         data_URL <- "https://www2.census.gov/programs-surveys/popest/datasets/2020-2024/state/totals/NST-EST2024-ALLDATA.csv"
         Trycatch_downloader(URL = data_URL,method = "save",output_location = State_pop_file,
                             error_message = paste0("State population data could not be downloaded using FTP link: ",data_URL))
-      }
-    }else{
-      #for every year after the most recent census they output a new file with
-      #the most recent estimates.  Iteratively test from the user input year
-      #going back to 2024 (year code was written) to find the newest one
-      #available.
-      if(!file.exists(State_pop_file)){
+      }else{
+        #for every year after the most recent census they output a new file with
+        #the most recent estimates.  Iteratively test from the user input year
+        #going back to 2024 (year code was written) to find the newest one
+        #available.
         #just check if the URL is valid
         for(A in inventory_year:2024){
           data_URL <- paste0("https://www2.census.gov/programs-surveys/popest/datasets/2020-",A,"/state/totals/NST-EST",A,"-ALLDATA.csv")
@@ -648,7 +645,7 @@ Wastewater <- function(input_directory,
   update_indx <- update_indx[Wastewater_State_info$State %in% State_Tigerlines$STUSPS]
   Wastewater_State_info <- Wastewater_State_info[Wastewater_State_info$State %in% State_Tigerlines$STUSPS,]
   Wastewater_State_info$Population <- State_population
-
+  
   #Same for the national data
   if(max(National_wastewater_info$Year) < (inventory_year-1)){
     National_wastewater_info <- National_wastewater_info[(National_wastewater_info$Year %in% max(National_wastewater_info$Year)) | 
@@ -676,6 +673,11 @@ Wastewater <- function(input_directory,
   #output from NLCD_fractions_by_state - rasters have been reprojected
   Suburbia_rasterfile <- list.files(pattern=glob2rx("*NLCD_suburban.tif"),path=Wastewater_partial_output_directory,full.names = T)
   nlcd_state_total_areas <- read.table(file.path(Wastewater_partial_output_directory,"NLCD_state_total_areas.csv"),header=T,sep=",")
+  
+  #just in case this is a rerun with more output here than the states being run
+  #now
+  Suburbia_rasterfile <- Suburbia_rasterfile[sapply(state_name_list,
+                                                    FUN=function(x){which(grepl(x,Suburbia_rasterfile))})]
   
   #quickly ensure that the state data is all in the same order, alphabetical
   Suburbia_rasterfile <- sort(Suburbia_rasterfile)
