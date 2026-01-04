@@ -151,9 +151,11 @@ Transmission <- function(input_directory,
                          domain_template,
                          GHGRP_facility_data,
                          GHGRP_subpartW_emissions,
+                         GHGRP_combustion_emissions,
                          state_name_list,
                          output_directory,
                          inventory_year,
+                         GHGI_data_yr,
                          verbose,
                          plot_directory,
                          County_Tigerlines,
@@ -205,13 +207,11 @@ Transmission <- function(input_directory,
   
   compressors_HIFLD <- terra::mask(compressors_HIFLD,terra::ext(-125,-95,49.0001,60),inverse=T)
   ################################################################################
-  #Determine nearest year available
+  #Use yr determined in CH4 inventory build - closest to inventory year with
+  #both GHGI and GHGRP
   
-  GHGRP_year <- unique(GHGRP_subpartW_emissions$reporting_year)
-  GHGRP_year <- GHGRP_year[which.min(abs(GHGRP_year - inventory_year))]
-  if(inventory_year!=GHGRP_year){
-    cat("GHGRP does not include",inventory_year,"using",GHGRP_year,"as the nearest data available\n")
-  }
+  GHGRP_year <- GHGI_data_yr
+  
   ################################################################################
   #load in and combine the emission data appropriately
   
@@ -339,11 +339,13 @@ Transmission <- function(input_directory,
   GHGRP_missing_from_HIFLD <- compressors_ghgrp_crop[is.na(indx),]
   indx <- indx[!is.na(indx)]
   
-  #replace the HIFLD default with GHGRP values for those with a match, then
-  #add in those without a match
-  compressors_crop_HIFLD$emiss[indx] <- GHGRP_in_HIFLD$ghg_quantity*1e6/(16.043*365*24*60*60) #MT CH4/yr to mol/s
-  names(GHGRP_missing_from_HIFLD) <- gsub("ghg_quantity","emiss",names(GHGRP_missing_from_HIFLD))
-  compressors_crop_HIFLD <- rbind(compressors_crop_HIFLD,GHGRP_missing_from_HIFLD[,"emiss"])
+  if(nrow(compressors_ghgrp_crop)>0){
+    #replace the HIFLD default with GHGRP values for those with a match, then
+    #add in those without a match
+    compressors_crop_HIFLD$emiss[indx] <- GHGRP_in_HIFLD$ghg_quantity*1e6/(16.043*365*24*60*60) #MT CH4/yr to mol/s
+    names(GHGRP_missing_from_HIFLD) <- gsub("ghg_quantity","emiss",names(GHGRP_missing_from_HIFLD))
+    compressors_crop_HIFLD <- rbind(compressors_crop_HIFLD,GHGRP_missing_from_HIFLD[,"emiss"])
+  }
   
   #convert to raster and convert units
   compressor_rast <- terra::rasterize(compressors_crop_HIFLD, domain_template, "emiss", fun=sum) # in mol/s
