@@ -274,20 +274,12 @@ Prepare_GEPA <- function(inventory_year,
     
     Summed_GEPA_saturated <- sum(GEPA,na.rm=T)
     not_log_plot(Summed_GEPA_saturated,
-                 "Gridded EPA Inventory - \nAll sectors, saturated colorscale high end",
+                 "Gridded EPA Inventory - \nAll sectors, saturated colorscale to match sectors used",
                  plot_directory=plot_directory,
                  zlim_min=as.numeric(terra::global(Summed_GEPA_inventory_subset,min,na.rm=T)),
                  zlim_max=as.numeric(terra::global(Summed_GEPA_inventory_subset,max,na.rm=T)),
                  domain=domain,County_Tigerlines=County_Tigerlines,
                  State_CB=State_CB)
-    
-    Summed_GEPA <- Summed_GEPA_saturated
-    log_plot(Summed_GEPA,
-             "Gridded EPA Inventory - \nAll sectors\nSaturated low end",
-             plot_directory=plot_directory,
-             domain=domain,County_Tigerlines=County_Tigerlines,
-             zlim_min=-4,
-             State_CB=State_CB)
   }
   cat("Finished pulling remaining sectors from gridded EPA inventory: Prepare_GEPA in",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
 }
