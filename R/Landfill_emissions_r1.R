@@ -523,9 +523,13 @@ Municipal_solid_waste <- function(input_directory,
   #Finally, load up some functions and plot up this output nicely
   
   if(verbose){
+    zlim_min <- 5000
+    zlim_max <- 0
+    
+    
     LMOP_flux[LMOP_flux==0] <- NA
-    zlim_min <- terra::global(LMOP_flux,min,na.rm=T)
-    zlim_max <- terra::global(LMOP_flux,max,na.rm=T)
+    zlim_max <- max(terra::global(LMOP_flux,max,na.rm=T),zlim_max,na.rm=T)
+    zlim_min <- min(terra::global(LMOP_flux,min,na.rm=T),zlim_min,na.rm=T)
     
     if(landfill_ghgrp_reported){
       ghgrp_reported[ghgrp_reported==0] <- NA
