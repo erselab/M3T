@@ -108,31 +108,6 @@ CH4_inventory_build <- function(run_directory,
                                 domain_res,
                                 domain_crs="epsg:4326",
                                 verbose=FALSE){
-  # # library(ncdf4);library(devtools);library(terra);library(jsonlite);library(readxl);library(dplyr);devtools::load_all()
-  # library(dplyr);devtools::load_all()
-  # # Set_config("~/../Desktop/testing_config/");
-  # # proj_pth <- r"(C:\Users\KHajny\AppData\Local\Programs\R\R-4.4.3\library\PROJ\proj)"
-  # # Sys.setenv("PROJ_LIB" = proj_pth)
-  # 
-  # # inventory_year=2011;
-  # inventory_year=2026;
-  # domain=c("DE","MD");
-  # # domain="CONUS";
-  # domain_res=0.01;
-  # domain_crs="epsg:4326";
-  # verbose=T;
-  # run_directory="~/../Desktop/testing_config/";
-  # M3T_set_config(Source_ACES="G:\\My Drive\\Shepson Group Drive\\Kris\\Philly Inventory\\Manuscript\\All inventory data\\Automated\\ACES V2.0\\Sectoral")
-  # M3T_set_config(Source_Vulcan="G:\\My Drive\\Shepson Group Drive\\Kris\\Philly Inventory\\Manuscript\\All inventory data\\Automated\\Vulcan_v4.0")
-  # M3T_set_config(Source_EIA_NG_file = "G:\\My Drive\\Shepson Group Drive\\Kris\\Philly Inventory\\Manuscript\\All inventory data\\Not Automated/EIA_form_176_all_years_downloaded_2025_09_27.csv")
-  # M3T_set_config(Source_PHMSA_file = "G:\\My Drive\\Shepson Group Drive\\Kris\\Philly Inventory\\Manuscript\\All inventory data\\Not Automated/PHMSA_annual_gas_distribution_2010_present/annual_gas_distribution_2024.xlsx")
-  # M3T_set_config(Source_HIFLD_compressor_file = "G:\\My Drive\\Shepson Group Drive\\Kris\\Philly Inventory\\Manuscript\\All inventory data\\Not Automated/HIFLD_Natural_Gas_Compressor_Stations_updated.xlsx")
-  # M3T_set_config(Source_wetcharts = "G:\\My Drive\\Shepson Group Drive\\Kris\\Philly Inventory\\Manuscript\\All inventory data\\Automated/MonthlyWetland_CH4_WetCHARTsV2_2346/MonthlyWetland_CH4_WetCHARTsV2_2346/data/WetCHARTs_v1_3_3_2022.nc")
-  # M3T_set_config(Source_wastewater_NLCD = "G:\\My Drive\\Shepson Group Drive\\Kris\\Philly Inventory\\Manuscript\\All inventory data\\Automated/NLCD/2022/Annual_NLCD_LndCov_2022_CU_C1V1.tif")
-  # M3T_set_config(Source_wetland_NLCD = "G:\\My Drive\\Shepson Group Drive\\Kris\\Philly Inventory\\Manuscript\\All inventory data\\Automated/NLCD/2022/Annual_NLCD_LndCov_2022_CU_C1V1.tif")
-  # M3T_set_config(Source_DMR = "G:\\My Drive\\Shepson Group Drive\\Kris\\Philly Inventory\\Manuscript\\All inventory data\\Not Automated/DMR_2024_downloaded_2025_09_28.csv")
-  # M3T_set_config(Source_CWNS = "G:\\My Drive\\Shepson Group Drive\\Kris\\Philly Inventory\\Manuscript\\All inventory data\\Not Automated/2022CWNS_NATIONAL_APR2024")
-  
   ################################################################################
   #Create input/output directories
   
@@ -478,7 +453,7 @@ CH4_inventory_build <- function(run_directory,
   #2024 given its solely for visualization at the state level, which doesn't
   #change significantly over time.
   
-  if(all(domain=="custom") | verbose==T){
+  if(all(tolower(domain)=="custom") | verbose==T){
     cb_file <- file.path(input_directory,"Cartographic_Boundary_500k","cb_2024_us_all_500k.gpkg")
     
     if(!file.exists(cb_file)){
@@ -535,7 +510,7 @@ CH4_inventory_build <- function(run_directory,
                               ymin=min(domain[,2]), ymax=max(domain[,2]),
                               vals=1)
         domain <- terra::as.polygons(terra::ext(domain),crs=domain_crs)
-      }else if(test_domain=="custom"){
+      }else if(tolower(test_domain)=="custom"){
         domain <- define_custom_domain(input_directory,State_CB)
         domain <- terra::project(domain,domain_crs)
       }else if(test_domain %in% State_Tigerlines$STUSPS){
