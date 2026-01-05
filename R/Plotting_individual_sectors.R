@@ -116,10 +116,34 @@ log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
                      legend=c("State","County"),
                      col=c("white","dimgrey"),lty=1,lwd=3,bg="black",xpd=T,
                      text.col="white",cex=1.5)
+  }else if(length(unique(terra::values(input)))==1){
+    #if there's exactly 1 value across the whole raster, plot it as a class
+    #instead of continuous
+    
+    plot_type="classes"
+    input <- prep_plot_data(input)
+    
+    grDevices::png(paste0(outputname,".png"),width = 480*2,height=480*2)
+    terra::plot(terra::mask(input,domain),mar=c(3.1, 3.1, 2.1, 7.1)+c(0,0,7,2),
+                type=plot_type,
+                colNA="black",
+                main=title,
+                plg=list(cex=2,title="log10(nmol/m2/s)",title.cex=2),
+                pax=list(cex.axis=2,line=2),
+                cex.main=2,cex.axis=2,cex.lab=2)
+    graphics::mtext("Latitude",side = 2,line = 0,cex = 2)
+    graphics::mtext("Longitude",side = 1,line = 3.75,cex = 2)
+    terra::plot(County_Tigerlines,add=T,border="dimgrey",col=NA)
+    terra::plot(State_CB,add=T,border="white",lwd=2,col=NA)
+    graphics::legend(x=graphics::par('usr')[1] - diff(graphics::par('usr')[1:2])*0.05,
+                     y=stats::quantile(graphics::par('usr')[3:4],0.85),
+                     legend=c("State","County"),
+                     col=c("white","dimgrey"),lty=1,lwd=3,bg="black",xpd=T,
+                     text.col="white",cex=1.5)
   }else{
-    if(terra::global(input,min,na.rm=T)<0){
-      stop("Results have negative values!  Some aspect of the calculation failed.")
-    }
+    # if(terra::global(input,min,na.rm=T)<0){
+    #   stop("Results have negative values!  Some aspect of the calculation failed.")
+    # }
     
     input <- prep_plot_data(input)
     
@@ -134,6 +158,13 @@ log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
       zlim_max <- unlist(terra::global(input,max,na.rm=T))
     }
     
+    #rare - but if all data < the assumed default low bound for some sectors this
+    #can happen
+    if(zlim_min > zlim_max){
+      zlim_min <- unlist(terra::global(input,min,na.rm=T))
+      gsub("\nSaturated colorscale low end","",title)
+    }
+
     if(zlim_max>0){
       zlim_max=zlim_max*1.00001
     }else{
@@ -148,14 +179,14 @@ log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
     
     grDevices::png(paste0(outputname,".png"),width = 480*2,height=480*2)
     terra::plot(input,mar=c(3.1, 3.1, 2.1, 7.1)+c(0,0,7,2),
-         type=plot_type,
-         colNA="black",
-         main=title,
-         plg=list(cex=2,title="log10(nmol/m2/s)",title.cex=2),
-         pax=list(cex.axis=2,line=2),
-         # xlab="Longitude",ylab="Latitude",
-         cex.main=2,cex.axis=2,cex.lab=2,
-         range=c(zlim_min,zlim_max))
+                type=plot_type,
+                colNA="black",
+                main=title,
+                plg=list(cex=2,title="log10(nmol/m2/s)",title.cex=2),
+                pax=list(cex.axis=2,line=2),
+                # xlab="Longitude",ylab="Latitude",
+                cex.main=2,cex.axis=2,cex.lab=2,
+                range=c(zlim_min,zlim_max))
     graphics::mtext("Latitude",side = 2,line = 0,cex = 2)
     graphics::mtext("Longitude",side = 1,line = 3.75,cex = 2)
     terra::plot(County_Tigerlines,add=T,border="dimgrey",col=NA)
@@ -167,10 +198,10 @@ log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
     #        col=c("white","dimgrey","darkgrey"),lty=1,lwd=3,bg="black",xpd=T,
     #        text.col="white",cex=1.5)
     graphics::legend(x=graphics::par('usr')[1] - diff(graphics::par('usr')[1:2])*0.05,
-           y=stats::quantile(graphics::par('usr')[3:4],0.85),
-           legend=c("State","County"),
-           col=c("white","dimgrey"),lty=1,lwd=3,bg="black",xpd=T,
-           text.col="white",cex=1.5)
+                     y=stats::quantile(graphics::par('usr')[3:4],0.85),
+                     legend=c("State","County"),
+                     col=c("white","dimgrey"),lty=1,lwd=3,bg="black",xpd=T,
+                     text.col="white",cex=1.5)
   }
   invisible(grDevices::dev.off())
   
@@ -236,13 +267,13 @@ not_log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
     
     grDevices::png(paste0(outputname,".png"),width = 480*2,height=480*2)
     terra::plot(terra::mask(input,domain),mar=c(3.1, 3.1, 2.1, 7.1)+c(0,0,7,2),
-         type=plot_type,
-         colNA="black",
-         main=title,
-         plg=list(cex=2,title="nmol/m2/s",title.cex=2),
-         pax=list(cex.axis=2,line=2),
-         # xlab="Longitude",ylab="Latitude",
-         cex.main=2,cex.axis=2,cex.lab=2)
+                type=plot_type,
+                colNA="black",
+                main=title,
+                plg=list(cex=2,title="nmol/m2/s",title.cex=2),
+                pax=list(cex.axis=2,line=2),
+                # xlab="Longitude",ylab="Latitude",
+                cex.main=2,cex.axis=2,cex.lab=2)
     graphics::mtext("Latitude",side = 2,line = 0,cex = 2)
     graphics::mtext("Longitude",side = 1,line = 3.75,cex = 2)
     terra::plot(County_Tigerlines,add=T,border="dimgrey",col=NA)
@@ -254,10 +285,34 @@ not_log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
     #        col=c("white","dimgrey","darkgrey"),lty=1,lwd=3,bg="black",xpd=T,
     #        text.col="white",cex=1.5)
     graphics::legend(x=graphics::par('usr')[1] - diff(graphics::par('usr')[1:2])*0.05,
-           y=stats::quantile(graphics::par('usr')[3:4],0.85),
-           legend=c("State","County"),
-           col=c("white","dimgrey"),lty=1,lwd=3,bg="black",xpd=T,
-           text.col="white",cex=1.5)
+                     y=stats::quantile(graphics::par('usr')[3:4],0.85),
+                     legend=c("State","County"),
+                     col=c("white","dimgrey"),lty=1,lwd=3,bg="black",xpd=T,
+                     text.col="white",cex=1.5)
+  }else if(length(unique(terra::values(input)))==1){
+    #if there's exactly 1 value across the whole raster, plot it as a class
+    #instead of continuous
+    
+    plot_type="classes"
+    input <- prep_plot_data(input)
+    
+    grDevices::png(paste0(outputname,".png"),width = 480*2,height=480*2)
+    terra::plot(terra::mask(input,domain),mar=c(3.1, 3.1, 2.1, 7.1)+c(0,0,7,2),
+                type=plot_type,
+                colNA="black",
+                main=title,
+                plg=list(cex=2,title="nmol/m2/s",title.cex=2),
+                pax=list(cex.axis=2,line=2),
+                cex.main=2,cex.axis=2,cex.lab=2)
+    graphics::mtext("Latitude",side = 2,line = 0,cex = 2)
+    graphics::mtext("Longitude",side = 1,line = 3.75,cex = 2)
+    terra::plot(County_Tigerlines,add=T,border="dimgrey",col=NA)
+    terra::plot(State_CB,add=T,border="white",lwd=2,col=NA)
+    graphics::legend(x=graphics::par('usr')[1] - diff(graphics::par('usr')[1:2])*0.05,
+                     y=stats::quantile(graphics::par('usr')[3:4],0.85),
+                     legend=c("State","County"),
+                     col=c("white","dimgrey"),lty=1,lwd=3,bg="black",xpd=T,
+                     text.col="white",cex=1.5)
   }else{
     if(!is.null(zlim_min)){
       input[input<zlim_min] <- zlim_min
@@ -270,6 +325,13 @@ not_log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
       zlim_max <- unlist(terra::global(input,max,na.rm=T))
     }
     
+    #rare - but if all data < the assumed default low bound for some sectors this
+    #can happen
+    if(zlim_min > zlim_max){
+      zlim_min <- unlist(terra::global(input,min,na.rm=T))
+      gsub("\nSaturated colorscale low end","",title)
+    }
+
     if(zlim_max>0){
       zlim_max=zlim_max*1.00001
     }else{
@@ -288,15 +350,15 @@ not_log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
     
     grDevices::png(paste0(outputname,".png"),width = 480*2,height=480*2)
     terra::plot(input,mar=c(3.1, 3.1, 2.1, 7.1)+c(0,0,7,2),
-         # col=timPalette(),
-         type=plot_type,
-         colNA="black",
-         main=title,
-         plg=list(cex=2,title="nmol/m2/s",title.cex=2),
-         pax=list(cex.axis=2),
-         # xlab="Longitude",ylab="Latitude",
-         cex.main=2,cex.axis=2,cex.lab=2,
-         range=c(zlim_min,zlim_max))
+                # col=timPalette(),
+                type=plot_type,
+                colNA="black",
+                main=title,
+                plg=list(cex=2,title="nmol/m2/s",title.cex=2),
+                pax=list(cex.axis=2),
+                # xlab="Longitude",ylab="Latitude",
+                cex.main=2,cex.axis=2,cex.lab=2,
+                range=c(zlim_min,zlim_max))
     graphics::mtext("Latitude",side = 2,line = 0,cex = 2)
     graphics::mtext("Longitude",side = 1,line = 3.75,cex = 2)
     terra::plot(County_Tigerlines,add=T,border="dimgrey",col=NA)
@@ -308,10 +370,10 @@ not_log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
     #        col=c("white","dimgrey","darkgrey"),lty=1,lwd=3,bg="black",xpd=T,
     #        text.col="white",cex=1.5)
     graphics::legend(x=graphics::par('usr')[1] - diff(graphics::par('usr')[1:2])*0.05,
-           y=stats::quantile(graphics::par('usr')[3:4],0.85),
-           legend=c("State","County"),
-           col=c("white","dimgrey"),lty=1,lwd=3,bg="black",xpd=T,
-           text.col="white",cex=1.5)
+                     y=stats::quantile(graphics::par('usr')[3:4],0.85),
+                     legend=c("State","County"),
+                     col=c("white","dimgrey"),lty=1,lwd=3,bg="black",xpd=T,
+                     text.col="white",cex=1.5)
   }
   invisible(grDevices::dev.off())
 }
