@@ -286,11 +286,13 @@ Combine_inventories <- function(output_directory,
     }
   }
   ################################################################################
-  #plot average across all combinations
+  #plot average across all combinations.  Name = sum instead of mean as this
+  #triggers log_plot to save to the proper folder and it is sum across sectors,
+  #average across variations.
   
   if(verbose){
-    Mean_final_inventory <- all_combinations_rast/nrow(Possible_combinations)
-    log_plot(Mean_final_inventory,
+    Summed_final_inventory <- all_combinations_rast/nrow(Possible_combinations)
+    log_plot(Summed_final_inventory,
              "Final Inventory -\nAveraged across all variations\nSaturated low end",
              plot_directory=plot_directory,
              domain=domain,County_Tigerlines=County_Tigerlines,
