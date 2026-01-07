@@ -218,7 +218,7 @@
 #'      \item{Select "simple query wizard"}
 #'      \item{Choose the first table you want ("SUMMARY_FACILITY")}
 #'      \item{Click the double right arrow to take all columns}
-#'      \item{Repeat for another table {"SUMMARY_FACILITY_FLOW"}}
+#'      \item{Repeat for another table ("SUMMARY_FACILITY_FLOW")}
 #'      \item{Click "finish"}
 #'      \item{In the left hand pane, make sure you have selected to view all Access objects. Your query should be here at the bottom. Right click on it and select to export to Excel as a .xlsx file.}
 #'    }. This filepath should point to this xlsx file. Default "M3T".}
