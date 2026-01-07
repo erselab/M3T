@@ -1,133 +1,105 @@
 #'@title Create gridded municipal solid waste methane emissions maps
 #'
-#'@description `Municipal_solid_waste` writes up to 4 netcdf files of gridded
-#'  methane emissions from municipal landfills, as well as optional visuals and
-#'  more easily read csv files
+#'@description \code{Municipal_solid_waste} is an internal function that we
+#'  strongly recommend users do not use directly, instead using
+#'  \code{\link{CH4_inventory_build}} and \code{\link{M3T_config}} which call
+#'  this function. \code{Municipal_solid_waste} writes up to 4 main netcdf files
+#'  and 3 sector total netcdf files of gridded methane emissions from municipal
+#'  landfills, as well as optional visuals
 #'
 #'@details This function calculates and grids methane emissions from municipal
-#'  landfills. It uses the Environmental Protection Agency's (EPA) Greenhouse
-#'  Gas Reporting Program (GHGRP) emissions when available.  It then calculates
-#'  the difference between national GHGRP emissions and the EPA national
-#'  Greenhouse Gas Inventory (GHGI) emissions (GHGI - GHGRP) and distributes
-#'  this residual equally to all facilities in the EPA Landfill Methane Outreach
-#'  Program (LMOP) that are not already accounted for by the GHGRP.
-#'
-#'  The necessary GHGRP and LMOP data will be automatically downloaded.
+#'  landfills. It uses the \href{https://www.epa.gov/ghgreporting}{Environmental
+#'  Protection Agency's (EPA) Greenhouse Gas Reporting Program (GHGRP)}
+#'  emissions when available.  It then calculates the difference between
+#'  national GHGRP emissions and the
+#'  \href{https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks}{EPA
+#'  national Greenhouse Gas Inventory (GHGI)} emissions (GHGI - GHGRP) and
+#'  distributes this residual equally to all facilities in the
+#'  \href{https://www.epa.gov/lmop/landfill-technical-data}{EPA Landfill Methane
+#'  Outreach Program (LMOP)} that are not already accounted for by the GHGRP.
 #'
 #'  Landfills have 2 options for reporting their emissions to the GHGRP -
 #'  equation HH-6 and HH-8.  HH-6 is based on a first order decay model, HH-8 is
 #'  based on the collection efficiency of a gas collection system. Landfills can
 #'  choose to treat either as the reported value, but both are provided to the
-#'  GHGRP.  If set in the config, the modeled values (HH-6) or collection
-#'  efficiency (HH-8) can be used rather than the reported values when a gas
-#'  collection system exists.  Note the GHGRP total used for the LMOP
-#'  calculation will be the reported values regardless, as these are what are
-#'  used in the GHGI.
+#'  GHGRP.  The modeled values (HH-6) or collection efficiency (HH-8) can be
+#'  used rather than the reported values when a gas collection system exists.
+#'  Note the GHGRP total used for the LMOP calculation will be the reported
+#'  values regardless, as these are what are used in the GHGI.
 #'
 #'  The GHGRP includes only facilities that emit at least 25,000 metric tons of
 #'  carbon dioxide equivalent while the GHGI is intended to capture all national
 #'  emissions and LMOP is a voluntary program with location and other details,
-#'  but no emissions information.  GHGRP data is available starting in 2010 and
+#'  but no emissions information.  GHGRP data is available starting in 2011 and
 #'  generally is about 2 years behind present day, the GHGI is available
 #'  starting in 1990 and is updated approximately in sync with the GHGRP, and
 #'  the LMOP is updated more frequently, sometimes multiple times per year.  All
 #'  three datasets are annual.  The GHGRP and LMOP are at the facility scale
 #'  while the GHGI is national totals.
+#'@inheritParams define_custom_domain
+#'@inheritParams CH4_inventory_build
 #'
-#'  The GHGI is available at
-#'  \url{https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks}
-#'  The GHGRP is available at \url{https://www.epa.gov/ghgreporting} LMOP is
-#'  available at \url{https://www.epa.gov/lmop/landfill-technical-data}
-#'
-#'  LMOP and GHGRP gridded emissions maps are saved separately.
-#'@inheritParams define_custom_domain 
-#'@param domain SpatVector polygon outlining the desired output area
+#'@param domain SpatVector polygon outlining the desired output area as created
+#'  in \code{\link{CH4_inventory_build}}.
 #'@param domain_template SpatRaster providing the desired output grid, including
-#'  the desired resolution and coordinate reference system
+#'  the desired resolution and coordinate reference system as created in
+#'  \code{\link{CH4_inventory_build}}.
 #'@param state_name_list Character vector listing all states within the desired
-#'  domain
+#'  domain as created in \code{\link{CH4_inventory_build}}.
 #'@param output_directory Character providing the full filepath to save
-#'  processed data
-#'@param inventory_year Numeric indicating the desired year of data to use.
-#'@param verbose Logical indicating whether to save additional output.  This
-#'  includes 2 csv files providing the downloaded information used for all
-#'  landfills within the domain, separated between LMOP and GHGRP.  It also
-#'  includes up to 4 plots of the gridded methane emissions on log scales, one
-#'  for LMOP facilities and one for each variation of the GHGRP facilities.
-#'@param GHGI_landfill_total Numeric.  Pulled from config file.  The total
-#'  national emissions from municipal solid waste from the GHGI for the
-#'  inventory_year in kilotons per year, equivalent to gigagrams per year.  The
-#'  GHGI is available at
-#'  \url{https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks}
-#'  and the value can be found in the table titled 'CH4 emissions from Landfills
-#'  (kt)' as row 'MSW net CH4 Emissions'.
+#'  processed data as created in \code{\link{CH4_inventory_build}}
+#'@param GHGI_data_yr Integer providing the year of data to use for the
+#'  \href{https://www.epa.gov/ghgreporting}{Environmental Protection Agency
+#'  (EPA) Greenhouse Gas Reporting Program (GHGRP) data}.
+#'@param verbose Logical indicating whether to save visuals. This includes up to
+#'  5 plots of the gridded methane emissions on log scales, one for LMOP
+#'  facilities, one for each variation of the GHGRP facilities, and one with the
+#'  sum of LMOP and GHGRP emissions. The GHGRP data is the first available in
+#'  the order of reported, modeled, then collection efficiency.
+#'@param GHGI_landfill_total Numeric.  Pulled from \code{\link{M3T_config}}.
 #'@param GHGRP_facility_data Data.frame with the GHGRP location data for all
-#'  years and states.  See
-#'  \url{https://www.epa.gov/enviro/envirofacts-data-service-api}
-#'@param landfill_ghgrp_reported Logical.  Pulled from config file.  Whether or
-#'  not to use reported GHGRP values.
-#'@param landfill_ghgrp_modeled Logical.  Pulled from config file.  Whether or
-#'  not to overwrite reported GHGRP values with the modeled emissions (HH-6) for
-#'  landfills with gas collection systems.
-#'@param landfill_ghgrp_collection_efficiency Logical.  Pulled from config file.
-#'  Whether or not to overwrite reported GHGRP values with the collection
-#'  efficiency based emissions (HH-8) for landfills with gas collection systems.
-#'@param plot_directory Character. \strong{Optional}. Provides the full filepath to save figures.
-#'  Only relevant if verbose = TRUE.
-#'@param County_Tigerlines SpatVector. \strong{Optional}. United States Census Bureau county
-#'  shapefile.  Available at
-#'  \url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.
-#'  Only relevant if verbose=TRUE.
-#'@param State_CB SpatVector. \strong{Optional}. US Census Cartographic Boundary files for
-#'  visualization
-#'  \url{https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html}.
-#'  Only relevant if verbose=T
+#'  years and states as prepared in \code{\link{CH4_inventory_build}} using the
+#'  \code{Source_GHGRP_facility_data} provided in \code{\link{M3T_config}}.
+#'@param GHGRP_combustion_emissions Data.frame with the GHGRP emissions data for
+#'  all years and states as prepared in \code{\link{CH4_inventory_build}} using
+#'  the \code{Source_GHGRP_combustion_emissions} provided in
+#'  \code{\link{M3T_config}}.
+#'@param Source_GHGRP_landfills Character.  Pulled from
+#'  \code{\link{M3T_config}}.
+#'@param Source_LMOP Character.  Pulled from \code{\link{M3T_config}}.
+#'@param landfill_ghgrp_reported Logical.  Pulled from \code{\link{M3T_config}}.
+#'@param landfill_ghgrp_modeled Logical.  \code{\link{M3T_config}}.
+#'@param landfill_ghgrp_collection_efficiency Logical. \code{\link{M3T_config}}.
+#'@param plot_directory Character. \strong{Optional}. Provides the full filepath
+#'  to save figures. Only relevant if \code{verbose} = TRUE.
+#'@param County_Tigerlines SpatVector. \strong{Optional}. SpatVector.
+#'  \href{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}{US
+#'  Census Tigerlines} files for visualization. Only relevant if \code{verbose} = TRUE.
+#'@param State_CB SpatVector. \strong{Optional}.
+#'  \href{https://www.census.gov/geographies/mapping-files/tme-series/geo/cartographic-boundary.html}{US
+#'  Census Cartographic Boundary} files for visualization. Only relevant if
+#'  \code{verbose} = TRUE.
 #'@returns Nothing is returned from the function, but the main outputs are up to
-#'  4 netcdf files of the methane emissions of municipal landfills.  They are
-#'  titled "MSW_GHGRP_reported.nc", "MSW_GHGRP_modeled.nc",
-#'  "MSW_GHGRP_collection_efficiency.nc", and "MSW_LMOP.nc".
-#'
-#'  If verbose is set to TRUE, then "MSW_GHGRP_all.csv" and "MSW_LMOP_all.csv"
-#'  are also saved.  The csvs include all downloaded variables for landfills
-#'  within the domain.
-#'@examples
-#'library(terra)
-#'grid_bbox=cbind(c(-76.65,-73.65),c(38.97,40.97))
-#'grid_res=0.01
-#'grid_crs="epsg:4326"
-#'grid <- rast(nrows=diff(range(grid_bbox[,2]))/grid_res,
-#'             ncols=diff(range(grid_bbox[,1]))/grid_res, xmin=min(grid_bbox[,1]),
-#'             xmax=max(grid_bbox[,1]), ymin=min(grid_bbox[,2]), ymax=max(grid_bbox[,2]),
-#'             crs=grid_crs)
-#'grid_polygon <- vect(ext(domain_template))
-#'crs(grid_polygon) <- grid_crs
-#'
-#'GHGRP_facility_data <- read.csv("~/../Desktop/GHGRP/facility_info.csv")
-#'GHGRP_facility_data$county_fips <- sprintf("%05d",GHGRP_facility_data$county_fips)
-#'GHGRP_facility_data$zip <- sprintf("%05d",GHGRP_facility_data$zip)
-#'
-#'
-#' Municipal_solid_waste(domain=grid_polygon,
-#'                       domain_template=grid,
-#'                       state_name_list=c("DE","MD","NJ","NY","PA"),
-#'                       output_directory="~/../Desktop/out/",
-#'                       input_directory="~/../Desktop/in/",
-#'                       inventory_year=2018,
-#'                       verbose=TRUE,
-#'                       GHGI_landfill_total = 3943,
-#'                       GHGRP_facility_data="~/../Desktop/in/GHGRP/facility_info.csv",
-#'                       landfill_ghgrp_reported=TRUE,
-#'                       landfill_ghgrp_modeled=TRUE,
-#'                       landfill_ghgrp_collection_efficiency=TRUE,
-#'                       plot_directory="~/../Desktop/plots/"
-#'                       County_Tigerlines=vect("~/../Desktop/in/County_Tigerlines/tl_2018_us_county.shp"),
-#'                       State_Tigerlines=vect("~/../Desktop/in/State_Tigerlines/tl_2018_us_state.shp"))
+#'  4 main netcdf files and 3 sector total netcdf files of gridded methane
+#'  emissions from municipal landfills. The main files are titled
+#'  "MSW_GHGRP_reported.nc", "MSW_GHGRP_modeled.nc",
+#'  "MSW_GHGRP_collection_efficiency.nc", and "MSW_LMOP.nc". The sector total
+#'  netcdf files are titled "Landfill_sector_total_GHGRP_reported.nc",
+#'  "Landfill_sector_total_GHGRP_modeled.nc", and
+#'  "Landfill_sector_total_GHGRP_collection_efficiency.nc".
 #'@inherit CH4_inventory_build author
-#'@seealso [CH4_inventory_build()] Calculates methane inventory using settings provided in config.
-#'@export
+#'@seealso [CH4_inventory_build()] Calculates methane inventory using settings
+#'  provided in config.
+#'
+#'  [M3T_config] Generates the config function with user-editable settings used
+#'  throughout processing.
+#'@keywords internal
 
 
 
+#@examples
+#We strongly recommend users do not use this function directly, but rely on
+#\code{\link{CH4_inventory_build}} and \code{\link{M3T_config}} instead.
 
 
 ## Landfill_emissions_r1.R
@@ -582,13 +554,15 @@ Municipal_solid_waste <- function(input_directory,
     
     if(landfill_ghgrp_reported){
       Summed_solid_waste <- sum(c(ghgrp_reported,LMOP_flux),na.rm=T)
+      title <- "Municipal Solid Waste -\n GHGRP reported emissions + (GHGI - GHGRP) distributed using \nLandfill Methane Outreach Program"
     }else if(landfill_ghgrp_modeled){
       Summed_solid_waste <- sum(c(ghgrp_modeled,LMOP_flux),na.rm=T)
+      title <- "Municipal Solid Waste -\n GHGRP modeled emissions + (GHGI - GHGRP) distributed using \nLandfill Methane Outreach Program"
     }else if(landfill_ghgrp_collection_efficiency){
       Summed_solid_waste <- sum(c(ghgrp_collection_efficiency,LMOP_flux),na.rm=T)
+      title <- "Municipal Solid Waste -\n GHGRP collection efficiency emissions + (GHGI - GHGRP) distributed using \nLandfill Methane Outreach Program"
     }
-    log_plot(Summed_solid_waste,
-             "Municipal Solid Waste -\n GHGRP reporters + (GHGI - GHGRP) distributed using \nLandfill Methane Outreach Program",
+    log_plot(Summed_solid_waste,title,
              plot_directory=plot_directory,
              domain=domain,County_Tigerlines=County_Tigerlines,
              State_CB=State_CB)
