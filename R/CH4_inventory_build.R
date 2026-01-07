@@ -5,109 +5,81 @@
 #'  the gridded methane emissions sector-by-sector using information provided in
 #'  the config file and inputs.
 #'
-#'@details This function will call all other functions and the config, create
-#'  the domain from the input data, and download some files (Census tigerlines, 
-#'  ghgrp location/name data) that will be needed for multiple sectors.  It will
-#'  then use the information in the config file and inputs to run every relevant
-#'  sector.  As such, the inputs to this function and the config may require 
-#'  user editing.
-#'
-#'  See references \href{https://doi.org/10.1029/2020JD032974}{Vulcan} and
-#'  \href{https://doi.org/10.1002/2017JD027359}{ACES}
+#'@details This function will call multiple internal functions and use
+#'  \code{\link{M3T_config}} to create gridded methane inventories. Internet
+#'  access is required so that the necessary datasets can be downloaded either
+#'  directly from the source or from a companion Zenodo contiaining
+#'  pre-processed data unless all "Source_" variables in
+#'  \code{\link{M3T_config}} are set to filepaths that point to local copies of
+#'  the needed data.
 #'@param domain data.frame or character.  If data.frame, provides the corner
 #'  coordinates of the desired region to process.  The first column would be x
 #'  values, the second column y values, and the first row would be the minima,
 #'  the second row the maxima.  These must be provided in the appropriate units
 #'  for the domain_crs parameter (e.g., decimal degrees for a lat/long
-#'  projection).  
-#'  
-#'  If character, it can be based on census Tigerlines.  It can be a state
-#'  abbreviation, state name, state FIPS code (as a character), Urban Area name,
-#'  or Urban Area Census Code.  For example: "DE", "Delaware", and "10" are all
-#'  equivalent and "Long Neck, DE" and "51202" are equivalent. It can also be
-#'  "CONUS" for the entire continental United States or "custom" for a domain
-#'  created by the user interactively on a US map. Lastly, it can be a filepath
-#'  pointing to a polygon file that can be interpreted by the terra package.
-#'  Names must match exactly and FIPS or urban area codes must include leading
-#'  0's.  Lists of the names and codes for all urban areas for the most recent
-#'  census are available at
-#'  \url{https://www.census.gov/programs-surveys/geography/guidance/geo-areas/urban-rural.html}.
+#'  projection).
+#'
+#'  If character, it can be defined based on
+#'  \href{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}{U.S.
+#'  Census Bureau Tigerlines}.  It can be a state abbreviation, state name,
+#'  state FIPS code (as a character), Urban Area name, or Urban Area Census
+#'  Code.  For example: "DE", "Delaware", and "10" are all equivalent and "Long
+#'  Neck, DE" and "51202" are equivalent. It can also be "CONUS" to run for the
+#'  entire continental United States or "custom" for a domain created by the
+#'  user interactively. Lastly, it can be a filepath pointing to a polygon file
+#'  that can be interpreted by the terra package. Names must match exactly and
+#'  FIPS or urban area codes must include leading 0's.  Lists of the names and
+#'  codes for all urban areas for the most recent census are available
+#'  \href{https://www.census.gov/programs-surveys/geography/guidance/geo-areas/urban-rural.html}{here}.
 #'  Links to previous census urban areas are on the same page.  A list with
-#'  state fips codes is available here
-#'  \url{https://www.census.gov/library/reference/code-lists/ansi.html}.
+#'  state fips codes is available
+#'  \href{https://www.census.gov/library/reference/code-lists/ansi.html}{here}.
 #'@param domain_res Numeric providing the resolution for the domain.  Can be
 #'  length 1 for equal x and y resolution or length 2 (x, y).
-#'@param domain_crs Character providing the projection of the domain in PROJ
-#'  string (\url{https://proj.org/en/stable/operations/projections/index.html})
-#'  or EPSG codes (\url{https://epsg.io/}) or WKT
-#'  (\url{https://docs.ogc.org/is/12-063r5/12-063r5.html}) formats.
-#'@param run_directory Character providing the full filepath to load/save
-#'  input and output data.  Subfolders will be created.
+#'@param domain_crs Character providing the projection of the domain in
+#'  \href{https://proj.org/en/stable/operations/projections/index.html}{PROJ
+#'  string} or \href{https://epsg.io/}{EPSG codes} or
+#'  \href{https://docs.ogc.org/is/12-063r5/12-063r5.html}{WKT} formats. Commonly
+#'  desired crs include "epsg:4326" for lat/long and "+proj=lcc +lat_0=40
+#'  +lon_0=-97 +lat_1=33 +lat_2=45 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
+#'  for a m grid in the lambert conformal conical projection used by some CO2
+#'  inventories for the continental US
+#'@param run_directory Character providing the full filepath to load/save input
+#'  and output data.  Subfolders will be created.
 #'@param inventory_year Numeric indicating the desired year of data to use.  The
-#'  closest available will be used for datasets that are not provided annually 
-#'  with a user update.
-#'@param verbose Logical indicating whether to save additional output.  This
-#'  includes easier to read csv files of the data that has been gridded for
-#'  multiple sectors as well as sector and subsector visuals.
-
-#'@param EIA_file Character providing the full filepath to the EIA form 176 data
-#'  in xlsx format available at
-#'  \url{https://www.eia.gov/naturalgas/ngqs/#?report=RP4&year1=2020&year2=2020&company=Name}
-#'  or "default" to use assets built into the package or it's companion Zenodo.
-#'@param HIFLD_compressor_file Character providing the full filepath to the
-#'  HIFLD natural gas transmission compressor data in csv format or "default" to
-#'  use assets built into the package or it's companion Zenodo.  This data has
-#'  been deprecated and is no longer available from HIFLD.
-#'@param DMR_file Character providing the full filepath to the DMR wastewater
-#'  treatment plant data in csv format available at
-#'  \url{https://echo.epa.gov/trends/loading-tool/water-pollution-search} or
-#'  "default" to use assets built into the package or it's companion Zenodo.
-#'@param CWNS_file Character providing the full filepath to the CWNS wastewater
-#'  treatment plant data or "default" to use assets built into the package or
-#'  it's companion Zenodo.  For 2012 this should be in xlsx format and for 2022
-#'  this should be a folder with multiple csv's. The 2012 CWNS is available at
-#'  \url{https://ordspub.epa.gov/ords/cwns2012/f?p=cwns2012:25} and the 2022
-#'  CWNS is available at
-#'  \url{https://sdwis.epa.gov/ords/sfdw_pub/r/sfdw/cwns_pub/data-download?session=8491118346746}.
-#'@param Wetcharts_file Character providing the full filepath to the Wetcharts
-#'  file to be used in .nc format available at
-#'  \url{https://doi.org/10.3334/ORNLDAAC/2346} or "default" to use assets built
-#'  into the package or it's companion Zenodo.
-#'@param PHMSA_file Character providing the full filepath to the PHMSA Gas
-#'  Distribution Annual Data xlsx file available at
-#'  \url{https://www.phmsa.dot.gov/data-and-statistics/pipeline/gas-distribution-gas-gathering-gas-transmission-hazardous-liquids}
-#'  or "default" to use assets built into the package or it's companion Zenodo.
-#'  Zip files for groups of years are available via links at the bottom of the
-#'  page.  The default cannot be used to run at the LDC level.
-#'@return Nothing is returned from the function, but there will be frequent
-#'  user updates as multiple other functions are run and output files created
-#'  for the various sectors.
+#'  closest available will be used if unavailable with a user update.
+#'@param verbose Logical indicating whether to save sector and subsector
+#'  visuals.
+#'@return Nothing is returned from the function, but there will be frequent user
+#'  updates as multiple other functions are run and output files created for the
+#'  various sectors.
 #'@export
 #'@examples
-#' CH4_inventory_build(run_directory="~/../Desktop/methane_inventory_2025_NE_run/",
+#' CH4_inventory_build(run_directory=tempdir(),
 #'                     inventory_year=2019,
-#'                     domain=as.data.frame(cbind(c(-76.65,-73.65),
-#'                                                c(38.97,40.97))),
-#'                     domain_res=0.01,
+#'                     domain="RI",
+#'                     domain_res=1,
 #'                     domain_crs="epsg:4326",
-#'                     verbose=TRUE)
+#'                     verbose=F)
 #'@author Kris Hajny, \email{kris.hajny@gmail.com}
 #'@author Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
 #'@seealso [M3T_config] Generates the config function with user-editable
 #'  settings used throughout processing.
 
 
-#Function to run all other functions as desired to build a CH4 inventory one
-#sector at a time.  Requires the user set a config file to determine which
-#variants for some sectors are run among other things.
-
-#some defaults for a Philly centered domain with NAD83 crs
 CH4_inventory_build <- function(run_directory,
                                 inventory_year,
                                 domain,
                                 domain_res,
                                 domain_crs="epsg:4326",
                                 verbose=FALSE){
+  ################################################################################
+  #quick internet check given much of the package requires it if any M3T_config
+  #values are M3T or download
+  if(!curl::has_internet() & any(M3T_get_config() %in% c("M3T","download"))){
+    stop("Internet is required to access the datasets needed to do these analyses. Either connect to the internet or use M3T_set_config() to instead point to locally available files for each of the below. See '?M3T_config' for details.\n",
+         paste0(names(M3T_get_config())[(M3T_get_config() %in% c("M3T","download"))],collapse="\n"))
+  }
   ################################################################################
   #Create input/output directories
   
