@@ -13,68 +13,65 @@ SOCCR_Wetlands(
   domain_template,
   Use_SOCCR1,
   Use_SOCCR2,
-  Include_freshwater,
   Wetland_EFs,
   verbose,
   County_Tigerlines,
   State_CB,
   Source_Watershed_file,
-  Use_NLCD,
-  Use_NALCMS,
   Use_Wetcharts,
   Wetcharts_model_subset
 )
 }
 \arguments{
+\item{input_directory}{Character providing the full filepath to save/load
+input data.  Automatically defined in \code{\link{CH4_inventory_build}} from
+the input \code{run_directory}.}
+
 \item{output_directory}{Character providing the full filepath to save
-processed data}
+processed data as created in \code{\link{CH4_inventory_build}}}
 
-\item{plot_directory}{Character providing the full filepath to save figures.
-Only relevant if verbose = TRUE.}
+\item{plot_directory}{Character. \strong{Optional}. Provides the full filepath
+to save figures. Only relevant if \code{verbose} = TRUE.}
 
-\item{domain}{SpatVector polygon outlining the desired output area}
+\item{state_name_list}{Character vector listing all states within the desired
+domain as created in \code{\link{CH4_inventory_build}}.}
+
+\item{domain}{SpatVector polygon outlining the desired output area as created
+in \code{\link{CH4_inventory_build}}.}
 
 \item{domain_template}{SpatRaster providing the desired output grid, including
-the desired resolution and coordinate reference system}
+the desired resolution and coordinate reference system as created in
+\code{\link{CH4_inventory_build}}.}
 
-\item{Use_SOCCR1}{Logical.  Pulled from config file.  Indicating whether or
-not to calculate emissions using SOCCR1.}
+\item{Use_SOCCR1}{Logical.  Pulled from \code{\link{M3T_config}}.}
 
-\item{Use_SOCCR2}{Logical.  Pulled from config file.  Indicating whether or
-not to calculate emissions using SOCCR2.}
+\item{Use_SOCCR2}{Logical.  Pulled from \code{\link{M3T_config}}.}
 
-\item{Include_freshwater}{Logical.  Pulled from config file.  Indicating
-whether or not to calculate emissions for freshwater wetlands using
-Rosentreter et al.}
-
-\item{Wetland_EFs}{Data frame.  Pulled from config file. Emission factors to
-use for all wetlands - including SOCCR1, SOCCR2, and Rosentreter et al.}
+\item{Wetland_EFs}{Data.frame.  Pulled from \code{\link{M3T_config}}.}
 
 \item{verbose}{Logical indicating whether to save additional output.  This
 includes plots of the gridded methane emissions on log scales, saved
 separately for SOCCR1, SOCCR2, and freshwater.}
 
-\item{County_Tigerlines}{SpatVector.  United States Census Bureau county
-shapefile.  Available at
-\url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.
-Only relevant if verbose=TRUE.}
+\item{County_Tigerlines}{SpatVector. \strong{Optional}.
+\href{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}{US
+Census Tigerlines} files for visualization. Only relevant if \code{verbose} = TRUE.}
 
-\item{State_CB}{SpatVector.  United States Census Bureau county
-shapefile.  Available at
-\url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.
-Only relevant if verbose=TRUE.}
+\item{State_CB}{SpatVector. \strong{Optional}.
+\href{https://www.census.gov/geographies/mapping-files/tme-series/geo/cartographic-boundary.html}{US
+Census Cartographic Boundary} files for visualization. Only relevant if
+\code{verbose} = TRUE.}
 
-\item{Watershed_file}{Character.  Commission for Environmental
-Cooperation watershed shapefile.  Available at
-\url{http://www.cec.org/north-american-environmental-atlas/watersheds/}.
-Only relevant if USE_SOCCR2 = TRUE.}
+\item{Source_Watershed_file}{Character.  Pulled from \code{\link{M3T_config}}.}
+
+\item{Use_Wetcharts}{Logical.  Pulled from \code{\link{M3T_config}}.}
 }
 \value{
 Nothing is returned from the function, but the main outputs are up to
 3 netcdcf files of the methane emissions from wetlands with 1 file for
-SOCCR1 and 1 file for SOCCR2 based emissions.  Lakes and rivers from
-Rosentreter et al. emissions can also be included.  They are titled
-"SOCCR1.nc", "SOCCR2.nc", and "Freshwater.nc".
+SOCCR1 based emissions, 1 file for SOCCR2 based emissions, and a file for
+lakes and rivers.  They are titled "SOCCR1.nc", "SOCCR2.nc", and
+"Freshwater.nc".
 
 If verbose is set to TRUE, then multiple figures are also saved.  Log scale
 plots with consistent axes are saved for the 2 SOCCR emissions and
@@ -110,44 +107,6 @@ SOCCR2 is available at \url{https://carbon2018.globalchange.gov/}.
 See references \href{https://doi.org/10.4319/lo.2012.57.2.0597}{McDonald et
 al.} and \href{https://doi.org/10.1038/s41561-021-00715-2}{Rosentreter et al.}
 }
-\examples{
-library(terra)
-grid_bbox=cbind(c(-76.65,-73.65),c(38.97,40.97))
-grid_res=0.01
-grid_crs="epsg:4326"
-grid <- rast(nrows=diff(range(grid_bbox[,2]))/grid_res,
-             ncols=diff(range(grid_bbox[,1]))/grid_res, xmin=min(grid_bbox[,1]),
-             xmax=max(grid_bbox[,1]), ymin=min(grid_bbox[,2]), ymax=max(grid_bbox[,2]),
-             crs=grid_crs)
-grid_vect <- as.polygons(ext(grid),crs=grid_crs)
-EFs <- data.frame("E2"=c(10.3,15.29*16.043/12.011),
-                          "M2"=c(10.3,15.29*16.043/12.011),
-                          "PFO"=c(36,18.52*16.043/12.011),
-                          "PNF"=c(36,24.92*16.043/12.011),
-                          "L1"=5,
-                          "L2"=5,
-                          "R1"=7.88,
-                          "R2"=7.88,
-                          "R3"=7.88,
-                          "R4"=7.88)
-rownames(EFs) <- c("SOCCR1","SOCCR2")
-
-# convert from g CH4 per m2 per yr to nmol/m2/s
-EFs=EFs*1E9/(16.043*365.25*24*60*60)
-
-SOCCR_Wetlands(output_directory="~/../Desktop/out/",
-               plot_directory="~/../Desktop/plots/",
-               domain=grid,
-               Use_SOCCR1=TRUE,
-               Use_SOCCR2=TRUE,
-               Include_freshwater=TRUE,
-               Wetland_EFs=EFs,
-               verbose=TRUE,
-               County_Tigerlines=vect("~/../Desktop/in/County_Tigerlines/tl_2018_us_county.shp"),
-               State_CB=vect("~/../Desktop/in/State_CB/tl_2018_us_state.shp"),
-               Watershed_file="~/../Desktop/in/watersheds_shapefile/watershed_p_v2.shp")
-
-}
 \references{
 \href{https://doi.org/10.4319/lo.2012.57.2.0597}{McDonald et al.}
 
@@ -155,16 +114,21 @@ SOCCR_Wetlands(output_directory="~/../Desktop/out/",
 al.}
 }
 \seealso{
-\itemize{
-\item \code{\link[=CH4_inventory_build]{CH4_inventory_build()}} Calculates methane inventory using settings provided in config.
-\item \code{\link[=Disaggregate_Wetcharts]{Disaggregate_Wetcharts()}} Calculates methane emissions for the wetland sector using wetcharts instead.
-\item \code{\link[=NWI_Wetland_fraction]{NWI_Wetland_fraction()}} Calculates the fraction of wetland land cover by wetland type in each pixel.
-}
+\code{\link[=CH4_inventory_build]{CH4_inventory_build()}} Calculates methane inventory using settings
+provided in config.
+
+\link{M3T_config} Generates the config function with user-editable settings used
+throughout processing.
+
+\code{\link[=Disaggregate_Wetcharts]{Disaggregate_Wetcharts()}} Calculates methane emissions for the wetland
+sector using wetcharts instead.
+
+\code{\link[=NWI_Wetland_fraction]{NWI_Wetland_fraction()}} Calculates the fraction of wetland land cover by
+wetland type in each pixel.
 }
 \author{
-Joe Pitt, \email{madeup@wisc.edu}
+Kris Hajny, \email{kris.hajny@gmail.com}
 
-Kris Hajny, \email{blank@fake.edu}
-
-Israel Lopez-Coto, \email{test@test.edu}
+Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
 }
+\keyword{internal}

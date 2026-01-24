@@ -1,14 +1,13 @@
 ## code to prepare `CWNS_2012` dataset.  This is to subset the data after
-## converting from an access database as described in the R/data.R documentation
+## converting from an access database as described in the M3T_config
+## documentation
 
-input_directory <- "D:/MMMT STUFF/All inventory data/Not Automated/"
-output_directory <- "D:/MMMT STUFF/All inventory data/Not Automated/"
-
-library(readxl)
+# input_directory <- "D:/MMMT STUFF/All inventory data/Not Automated/"
+input_directory <- "G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Manuscript/All inventory data/Prepared inventory data/"
 ################################################################################
 #load and minor processing
 
-CWNS_2012 <- read_xlsx(file.path(input_directory,"2012_CWNS.xlsx"))
+CWNS_2012 <- readxl::read_xlsx(file.path(input_directory,"2012_CWNS.xlsx"))
 
 #correct an oklahoma site that had the wrong hemisphere listed
 CWNS_2012[CWNS_2012$FACILITY_ID=="1172804","LONGITUDE"] <- gsub("E","W",CWNS_2012[CWNS_2012$FACILITY_ID=="1172804","LONGITUDE"])

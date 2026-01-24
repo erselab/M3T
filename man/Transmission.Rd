@@ -27,7 +27,8 @@ Transmission(
 }
 \arguments{
 \item{input_directory}{Character providing the full filepath to save/load
-raw input data}
+input data.  Automatically defined in \code{\link{CH4_inventory_build}} from
+the input \code{run_directory}.}
 
 \item{GHGI_transmission_compressors}{Character or data.frame.  Pulled from
 config file. Either GHGI to indicate the GHGI file should be used to pull
@@ -41,22 +42,35 @@ emissions and activity data or a data frame providing the needed values.}
 HIFLD compressor data.  As this file is now deprecated and no replacement
 has been created, it currently must be provided as part of the package.}
 
-\item{domain}{SpatVector polygon outlining the desired output area}
+\item{domain}{SpatVector polygon outlining the desired output area as created
+in \code{\link{CH4_inventory_build}}.}
 
 \item{domain_template}{SpatRaster providing the desired output grid, including
-the desired resolution and coordinate reference system}
+the desired resolution and coordinate reference system as created in
+\code{\link{CH4_inventory_build}}.}
 
 \item{GHGRP_facility_data}{Data.frame with the GHGRP location data for all
 years and states.  See
 https://www.epa.gov/enviro/envirofacts-data-service-api}
 
+\item{GHGRP_combustion_emissions}{Data.frame with the GHGRP combustion
+emissions data for all years and states as prepared in
+\code{\link{CH4_inventory_build}} using
+\code{Source_GHGRP_combustion_emissions} provided in
+\code{\link{M3T_config}}.}
+
 \item{state_name_list}{Character vector listing all states within the desired
 domain}
 
 \item{output_directory}{Character providing the full filepath to save
-processed data}
+processed data as created in \code{\link{CH4_inventory_build}}}
 
-\item{inventory_year}{Character indicating the desired year of data to use.}
+\item{inventory_year}{Numeric indicating the desired year of data to use.  The
+closest available will be used if unavailable with a user update.}
+
+\item{GHGI_data_yr}{Integer providing the year of data to use for the
+\href{https://www.epa.gov/ghgreporting}{Environmental Protection Agency
+(EPA) Greenhouse Gas Reporting Program (GHGRP) data}.}
 
 \item{verbose}{Logical indicating whether to save additional output.  This
 includes plots of the gridded methane emissions for each
@@ -70,10 +84,10 @@ Only relevant if verbose = TRUE.}
 \item{County_Tigerlines}{SpatVector.  United States Census Bureau county
 shapefile downloaded in Main.}
 
-\item{State_Tigerlines}{SpatVector.  United States Census Bureau county
-shapefile.  Available at
-\url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.
-Only relevant if verbose=TRUE.}
+\item{State_CB}{SpatVector. \strong{Optional}.
+\href{https://www.census.gov/geographies/mapping-files/tme-series/geo/cartographic-boundary.html}{US
+Census Cartographic Boundary} files for visualization. Only relevant if
+\code{verbose} = TRUE.}
 }
 \value{
 Nothing is returned from the function, but the main outputs are 2
@@ -148,41 +162,16 @@ available at \url{https://ghgdata.epa.gov/ghgp/main.do}, and the EIA data is
 available at
 \url{https://atlas.eia.gov/datasets/eia::natural-gas-interstate-and-intrastate-pipelines/about}.
 }
-\examples{
-library(terra)
-grid_bbox=cbind(c(-76.65,-73.65),c(38.97,40.97))
-grid_res=0.01
-grid_crs="epsg:4326"
-grid <- rast(nrows=diff(range(grid_bbox[,2]))/grid_res,
-             ncols=diff(range(grid_bbox[,1]))/grid_res, xmin=min(grid_bbox[,1]),
-             xmax=max(grid_bbox[,1]), ymin=min(grid_bbox[,2]), ymax=max(grid_bbox[,2]),
-             crs=grid_crs)
-grid_vect <- as.polygons(ext(grid),crs=grid_crs)
-Transmission(GHGI_transmission_compressors="GHGI",
-                      GHGI_Pipeline="GHGI",
-                      Source_HIFLD_compressor_file="~/../Desktop/in/Natural_Gas_Compressor_Stations.csv",
-                      GHGRP_facility_data="~/../Desktop/in/GHGRP/facility_info.csv",
-                      domain=grid_vect,
-                      domain_template=grid,
-                      state_name_list=c("DE","MD","NJ","NY","PA"),
-                      output_directory="~/../Desktop/out/",
-                      input_directory="~/../Desktop/in/",
-                      inventory_year=2018,
-                      verbose=TRUE,
-                      State_Tigerlines=vect("~/../Desktop/in/State_Tigerlines/tl_2018_us_state.shp"),
-                      County_Tigerlines=vect("~/../Desktop/in/County_Tigerlines/tl_2018_us_county.shp"),
-                      plot_directory="~/../Desktop/plots/")
-}
 \seealso{
-\itemize{
-\item \code{\link[=CH4_inventory_build]{CH4_inventory_build()}} Calculates methane inventory using settings provided in config.
-\item \code{\link[=disaggregation]{disaggregation()}} Disaggregates data using NEI county level CO data.
-}
+\code{\link[=CH4_inventory_build]{CH4_inventory_build()}} Calculates methane inventory using settings
+provided in config.
+
+\link{M3T_config} Generates the config function with user-editable settings used
+throughout processing.
 }
 \author{
-Joe Pitt, \email{madeup@wisc.edu}
+Kris Hajny, \email{kris.hajny@gmail.com}
 
-Kris Hajny, \email{blank@fake.edu}
-
-Israel Lopez-Coto, \email{test@test.edu}
+Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
 }
+\keyword{internal}

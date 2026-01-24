@@ -1,11 +1,15 @@
-## code to prepare `EIA_NG_data` dataset goes here
+## code to prepare `EIA_NG_data` dataset.
+## https://www.eia.gov/naturalgas/ngqs/#?report=RP4&year1=2020&year2=2020&company=Name
+## EIA Form 176 - the Annual Report of Natural and supplemental Gas Supply and
+## Disposition that includes sold natural gas volume by company and customer
+## type. Can be downloaded as a csv file using a button in the topright on the
+## webpage. Default "M3T".
 
-
-input_directory <- "D:\\MMMT STUFF\\All inventory data\\Not Automated"
+input_directory <- "G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Manuscript/All inventory data/Prepared inventory data/"
 
 ################################################################################
 #load in
-EIA_file <- file.path(input_directory,"EIA_form_176_all_years_downloaded_2025_09_27.csv")
+EIA_file <- list.files(input_directory,pattern = "EIA_form_176_.*.csv",full.names = T)
 
 EIA_NG_data <- read.csv(EIA_file)
 

@@ -1,83 +1,75 @@
-## code to prepare `Wetland_Landcover` dataset goes here.  Note this is a
-## very time and memory intensive piece of code to run
+## code to prepare `NLCD_downscaled_wetcharts'.  This uses the 30 m national
+## land cover database to downscale the 0.5 deg Wetcharts model data to 0.1 deg
+## for CONUS. Assumes NLCD data and state tigerlines have already been
+## downloaded (separate scripts).  Note this is extremely time consuming to run
+## as it's processing high resolution data across multiple years.
 
-#Location with data from the national land cover database (NLCD).  This data is
-#available at https://www.mrlc.gov/data. This is a geotif of 30 m land
-#cover data for the Continental United States where different values represent
-#the different land cover classifications. It's download has not been automated
-#here.
-NLCD_input_directory <- "D:/MMMT STUFF/All inventory data/Automated/NLCD"
 
-#WETcharts data for all relevant years.  This data is available at
-#https://www.earthdata.nasa.gov/data/catalog/ornl-cloud-monthlywetland-ch4-wetchartsv2-2346-1.3.3.
-#It includes monthly modeled wetland CH4 for multiple biogeochemical models. It
-#has not been automated as, at the time of writing, files are being transferred
-#from the ORNL DAAC to NASA's Earthdata site and the THREDDS API is not
-#available for some files.
-wetcharts_input_directory <- "D:/MMMT STUFF/All inventory data/Automated/MonthlyWetland_CH4_WetCHARTsV2_2346/MonthlyWetland_CH4_WetCHARTsV2_2346/data/"
+input_directory <- "G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Manuscript/All inventory data/Prepared inventory data/"
 
-# #US census tigerlines data necessary for processing as much of it is
-# #state-specific.  Assumes the format matches that created using the data-raw
-# #script in this package
-# tigerlines_input_directory <- "D:/MMMT STUFF/All inventory data/Automated/"
-
-# Calculate NLCD fractions for CONUS states
-output_directory <- "D:/MMMT STUFF/All inventory data/Automated/"
-
-library(terra)
-
-#save data at a higher resolution
-terraOptions(datatype="FLT8S")
-# terraOptions(datatype="FLT8S",progress=0)
 ################################################################################
-#prep to load in the landcover - national land cover database (NLCD)
+#Where to load in NLCD and wetcharts data
 
-NLCD_files <- list.files(NLCD_input_directory,pattern="*.tif$",full.names = T,
-                         recursive = T)
-NLCD_years <- basename(dirname(NLCD_files))
-
-# total_suburban <- vector(length = length(NLCD_files))
-
-#loop through files rather than all at once to make it a much more manageable
-#memory requirement
+NLCD_directory <- file.path(input_directory,"NLCD_data")
+Wetcharts_directory <- file.path(input_directory,"MonthlyWetland_CH4_WetCHARTsV2_2346","MonthlyWetland_CH4_WetCHARTsV2_2346","data")
 ################################################################################
-#CONUS outline
+#setup a CONUS domain at 0.01 deg x 0.01 deg resolution
+
+domain_res <- c(0.01,0.01)
+domain_crs <- "+proj=longlat +ellps=WGS84 +no_defs"
 domain <- as.data.frame(cbind(c(-130,-60),
                               c(20,55)))
-domain_template <- terra::rast(nrows=diff(range(domain[,2]))/0.01,
-                               ncols=diff(range(domain[,1]))/0.01,
-                               xmin=min(domain[,1]), xmax=max(domain[,1]),
-                               ymin=min(domain[,2]), ymax=max(domain[,2]),
-                               vals=1)
-domain <- terra::as.polygons(terra::ext(domain_template),crs=terra::crs(domain_template))
-# NLCD_suburban <- rast(NLCD_files[1])
-# 
-# domain_template <- project(domain_template,crs(NLCD_suburban))
-################################################################################
-#prep to load in  wetcharts
-
-Wetcharts_file <- list.files(wetcharts_input_directory,
-                             pattern="WetCHARTs_v1_3_3_.{4}\\.nc$",full.names = T)
-Wetcharts_years <- sapply(strsplit(gsub(".nc","",Wetcharts_file),split = "_"),FUN = "[[",11)
+domain <- terra::rast(nrows=diff(range(domain[,2]))/domain_res[2],
+                      ncols=diff(range(domain[,1]))/domain_res[1],
+                      xmin=min(domain[,1]), xmax=max(domain[,1]),
+                      ymin=min(domain[,2]), ymax=max(domain[,2]),
+                      vals=1)
+domain <- terra::as.polygons(terra::ext(domain),crs=domain_crs)
+domain_template <- terra::rast(domain,resolution=domain_res,crs=domain_crs,vals=NA)
 
 ################################################################################
-#retain only relevant years and align wetcharts and NLCD
+#save partial data given the significant processing time/memory needed
 
-Wetcharts_file <- Wetcharts_file[as.numeric(Wetcharts_years)>2010]
-Wetcharts_years <- Wetcharts_years[as.numeric(Wetcharts_years)>2010]
+Wetlands_partial_output_directory <- file.path(input_directory,"processed_wetlands_NLCD_data")
+dir.create(Wetlands_partial_output_directory,showWarnings = F,recursive = T)
 
-NLCD_files <- NLCD_files[as.numeric(NLCD_years)>2010 & NLCD_years %in% Wetcharts_years]
-NLCD_years <- NLCD_years[as.numeric(NLCD_years)>2010 & NLCD_years %in% Wetcharts_years]
+################################################################################
+#loop through each year with NLCD data
+
+NLCD_files <- list.files(NLCD_directory,recursive=T,pattern=".tif$",full.names = T)
+Wetcharts_files <- list.files(Wetcharts_directory,
+                              pattern="WetCHARTs_v1_3_3_.{4}\\.nc$",full.names = T)
+
+Wetcharts_years <- sapply(strsplit(gsub(".nc","",basename(Wetcharts_files)),split = "_"),FUN = "[[",5)
+
+NLCD_years <- basename(dirname(NLCD_files))
+
+Tigerlines_years <- terra::vector_layers(file.path(input_directory,"combined_state_tigerlines.gpkg"))
+
+
+Wetcharts_files <- Wetcharts_files[(Wetcharts_years %in% Tigerlines_years) & 
+                                     Wetcharts_years>2010 & 
+                                     (Wetcharts_years %in% NLCD_years)]
+
+Tigerlines_years <- Tigerlines_years[(Tigerlines_years %in% Wetcharts_years) & 
+                                       (Tigerlines_years %in% NLCD_years)]
+
+NLCD_files <- NLCD_files[(NLCD_years %in% Wetcharts_years) &
+                           (NLCD_years %in% Tigerlines_years)]
 
 ################################################################################
 #function to speed processing
 
-Annual_Wetcharts_prep <- function(file_num){
+#loop through files rather than all at once to make it a much more manageable
+#memory requirement
+
+output_wetcharts <- list()
+for(A in 1:length(NLCD_files)){
   ################################################################################
   #limit Wetcharts to CONUS + a little buffer, crop wetcharts
   
-  Wetcharts <- terra::rast(Wetcharts_file[file_num])
-  Wetcharts <- terra::crop(Wetcharts,terra::ext(terra::project(domain,terra::crs(Wetcharts)))+0.5)
+  Wetcharts <- terra::rast(Wetcharts_files[A])
+  Wetcharts <- terra::crop(Wetcharts,terra::ext(domain)+2)
   ################################################################################
   #load in, reclassify, and project NLCD to wetcharts CRS at 0.1 deg.
   
@@ -85,32 +77,29 @@ Annual_Wetcharts_prep <- function(file_num){
   template <- terra::disagg(Wetcharts[[1]],fact=5)
   terra::values(template) <- 1
   
-  NLCD <- rast(NLCD_files[file_num])
+  NLCD <- terra::rast(NLCD_files[A])
   
   #correct levels from the R interpreted ones (as provided in manual)
   NLCD_key <- data.frame("Value"=c(11,12,21:24,31,41:43,52,71,81:82,90,95),
-                         "Land_Class"=levels(NLCD)[[1]][,2])
+                         "Land_Class"=terra::levels(NLCD)[[1]][,2])
   levels(NLCD) <- NLCD_key
-  
-  cat("Reclassifying 30 m national dataset - this is a very time consuming step\n")
   
   #force all values between 0 and 89 to 0.  values between 89 and 200 are forced
   #to 1.  90 and 95 = wetland land cover for NLCD.
+  cat("Reclassifying NLCD\n")
   NLCD <- terra::classify(NLCD,matrix(c(0,89,0,
                                         89,200,1),
                                       ncol=3,byrow=T))
   
-  cat("Removing 0's\n")
-  NLCD[is.na(NLCD)] <- 0
+  #Aggregate slightly first for memory/speed
+  cat("Aggregating and then reprojecting NLCD\n")
+  NLCD <- terra::aggregate(NLCD,
+                           na.rm=T,
+                           fact=10,
+                           fun=sum)
   
-  # #save this temporarily for speed/memory
-  # NLCD_tempfile <- tempfile(fileext = '.tif')
-  # writeRaster(NLCD,NLCD_tempfile)
-  # NLCD <- rast(NLCD_tempfile)
-  
-  cat("Reprojecting\n")
   #project to a grid with the exact right resolution, extent and origin.
-  NLCD=terra::project(NLCD,template,method="sum")
+  NLCD <- terra::project(NLCD,template,method="sum")
   
   ################################################################################
   #now calculate the wetland fraction
@@ -141,7 +130,7 @@ Annual_Wetcharts_prep <- function(file_num){
   NLCD_wetland_fraction[is.na(NLCD_wetland_fraction)] <- 1/25
   
   ################################################################################
-  #Subset to the user-set models and average monthly Wetcharts across models.
+  #Average monthly Wetcharts separately for each model.
   
   #pull the model numbers from the names of wetcharts
   Wetcharts_models <- sapply(strsplit(names(Wetcharts),"_"),"[[",4)
@@ -172,9 +161,9 @@ Annual_Wetcharts_prep <- function(file_num){
   Averaged_wetcharts <- Wetcharts[[1]]
   terra::nlyr(Averaged_wetcharts) <- length(unique(Wetcharts_models))
   for(B in 1:length(unique(Wetcharts_models))){
-    Averaged_wetcharts[[B]] <- mean(Wetcharts[[Wetcharts_models==unique(Wetcharts_models)[B]]])
+    Averaged_wetcharts[[B]] <- terra::mean(Wetcharts[[Wetcharts_models==unique(Wetcharts_models)[B]]])
   }
-  terra::names(Averaged_wetcharts) <- unique(Wetcharts_models)
+  names(Averaged_wetcharts) <- unique(Wetcharts_models)
   
   #Convert from mg/m2day to nmol/m2s
   Averaged_wetcharts <- Averaged_wetcharts*1e9/(1000*16.043*24*3600)
@@ -197,47 +186,19 @@ Annual_Wetcharts_prep <- function(file_num){
   #nmol/m2s for the smaller pixels
   NLCD_Downscaled_Averaged_wetcharts <- terra::crop(Downscaled_Averaged_wetcharts*NLCD_wetland_fraction/terra::cellSize(Downscaled_Averaged_wetcharts),terra::project(domain,terra::crs(NLCD_wetland_fraction)),snap="out")
   
-  cat("\rFinished NLCD year",A,"of",length(NLCD_files),"\n")
-  return(NLCD_Downscaled_Averaged_wetcharts)
+  terra::writeRaster(NLCD_Downscaled_Averaged_wetcharts,file.path(Wetlands_partial_output_directory,
+                                                                  paste0(Tigerlines_years[A],"_NLCD_downscaled_wetcharts.tif")),
+                     overwrite=T)
+  cat("Finished NLCD year",A,"of",length(NLCD_files),"\n\n\n\n")
 }
 
 ################################################################################
-#loop through files rather than all at once to make it a much more manageable
-#memory requirement
+#Combine and save
 
-output_wetcharts <- list()
-for(A in 1:length(NLCD_files)){
-  output_wetcharts[[A]] <- Annual_Wetcharts_prep(A)
-}
+NLCD_Downscaled_wetcharts <- terra::rast(list.files(Wetlands_partial_output_directory,pattern=".tif$",full.names=T))
+names(NLCD_Downscaled_wetcharts) <- paste0(rep(Tigerlines_years,each=length(unique(Wetcharts_models))),
+                                           "_model_",
+                                           names(NLCD_Downscaled_wetcharts))
+terra::writeRaster(NLCD_Downscaled_wetcharts,file.path(input_directory,"combined_NLCD_downscaled_wetcharts.tif"),
+                   overwrite=T)
 
-################################################################################
-# reproject output to match domain exactly
-
-#disaggregate to a similar resolution
-domain_trans <- terra::project(domain_template,terra::crs(output_wetcharts[[1]]))
-domain_res <- terra::res(domain_trans)
-
-output_wetcharts <- lapply(output_wetcharts,FUN=function(x){
-  terra::disagg(x,round(terra::res(x)/domain_res,3),
-                "near")})
-
-#reproject to exact domain now.  Here using nearest neighbor to prevent
-#only 1 row/column of higher res pixels on the border from being
-#interpolated.
-output_wetcharts <- lapply(output_wetcharts,FUN=function(x){
-  terra::mask(terra::project(x,domain_template,method="near"),
-              domain)})
-
-cover <- terra::extract(output_wetcharts[[1]][[1]],
-                        terra::project(domain,output_wetcharts[[1]]),
-                        weights=T,cells=T)
-output_wetcharts[cover[,'cell']] <- output_wetcharts[cover[,'cell']]*cover[,'weight']
-for(A in 1:length(output_wetcharts)){
-  output_wetcharts[[A]][cover[,'cell']] <- output_wetcharts[[A]][cover[,'cell']]*cover[,'weight']
-}
-
-################################################################################
-#save
-
-output_directory
-# usethis::use_data(Wetland_Landcover, overwrite = TRUE,internal = T)

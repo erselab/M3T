@@ -8,28 +8,25 @@ define_custom_domain(input_directory, State_CB)
 }
 \arguments{
 \item{input_directory}{Character providing the full filepath to save/load
-input data.  Automatically defined in 'CH4_inventory_build'.}
+input data.  Automatically defined in \code{\link{CH4_inventory_build}} from
+the input \code{run_directory}.}
 
-\item{State_CB}{SpatVector. US Census Cartographic Boundary files for
-visualization
-\url{https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html}.}
+\item{State_CB}{SpatVector.
+\href{https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html}{US
+Census Cartographic Boundary} files for visualization.}
 }
 \value{
 SpatVector
 }
 \description{
-This function uses functions from the terra package to allow a
-user to build a domain area using a state map of the continental US.
+This function uses the terra package to interactively build a
+domain area using a state map of the continental US.
 }
 \details{
 The polygon is saved for potential reuse and reference.  Be aware
 that nonsensical polygons can be built (e.g., those with holes, odd shapes,
 etc.) so the user check at the end is quite important to make sure this
 polygon is useful.
-}
-\examples{
-define_custom_domain("~/../Desktop/CONUS_2020_MMMT_run/in")
-
 }
 \seealso{
 \code{\link[=CH4_inventory_build]{CH4_inventory_build()}} Calculates methane inventory using settings
@@ -40,3 +37,4 @@ Kris Hajny, \email{kris.hajny@gmail.com}
 
 Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
 }
+\keyword{internal}

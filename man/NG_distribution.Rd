@@ -15,7 +15,6 @@ NG_distribution(
   verbose,
   GHGRP_facility_data,
   GHGRP_subpartW_emissions,
-  NG_annex_file,
   Source_EIA_NG_file,
   Source_PHMSA_file,
   Source_GHGRP_LDC,
@@ -42,21 +41,29 @@ NG_distribution(
 )
 }
 \arguments{
-\item{domain}{SpatVector polygon outlining the desired output area}
+\item{domain}{SpatVector polygon outlining the desired output area as created
+in \code{\link{CH4_inventory_build}}.}
 
 \item{domain_template}{SpatRaster providing the desired output grid, including
-the desired resolution and coordinate reference system}
+the desired resolution and coordinate reference system as created in
+\code{\link{CH4_inventory_build}}.}
 
 \item{state_name_list}{Character vector listing all states within the desired
-domain}
+domain as created in \code{\link{CH4_inventory_build}}.}
 
 \item{input_directory}{Character providing the full filepath to save/load
-input data.  Automatically defined in 'CH4_inventory_build'.}
+input data.  Automatically defined in \code{\link{CH4_inventory_build}} from
+the input \code{run_directory}.}
 
 \item{output_directory}{Character providing the full filepath to save
-processed data}
+processed data as created in \code{\link{CH4_inventory_build}}}
 
-\item{inventory_year}{Numeric indicating the desired year of data to use.}
+\item{inventory_year}{Numeric indicating the desired year of data to use.  The
+closest available will be used if unavailable with a user update.}
+
+\item{GHGI_data_yr}{Integer providing the year of data to use for the
+\href{https://www.epa.gov/ghgreporting}{Environmental Protection Agency
+(EPA) Greenhouse Gas Reporting Program (GHGRP) data}.}
 
 \item{verbose}{Logical indicating whether to save additional output.  This
 includes plots of the gridded methane emissions for each
@@ -65,117 +72,71 @@ each inventory-variation combination - one for wood and one for all other
 sectors.}
 
 \item{GHGRP_facility_data}{Data.frame with the GHGRP location data for all
-years and states.  See
-\url{https://www.epa.gov/enviro/envirofacts-data-service-api}}
+years and states as prepared in \code{\link{CH4_inventory_build}} using the
+\code{Source_GHGRP_facility_data} provided in \code{\link{M3T_config}}.}
 
-\item{Source_EIA_NG_file}{Character providing the full filepath to the EIA Form 176 -
-Annual Report of Natural and supplemental Gas Supply and Disposition xlsx
-file available at
-\url{https://www.eia.gov/naturalgas/ngqs/#?report=RP4&year1=2020&year2=2020&company=Name}.
-The year can be set to just the desired year.  Then all data can be
-downloaded to an xlsx file using a button to the topright of the data table.
-If running at the LDC level, the file must be edited such that there is a
-consistent identifier with other input data (HIFLD, PHMSA, GHGRP).  There is
-an example file in the package's datasets folder that has been successfully
-used in this code available for reference.}
+\item{GHGRP_subpartW_emissions}{Data.frame with the GHGRP petroleum and
+natural gas systems emissions data for all years and states as prepared in
+\code{\link{CH4_inventory_build}} using
+\code{Source_GHGRP_subpartW_emissions} provided in \code{\link{M3T_config}}.}
 
-\item{Source_PHMSA_file}{Character providing the full filepath to the PHMSA Gas
-Distribution Annual Data xlsx file available at
-\url{https://www.phmsa.dot.gov/data-and-statistics/pipeline/gas-distribution-gas-gathering-gas-transmission-hazardous-liquids}.
-Zip files for groups of years are available via links at the bottom of the
-page.  If running at the LDC level the file must be edited such that there
-is a consistent identifier with other input data (EIA, HIFLD, GHGRP).  There
-is an example file in the package's datasets folder that has been
-successfully used in this code available for reference.}
+\item{Source_EIA_NG_file}{Character.  Pulled from \code{\link{M3T_config}}.}
 
-\item{GHGI_MnR}{Character or data.frame.  Pulled from config file. Either GHGI
-to indicate the GHGI file should be used to pull emissions and activity data
-or a data frame providing the needed values.}
+\item{Source_PHMSA_file}{Character.  Pulled from \code{\link{M3T_config}}.}
 
-\item{GHGI_maintenance}{Character or data.frame.  Pulled from config file.
-Either GHGI to indicate the GHGI file should be used to pull emissions and
-activity data or a data frame providing the needed values.}
+\item{Source_GHGRP_LDC}{Character.  Pulled from \code{\link{M3T_config}}.}
 
-\item{GHGI_meters}{Character or data.frame.  Pulled from config file. Either
-GHGI to indicate the GHGI file should be used to pull emissions and activity
-data or a data frame providing the needed values.}
+\item{GHGI_MnR}{Data.frame.  Pulled from \code{\link{M3T_config}}.}
 
-\item{GHGI_services}{Character or data.frame.  Pulled from config file. Either
-GHGI to indicate the GHGI file should be used to pull emissions and activity
-data or a data frame providing the needed values.}
+\item{GHGI_maintenance}{Data.frame.  Pulled from \code{\link{M3T_config}}.}
 
-\item{State_Tigerlines}{SpatVector.  United States Census Bureau county
-shapefile.  Available at
-\url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.}
+\item{GHGI_meters}{Data.frame.  Pulled from \code{\link{M3T_config}}.}
 
-\item{NG_distribution_by_LDC}{Logical.  Pulled from config file.  Indicating
-whether emissions should be calculated at the Local Distribution Company
-level.}
+\item{GHGI_services}{Data.frame.  Pulled from \code{\link{M3T_config}}.}
 
-\item{NG_distribution_by_state}{Logical.  Pulled from config file.  Indicating
-whether emissions should be calculated at the state level.}
+\item{NG_distribution_by_LDC}{Logical.  Pulled from \code{\link{M3T_config}}.}
 
-\item{NG_distribution_by_domain}{Logical.  Pulled from config file. Indicating
-whether emissions should be calculated at the domain level.}
+\item{NG_distribution_by_state}{Logical.  Pulled from \code{\link{M3T_config}}.}
 
-\item{natural_gas_pipeline_emission_factors}{Data frame.  Pulled from config
-file.  2 columns by 4 rows.  Columns are "Leaks_per_mile" and
-"Avg_emissions_mol_per_s".  Rownames are "Bare_Steel", "Cast_Iron",
-"Coated_steel", and "Plastic".  Default is from Weller et al.}
+\item{NG_distribution_by_domain}{Logical.  Pulled from \code{\link{M3T_config}}.}
 
-\item{Use_ACES}{Logical indicating whether or not to use ACES to disaggregate
-from county-level to pixel level emissions.  Either ACES or Vulcan must be
-used, though both can be.}
+\item{natural_gas_pipeline_emission_factors}{Data.frame.  Pulled from \code{\link{M3T_config}}.}
 
-\item{Use_Vulcan}{Logical indicating whether or not to use Vulcan to
-disaggregate from county-level to pixel level emissions.  Either ACES or
-Vulcan must be used, though both can be.}
+\item{natural_gas_res_post_meter_emission_factor}{Numeric.  Pulled from \code{\link{M3T_config}}.}
 
-\item{plot_directory}{Character. \strong{Optional}. Provides the full filepath to save figures.
-Only relevant if verbose = TRUE.}
+\item{natural_gas_com_post_meter_emission_factor}{Numeric.  Pulled from \code{\link{M3T_config}}.}
 
-\item{County_Tigerlines}{SpatVector. \strong{Optional}. United States Census Bureau county
-shapefile.  Available at
-\url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.
-Only relevant if verbose=TRUE.}
+\item{Use_ACES}{Logical.  Pulled from \code{\link{M3T_config}}.}
 
-\item{State_CB}{SpatVector. \strong{Optional}. US Census Cartographic Boundary files for
-visualization
-\url{https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html}.
-Only relevant if verbose=T}
+\item{Use_Vulcan}{Logical.  Pulled from \code{\link{M3T_config}}.}
 
-\item{natural_gas_post_meter_emission_factor}{Numeric.  Pulled from config
-file.  Emission factor for whole-house residential emissions in mol/s.
-Default is from Fischer et al.}
+\item{aces_res}{SpatRaster of residential CO2 emissions from the ACES
+inventory as loaded in \code{\link{CH4_inventory_build}} based on
+\code{Use_ACES} and \code{Source_ACES}.}
 
-\item{ACES_directory}{\strong{Optional} character providing the full path to a
-folder containing the ACES sectoral CO2 inventories.  Must include the
-residential and commercial sectors.  ACES v2.0 is available at
-\url{https://doi.org/10.3334/ORNLDAAC/1943}, though the hourly file should
-be averaged across hours to create an annually averaged inventory. Code to
-do this on a linux-based HPC system is available as the script
-"Annualize_ACES_seawulf.R" and the accompanying batch script
-"Annualize_ACES.sh".  The year closest to "inventory_year" is used, but
-those further from that year are considered if the closest is unavailable.
-Only needed if Use_ACES = TRUE.  At least one of Use_Vulcan or Use_ACES must
-be TRUE.}
+\item{aces_com}{SpatRaster of commercial CO2 emissions from the ACES
+inventory as loaded in \code{\link{CH4_inventory_build}} based on
+\code{Use_ACES} and \code{Source_ACES}.}
 
-\item{vulcan_directory}{\strong{Optional} character providing the full path to
-a folder containing the Vulcan sectoral CO2 inventories.  Must include the
-residential and commercial sectors. Vulcan v3.0 is available at
-\url{https://doi.org/10.3334/ORNLDAAC/1741}, and the annual mean files
-should be used.  The year closest to "inventory_year" is used.  As all years
-are contained in the same file, it does not search for other years.  Only
-needed if Use_Vulcan = TRUE.  At least one of Use_Vulcan or Use_ACES must be
-TRUE.}
+\item{vu_res}{SpatRaster of residential CO2 emissions from the Vulcan v4.0
+inventory as loaded in \code{\link{CH4_inventory_build}} based on
+\code{Use_Vulcan} and \code{Source_Vulcan}.}
 
-\item{ACES_year}{\strong{Optional} numeric providing the year of ACES data to
-use. Only needed if Use_ACES = TRUE.  At least one of Use_Vulcan or Use_ACES
-must be TRUE.}
+\item{vu_com}{SpatRaster of commercial CO2 emissions from the Vulcan v4.0
+inventory as loaded in \code{\link{CH4_inventory_build}} based on
+\code{Use_Vulcan} and \code{Source_Vulcan}.}
 
-\item{vulcan_year}{\strong{Optional} numeric providing the band of Vulcan data
-to use (1-6 = 2010 - 2015).  Only needed if Use_Vulcan = TRUE.  At least one
-of Use_Vulcan or Use_ACES must be TRUE.}
+\item{plot_directory}{Character. \strong{Optional}. Provides the full filepath
+to save figures. Only relevant if \code{verbose} = TRUE.}
+
+\item{County_Tigerlines}{SpatVector. \strong{Optional}.
+\href{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}{US
+Census Tigerlines} files for visualization. Only relevant if \code{verbose} = TRUE.}
+
+\item{State_CB}{SpatVector. \strong{Optional}.
+\href{https://www.census.gov/geographies/mapping-files/tme-series/geo/cartographic-boundary.html}{US
+Census Cartographic Boundary} files for visualization. Only relevant if
+\code{verbose} = TRUE.}
 }
 \value{
 Nothing is returned from the function, but the main outputs are up to
@@ -357,55 +318,6 @@ al.}, \href{https://doi.org/10.1021/acs.est.8b03217}{Fischer et al.},
 \href{https://doi.org/10.1029/2020JD032974}{Vulcan} and,
 \href{https://doi.org/10.1002/2017JD027359}{ACES}
 }
-\examples{
-library(terra)
-grid_bbox=cbind(c(-76.65,-73.65),c(38.97,40.97))
-grid_res=0.01
-grid_crs="epsg:4326"
-grid <- rast(nrows=diff(range(grid_bbox[,2]))/grid_res,
-             ncols=diff(range(grid_bbox[,1]))/grid_res, xmin=min(grid_bbox[,1]),
-             xmax=max(grid_bbox[,1]), ymin=min(grid_bbox[,2]), ymax=max(grid_bbox[,2]),
-             crs=grid_crs)
-grid_vect <- as.polygons(ext(grid),crs=grid_crs)
-
-GHGI_EF_dataframe <- data.frame("Leaks_per_mile"=
-                                  c(0.51,1,0.61,0.43),
-                                "Avg_emissions_mol_per_s"=
-                                  c(2.24,1.72,2,2.03)/(16.043*60)) #converting from g/min to mol/s
-rownames(GHGI_EF_dataframe) <- c("Bare_Steel",
-                                 "Cast_Iron",
-                                 "Coated_steel",
-                                 "Plastic")
-
-NG_distribution(domain=grid_vect,
-                domain_template=grid,
-                state_name_list=c("DE","MD","NJ","NY","PA"),
-                input_directory="~/../Desktop/in/",
-                output_directory="~/../Desktop/out/",
-                inventory_year=2018,
-                verbose=TRUE,
-                GHGRP_facility_data="~/../Desktop/in/GHGRP/facility_info.csv",
-                EIA_file = "~/../Desktop/in/176 Type of Operations and Sector Items.xlsx",
-                PHMSA_file = "~/../Desktop/in/annual_gas_distribution_2010_present/annual_gas_distribution_2019.xlsx",
-                GHGI_MnR="GHGI",
-                GHGI_maintenance="GHGI",
-                GHGI_meters="GHGI",
-                GHGI_services="GHGI",
-                State_Tigerlines=vect("~/../Desktop/in/State_Tigerlines/tl_2018_us_state.shp"),
-                NG_distribution_by_LDC = FALSE,
-                NG_distribution_by_state = TRUE,
-                NG_distribution_by_domain = TRUE,
-                natural_gas_pipeline_emission_factors=GHGI_EF_dataframe,
-                natural_gas_post_meter_emission_factor=7850/401*0.005/(16.043*60*60*24*365),
-                Use_ACES=TRUE,
-                Use_Vulcan=TRUE,
-                ACES_directory="~/../Desktop/in/Inventories/ACES_v2.0",
-                vulcan_directory="~/../Desktop/in/Inventories/Vulcan_v3.0",
-                ACES_year=2017,
-                vulcan_year=6,
-                County_Tigerlines=vect("~/../Desktop/in/County_Tigerlines/tl_2018_us_county.shp"),
-                plot_directory="~/../Desktop/plots/")
-}
 \references{
 \href{https://doi.org/10.1021/acs.est.0c00437}{Weller et al.}
 
@@ -416,13 +328,17 @@ NG_distribution(domain=grid_vect,
 \href{https://doi.org/10.1002/2017JD027359}{ACES}
 }
 \seealso{
-\itemize{
-\item \code{\link[=CH4_inventory_build]{CH4_inventory_build()}} Calculates methane inventory using settings provided in config.
-\item \code{\link[=disaggregation]{disaggregation()}} Disaggregates data using NEI county level CO data.
-}
+\code{\link[=CH4_inventory_build]{CH4_inventory_build()}} Calculates methane inventory using settings
+provided in config.
+
+\link{M3T_config} Generates the config function with user-editable settings used
+throughout processing.
+
+\code{\link[=disaggregation]{disaggregation()}} Disaggregates data to pixels using a sectoral CO2 inventory.
 }
 \author{
 Kris Hajny, \email{kris.hajny@gmail.com}
 
 Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
 }
+\keyword{internal}

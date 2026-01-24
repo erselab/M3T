@@ -4,7 +4,8 @@
 ## There is a link to the data dashboard which has a data download tab.
 ## Download the data as CSV and set the working directory to this folder.
 
-input_directory <- "D:/MMMT STUFF/All inventory data/Not Automated/2022_CWNS_NATIONAL_APR2024/"
+# input_directory <- "D:/MMMT STUFF/All inventory data/Not Automated/2022_CWNS_NATIONAL_APR2024/"
+input_directory <- "G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Manuscript/All inventory data/Prepared inventory data/2022CWNS_NATIONAL_APR2024/"
 
 ################################################################################
 #load in and preprocess

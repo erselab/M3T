@@ -15,7 +15,6 @@ Disaggregate_Wetcharts(
   County_Tigerlines,
   State_Tigerlines,
   State_CB,
-  Use_NLCD,
   Source_wetland_NLCD,
   Source_wetcharts,
   Wetcharts_model_subset
@@ -23,71 +22,56 @@ Disaggregate_Wetcharts(
 }
 \arguments{
 \item{input_directory}{Character providing the full filepath to save/load
-input data}
+input data.  Automatically defined in \code{\link{CH4_inventory_build}} from
+the input \code{run_directory}.}
 
 \item{output_directory}{Character providing the full filepath to save
-processed data}
+processed data as created in \code{\link{CH4_inventory_build}}}
 
-\item{domain}{SpatVector polygon outlining the desired output area}
+\item{domain}{SpatVector polygon outlining the desired output area as created
+in \code{\link{CH4_inventory_build}}.}
 
 \item{domain_template}{SpatRaster providing the desired output grid, including
-the desired resolution and coordinate reference system}
+the desired resolution and coordinate reference system as created in
+\code{\link{CH4_inventory_build}}.}
 
 \item{verbose}{Logical indicating whether to save additional output.  This
 includes monthly plots of the gridded methane emissions on log scales, saved
-separately for each model subset and each land cover dataset used.}
+separately for each model subset used.}
 
-\item{plot_directory}{Character providing the full filepath to save figures.
-Only relevant if verbose = TRUE.}
+\item{plot_directory}{Character. \strong{Optional}. Provides the full filepath
+to save figures. Only relevant if \code{verbose} = TRUE.}
 
-\item{inventory_year}{Character indicating the desired year of data to use.}
+\item{inventory_year}{Numeric indicating the desired year of data to use.  The
+closest available will be used if unavailable with a user update.}
 
-\item{County_Tigerlines}{SpatVector.  United States Census Bureau county
-shapefile.  Available at
-\url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.
-Only relevant if verbose=TRUE.}
+\item{County_Tigerlines}{SpatVector. \strong{Optional}.
+\href{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}{US
+Census Tigerlines} files for visualization. Only relevant if \code{verbose} = TRUE.}
 
-\item{State_CB}{SpatVector.  United States Census Bureau county
-shapefile.  Available at
-\url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.
-Only relevant if verbose=TRUE.}
+\item{State_CB}{SpatVector. \strong{Optional}.
+\href{https://www.census.gov/geographies/mapping-files/tme-series/geo/cartographic-boundary.html}{US
+Census Cartographic Boundary} files for visualization. Only relevant if
+\code{verbose} = TRUE.}
 
-\item{Use_NLCD}{Logical. Pulled from config file. Indicating whether to use
-the National Land Cover Database (NLCD) to downscale Wetcharts.}
+\item{Source_wetland_NLCD}{Character.  Pulled from \code{\link{M3T_config}}.}
 
-\item{Wetcharts_model_subset}{Numeric list. Pulled from config file. Indicates
-which models of Wetcharts to average across.  Multiple list entries are
-allowed, providing multiple variations of wetcharts to be run
-simultaneously.  This is far faster than running them separately as
-landcover processing is more time consuming and avoided if running multiple
-wetcharts subsets simultaneously.}
+\item{Source_wetcharts}{Character.  Pulled from \code{\link{M3T_config}}.}
 
-\item{Use_NALCMS}{Logical. Pulled from config file. Indicating whether to use
-the North America Land Change Monitoring System (NALCMS) to downscale
-Wetcharts.}
-
-\item{NLCD_file}{Character.  The NLCD land cover data as an img. Available at
-\url{https://www.mrlc.gov/data?f%5B0%5D=category%3ALand%20Cover&f%5B1%5D=region%3Aconus
- }.}
-
-\item{NALCMS_file}{Character.  The NALCMS land cover data as a tif.  Available
-at \url{http://www.cec.org/north-american-land-change-monitoring-system/}.}
-
-\item{Wetcharts_file}{Character providing the full filepath to the Wetcharts
-model file}
+\item{Wetcharts_model_subset}{List of numeric vectors.  Pulled from
+\code{\link{M3T_config}}.}
 }
 \value{
 Nothing is returned from the function, but the main outputs are
 netcdf files of the methane emissions from wetlands with 1 file per land
 cover used and per model subset.  They are titled
-"Wetcharts_landcover_Downscaled_subset_A.nc" where landcover is NLCD or
-NALCMS and A is just a numeric to identify which model subset, in case
-multiple were set.
+"Wetcharts_NLCD_Downscaled_subset_#.nc" where # is just a numeric to
+identify which model subset, in case multiple were set.
 
 If verbose is set to TRUE, then multiple figures are also saved.  Log scale
-plots with consistent axes are saved for each model subset and land cover
-used.  They are named "Wetcharts_landcover_subset_A_annual.png" where
-landcover is NLCD or NALCMS, A is a numeric to identify the model subset.
+plots with consistent axes are saved for each model subset used.  They are
+named "Wetcharts_NLCD_subset_#_annual.png" where # is a numeric to identify
+the model subset.
 }
 \description{
 \code{Disaggregate_Wetcharts} writes 1 monthly netcdf file of gridded
@@ -125,45 +109,19 @@ NLCD is available at
 and the NALCMS is available at
 \url{http://www.cec.org/north-american-land-change-monitoring-system/}.
 }
-\examples{
-library(terra)
-grid_bbox=cbind(c(-76.65,-73.65),c(38.97,40.97))
-grid_res=0.01
-grid_crs="epsg:4326"
-grid <- rast(nrows=diff(range(grid_bbox[,2]))/grid_res,
-             ncols=diff(range(grid_bbox[,1]))/grid_res, xmin=min(grid_bbox[,1]),
-             xmax=max(grid_bbox[,1]), ymin=min(grid_bbox[,2]), ymax=max(grid_bbox[,2]),
-             crs=grid_crs)
-grid_vect <- as.polygons(ext(grid),crs=grid_crs)
-
-Disaggregate_Wetcharts(input_directory="~/../Desktop/in/",
-                       output_directory="~/../Desktop/out/",
-                       domain=grid_vect,
-                       domain_template=grid,
-                       verbose=TRUE,
-                       inventory_year=2018,
-                       plot_directory="~/../Desktop/plots/",
-                       State_CB=vect("~/../Desktop/in/State_CB/tl_2018_us_state.shp"),
-                       County_Tigerlines=vect("~/../Desktop/in/County_Tigerlines/tl_2018_us_county.shp"),
-                       Use_NLCD=TRUE,
-                       Use_NALCMS=TRUE,
-                       NLCD_file=file.path("~/../Desktop/in/nlcd_2019_land_cover_l48_20210604/nlcd_2019_land_cover_l48_20210604.img"),
-                       NALCMS_file=file.path("~/../Desktop/in/NALCMS_2020_land_cover/NA_NALCMS_landcover_2020_30m/data/NA_NALCMS_landcover_2020_30m.tif"),
-                       Wetcharts_model_subset=list(c(1913,1914,1923,1924,1933,1934,2913,2914,2923,
-                                                     2924,2933,2934,3913,3914,3923,3924,3933,3934)))
-
-
-}
 \seealso{
-\itemize{
-\item \code{\link[=CH4_inventory_build]{CH4_inventory_build()}} Calculates methane inventory using settings provided in config.
-\item \code{\link[=SOCCR_Wetlands]{SOCCR_Wetlands()}} Calculates methane emissions for the wetland sector using the state of the carbon cycle report instead.
-}
+\code{\link[=CH4_inventory_build]{CH4_inventory_build()}} Calculates methane inventory using settings
+provided in config.
+
+\link{M3T_config} Generates the config function with user-editable settings used
+throughout processing.
+
+\code{\link[=SOCCR_Wetlands]{SOCCR_Wetlands()}} Calculates methane emissions for the wetland sector using
+the state of the carbon cycle report instead.
 }
 \author{
-Joe Pitt, \email{madeup@wisc.edu}
+Kris Hajny, \email{kris.hajny@gmail.com}
 
-Kris Hajny, \email{blank@fake.edu}
-
-Israel Lopez-Coto, \email{test@test.edu}
+Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
 }
+\keyword{internal}

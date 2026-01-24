@@ -7,9 +7,12 @@
 make_consistent(input)
 }
 \arguments{
-\item{input}{Dataframe. A GHGRP dataframe built from a "subpart information"
+\item{input}{Data.frame. A GHGRP dataframe built from a "subpart information"
 table such as
 \url{https://enviro.epa.gov/envirofacts/metadata/table/ghg/hh_subpart_level_information}}
+}
+\value{
+input with changes described as in Details
 }
 \description{
 Helper function for making GHGRP data consistent across sectors
@@ -20,16 +23,9 @@ This function will change "ghg_gas_name" to "ghg_name" and
 tables.  It will also force the "ghg_name" and "facility_name" data to be
 lower case and remove any data for a ghg besides methane.
 }
-\examples{
-GHGRP_combustion <- data.frame("facility_id"=c(1,2,3,3),
-                               "facility_name"=c("ONE","TWO","THREE","FOUR"),
-                               "ghg_gas_name"=c(rep("METHANE",3),"CARBON DIOXIDE"),
-                               "ghg_quantity"=c(rep(100,3),500),
-                               "reporting_year"=rep(2015,4))
-make_consistent(GHGRP_combustion)
-}
 \author{
 Kris Hajny, \email{kris.hajny@gmail.com}
 
 Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
 }
+\keyword{internal}

@@ -29,8 +29,8 @@ utils::download.file(data_URL,ghgrp_landfill_system_details_file,quiet=T)
 #load in and combine the emission data appropriately
 
 #load in the files
-ghgrp_landfill_only_emissions <- read.csv(ghgrp_landfill_file)
-ghgrp_landfill_detail_emissions <- read.csv(ghgrp_landfill_system_details_file)
+ghgrp_landfill_only_emissions <- utils::read.csv(ghgrp_landfill_file)
+ghgrp_landfill_detail_emissions <- utils::read.csv(ghgrp_landfill_system_details_file)
 
 #simple function to make sure gas names are limited to methane, and column
 #names are consistent

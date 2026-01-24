@@ -17,28 +17,25 @@ NWI_Wetland_fraction(
 }
 \arguments{
 \item{input_directory}{Character providing the full filepath to save/load
-input data}
+input data.  Automatically defined in \code{\link{CH4_inventory_build}} from
+the input \code{run_directory}.}
 
 \item{output_directory}{Character providing the full filepath to save
-processed data}
+processed data as created in \code{\link{CH4_inventory_build}}}
 
-\item{domain}{SpatVector polygon outlining the desired output area}
+\item{domain}{SpatVector polygon outlining the desired output area as created
+in \code{\link{CH4_inventory_build}}.}
 
 \item{domain_template}{SpatRaster providing the desired output grid, including
-the desired resolution and coordinate reference system}
+the desired resolution and coordinate reference system as created in
+\code{\link{CH4_inventory_build}}.}
 
 \item{state_name_list}{Character vector listing all states within the desired
-domain}
+domain as created in \code{\link{CH4_inventory_build}}.}
 
-\item{Use_SOCCR1}{Logical.  Pulled from config file.  Indicating whether or
-not to calculate emissions using SOCCR1.}
+\item{Use_SOCCR1}{Logical.  Pulled from \code{\link{M3T_config}}.}
 
-\item{Use_SOCCR2}{Logical.  Pulled from config file.  Indicating whether or
-not to calculate emissions using SOCCR2.}
-
-\item{Include_freshwater}{Logical.  Pulled from config file.  Indicating
-whether or not to calculate emissions for freshwater wetlands using
-Rosentreter et al.}
+\item{Use_SOCCR2}{Logical.  Pulled from \code{\link{M3T_config}}.}
 }
 \value{
 Nothing is returned from the function, but the main outputs are TIFF
@@ -82,36 +79,19 @@ wetlands across the United States.  It is available at
 A separate TIFF file is saved for each state - wetland type combination.
 These are used in further processing.
 }
-\examples{
-library(terra)
-grid_bbox=cbind(c(-76.65,-73.65),c(38.97,40.97))
-grid_res=0.01
-grid_crs="epsg:4326"
-grid <- rast(nrows=diff(range(grid_bbox[,2]))/grid_res,
-             ncols=diff(range(grid_bbox[,1]))/grid_res, xmin=min(grid_bbox[,1]),
-             xmax=max(grid_bbox[,1]), ymin=min(grid_bbox[,2]), ymax=max(grid_bbox[,2]),
-             crs=grid_crs)
-grid_vect <- as.polygons(ext(grid),crs=grid_crs)
-
-NWI_Wetland_fraction(input_directory="~/../Desktop/in/",
-                     output_directory="~/../Desktop/out/",
-                     Use_SOCCR1=TRUE,
-                     Use_SOCCR2=TRUE,
-                     Include_freshwater=TRUE,
-                     domain=grid_vect,
-                     domain_template=grid,
-                     state_name_list=c("DE","MD","NJ","NY","PA"))
-}
 \seealso{
-\itemize{
-\item \code{\link[=CH4_inventory_build]{CH4_inventory_build()}} Calculates methane inventory using settings provided in config.
-\item \code{\link[=SOCCR_Wetlands]{SOCCR_Wetlands()}} Calculates methane emissions for the wetland sector using the state of the carbon cycle report.
-}
+\code{\link[=CH4_inventory_build]{CH4_inventory_build()}} Calculates methane inventory using settings
+provided in config.
+
+\link{M3T_config} Generates the config function with user-editable settings used
+throughout processing.
+
+\code{\link[=SOCCR_Wetlands]{SOCCR_Wetlands()}} Calculates methane emissions for the wetland sector using
+the state of the carbon cycle report.
 }
 \author{
-Joe Pitt, \email{madeup@wisc.edu}
+Kris Hajny, \email{kris.hajny@gmail.com}
 
-Kris Hajny, \email{blank@fake.edu}
-
-Israel Lopez-Coto, \email{test@test.edu}
+Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
 }
+\keyword{internal}

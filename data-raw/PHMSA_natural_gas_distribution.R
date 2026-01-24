@@ -6,13 +6,13 @@
 ## failed.  This code can then be run after setting the working directory to the
 ## unzipped folder.
 
-input_directory <- "D:/MMMT STUFF/All inventory data/Not Automated/PHMSA_annual_gas_distribution_2010_present"
-library(readxl)
+input_directory <- "G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Manuscript/All inventory data/Prepared inventory data/"
 ################################################################################
 #settings
 
 #the subset variables needed for the package
-PHMSA_cols_to_keep <- c("REPORT_YEAR",
+PHMSA_cols_to_keep <- c("OPERATOR_NAME",
+                        "REPORT_YEAR",
                         "NUM_SRVCS_TOTAL",
                         "AVERAGE_LENGTH",
                         "COMMODITY",
@@ -46,7 +46,7 @@ PHMSA_cols_to_keep <- c("REPORT_YEAR",
 combined_data <- data.frame(matrix(ncol=length(PHMSA_cols_to_keep),nrow=0))
 colnames(combined_data) <- PHMSA_cols_to_keep
 
-PHMSA_files <- list.files(path=input_directory,pattern="annual_gas_distribution_",full.names = T)
+PHMSA_files <- list.files(path=input_directory,pattern="annual_gas_distribution_",full.names = T,recursive = T)
 
 for(A in 1:length(PHMSA_files)){
   #read in 1 by 1, suppress messages as most files have rows before the header
@@ -74,8 +74,6 @@ for(A in 1:length(PHMSA_files)){
   if(all(PHMSA_cols_to_keep %in% colnames(data))){
     data <- data[,PHMSA_cols_to_keep]
     data <- data[which(data$COMMODITY == 'Natural Gas'),]
-    # sum(data$MMILES_TOTAL[data$COMMODITY!="Natural Gas"]) / sum(data$MMILES_TOTAL) * 100
-    # sum(data$MMILES_RCI_TOTAL,na.rm=T)/ sum(data$MMILES_TOTAL) * 100
   }
   
   if(all(PHMSA_cols_to_keep[!PHMSA_cols_to_keep %in% colnames(data)] == c("COMMODITY","MMILES_RCI","NUM_SRVS_RCI"))){
@@ -95,7 +93,7 @@ for(A in 1:length(PHMSA_files)){
 PHMSA_natural_gas_distribution <- data.frame(matrix(ncol=0,nrow=nrow(combined_data)))
 
 #combine to just the columns and combination of columns needed
-PHMSA_natural_gas_distribution[,c("REPORT_YEAR","NUM_SRVCS_TOTAL","AVERAGE_LENGTH","STOP",'MMILES_TOTAL')] <- combined_data[,c("REPORT_YEAR","NUM_SRVCS_TOTAL","AVERAGE_LENGTH","STOP",'MMILES_TOTAL')]
+PHMSA_natural_gas_distribution[,c("OPERATOR_NAME","REPORT_YEAR","NUM_SRVCS_TOTAL","AVERAGE_LENGTH","STOP",'MMILES_TOTAL')] <- combined_data[,c("OPERATOR_NAME","REPORT_YEAR","NUM_SRVCS_TOTAL","AVERAGE_LENGTH","STOP",'MMILES_TOTAL')]
 
 PHMSA_natural_gas_distribution$MMILES_bare_steel <- rowSums(combined_data[,c("MMILES_STEEL_UNP_BARE","MMILES_STEEL_CP_BARE","MMILES_CU")])
 PHMSA_natural_gas_distribution$MMILES_iron <- rowSums(combined_data[,c("MMILES_CI","MMILES_DI","MMILES_RCI")])

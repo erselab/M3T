@@ -1,9 +1,5 @@
 ## code to prepare `LMOP_data` dataset goes here
 
-library(readxl)
-output_directory <- "D:/MMMT STUFF/All inventory data/Automated/"
-# output_directory <- "G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Manuscript/All inventory data/Automated/"
-
 ################################################################################
 #Download, load in, and prepare LMOP data
 
@@ -24,7 +20,7 @@ data_URL2 <- substring(HTML_data,Matchtext[1],Matchtext[1]+attr( Matchtext , "ma
 #Use regex to save the year of the dataset as part of the download for
 #clarity
 LMOP_yr <- substr(data_URL2,regexpr("20??",data_URL2)[1],regexpr("20??",data_URL2)[1]+3)
-LMOP_file <- file.path(output_directory,paste0(LMOP_yr,"_LMOP_landfill_only.xlsx"))
+LMOP_file <- tempfile(fileext = ".xlsx")
 download.file(data_URL2,LMOP_file,quiet=T,method="curl")
 unlink(download_dest)
 
@@ -32,6 +28,7 @@ unlink(download_dest)
 # to GHGRP and stopped with a valid reason are being considered LMOP
 # facilities in this approach.  
 LMOP <- readxl::read_xlsx(LMOP_file,sheet="LMOP Database",col_names = T)
+LMOP <- as.data.frame(LMOP)
 
 #This has some nans in, remove those
 LMOP_data <- subset(LMOP,!is.na(Latitude))

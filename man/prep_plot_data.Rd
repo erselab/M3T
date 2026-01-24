@@ -20,20 +20,16 @@ the log10 of the data and sets infinite values to NA.
 }
 \details{
 This function is intended to be used when verbose = TRUE for
-CH4_inventory_build.  It is called by log_plot to help build plots for each
-individual sector/subsector.  Some of these, particular those for point
-sources, are more useful on a log scale.
-}
-\examples{
-prep_plot_data(central_flux)
+\code{\link{CH4_inventory_build}}.  It is called by log_plot to help build
+plots for each individual sector/subsector.  Some of these, particularly
+those for point sources, are more useful on a log scale.
 }
 \seealso{
 \code{\link[=log_plot]{log_plot()}} plots the data in simple log-scale visuals.
 }
 \author{
-Joe Pitt, \email{madeup@wisc.edu}
+Kris Hajny, \email{kris.hajny@gmail.com}
 
-Kris Hajny, \email{blank@fake.edu}
-
-Israel Lopez-Coto, \email{test@test.edu}
+Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
 }
+\keyword{internal}

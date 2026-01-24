@@ -19,32 +19,40 @@ Prepare_GEPA(
 )
 }
 \arguments{
-\item{inventory_year}{Numeric indicating the desired year of data to use.}
+\item{inventory_year}{Numeric indicating the desired year of data to use.  The
+closest available will be used if unavailable with a user update.}
 
 \item{input_directory}{Character providing the full filepath to save/load
-input data}
+input data.  Automatically defined in \code{\link{CH4_inventory_build}} from
+the input \code{run_directory}.}
 
 \item{output_directory}{Character providing the full filepath to save
-processed data}
+processed data as created in \code{\link{CH4_inventory_build}}}
 
-\item{plot_directory}{Character providing the full filepath to save figures.
-Only relevant if verbose = TRUE.}
+\item{plot_directory}{Character. \strong{Optional}. Provides the full filepath
+to save figures. Only relevant if \code{verbose} = TRUE.}
 
-\item{County_Tigerlines}{SpatVector.  United States Census Bureau county
-shapefile downloaded in Main.}
+\item{Source_GEPA}{Character.  Pulled from \code{\link{M3T_config}}.}
 
-\item{State_CB}{SpatVector.  United States Census Bureau county
-shapefile.  Available at
-\url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.
-Only relevant if verbose=TRUE.}
+\item{County_Tigerlines}{SpatVector. \strong{Optional}.
+\href{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}{US
+Census Tigerlines} files for visualization. Only relevant if \code{verbose} = TRUE.}
 
-\item{domain}{SpatVector polygon outlining the desired output area}
+\item{State_CB}{SpatVector. \strong{Optional}.
+\href{https://www.census.gov/geographies/mapping-files/tme-series/geo/cartographic-boundary.html}{US
+Census Cartographic Boundary} files for visualization. Only relevant if
+\code{verbose} = TRUE.}
+
+\item{domain}{SpatVector polygon outlining the desired output area as created
+in \code{\link{CH4_inventory_build}}.}
 
 \item{domain_template}{SpatRaster providing the desired output grid, including
-the desired resolution and coordinate reference system}
+the desired resolution and coordinate reference system as created in
+\code{\link{CH4_inventory_build}}.}
 
-\item{verbose}{Logical indicating whether to save visuals.  It includes 3
-plots of the gridded methane emissions, 1 for each netcdf file.}
+\item{verbose}{Logical indicating whether to save visuals.  They include 2
+plots of the gridded methane emissions, 1 for the GEPA sectors used in M3T,
+1 for all GEPA sectors on the same colorscale as the other.}
 }
 \value{
 Nothing is returned from the function, but the main outputs are 3
@@ -90,36 +98,19 @@ closest year will be automatically downloaded.
 See reference \href{https://doi.org/10.1021/acs.est.3c05138}{Maasakkers et
 al.}
 }
-\examples{
-library(terra)
-grid_bbox=cbind(c(-76.65,-73.65),c(38.97,40.97))
-grid_res=0.01
-grid_crs="epsg:4326"
-grid <- rast(nrows=diff(range(grid_bbox[,2]))/grid_res,
-             ncols=diff(range(grid_bbox[,1]))/grid_res, xmin=min(grid_bbox[,1]),
-             xmax=max(grid_bbox[,1]), ymin=min(grid_bbox[,2]), ymax=max(grid_bbox[,2]),
-             crs=grid_crs)
-grid_vect <- as.polygons(ext(grid),crs=grid_crs)
-Prepare_GEPA(inventory_year=2018,
-             input_directory="~/../Desktop/in/",
-             output_directory="~/../Desktop/out/",
-             domain=grid_vect,
-             domain_template=grid,
-             verbose=TRUE,
-             State_CB=vect("~/../Desktop/in/State_CB/tl_2018_us_state.shp"),
-             County_Tigerlines=vect("~/../Desktop/in/County_Tigerlines/tl_2018_us_county.shp"),
-             plot_directory="~/../Desktop/plots/")
-}
 \references{
 \href{https://doi.org/10.1021/acs.est.3c05138}{Maasakkers et al.}
 }
 \seealso{
-\code{\link[=CH4_inventory_build]{CH4_inventory_build()}} Calculates methane inventory using settings provided in config.
+\code{\link[=CH4_inventory_build]{CH4_inventory_build()}} Calculates methane inventory using settings
+provided in config.
+
+\link{M3T_config} Generates the config function with user-editable settings used
+throughout processing.
 }
 \author{
-Joe Pitt, \email{madeup@wisc.edu}
+Kris Hajny, \email{kris.hajny@gmail.com}
 
-Kris Hajny, \email{blank@fake.edu}
-
-Israel Lopez-Coto, \email{test@test.edu}
+Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
 }
+\keyword{internal}

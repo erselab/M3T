@@ -1,10 +1,10 @@
 ## code to prepare ghgi_data
 
-output_directory <- "D:/MMMT STUFF/All inventory data/Not Automated/"
-
-library(readxl)
 ################################################################################
-#Download main and annex GHGI data tables
+#Download main and annex GHGI data tables for the most recent year.  Data
+#includes updated values for past year so only the most recent is needed
+
+output_directory <- tempdir()
 
 #Iteratively test GHGI webpages down to 2022 (most recent available when code
 #was written) to find the newest one available.
@@ -18,7 +18,7 @@ for(GHGI_data_yr in 2029:2022){
 
 #download the webpage and load in the HTML
 download_dest <- tempfile(fileext = ".html")
-download.file(data_URL,download_dest,quiet=T)
+utils::download.file(data_URL,download_dest,quiet=T)
 HTML_data <- readChar(download_dest,file.info(download_dest)$size)
 
 #Search for https:// - any 60 or fewer characters - main - any
@@ -35,11 +35,11 @@ data_URL_annex <- substring(HTML_data,Matchtext_annex[1],Matchtext_annex[1]+attr
 GHGI_yr <- substr(data_URL2,regexpr("20??",data_URL2)[1],regexpr("20??",data_URL2)[1]+3)
 GHGI_file <- file.path(output_directory,paste0(GHGI_yr,"_GHGI_tables.zip"))
 
-download.file(data_URL2,GHGI_file,quiet=T)
+utils::download.file(data_URL2,GHGI_file,quiet=T)
 utils::unzip(GHGI_file,exdir = file.path(output_directory,paste0(GHGI_yr,"_GHGI_tables")),overwrite=T)
 
 #annex too
-download.file(data_URL_annex,GHGI_file,quiet=T)
+utils::download.file(data_URL_annex,GHGI_file,quiet=T)
 utils::unzip(GHGI_file,exdir = file.path(output_directory,paste0(GHGI_yr,"_GHGI_tables")),overwrite=T)
 
 #delete zip files
@@ -70,14 +70,14 @@ NG_annex <- paste0(gsub("inventory-us-greenhouse-gas-emissions-and-sinks",
                         "natural-gas-and-petroleum-systems-ghg-inventory-additional-information",
                         data_URL),"-ghg")
 
-download.file(NG_annex,download_dest,quiet=T)
+utils::download.file(NG_annex,download_dest,quiet=T)
 HTML_data <- readChar(download_dest,file.info(download_dest)$size)
 
 Matchtext <- regexpr("https://www.epa.gov/.{1,100}ghgi_natural_gas_systems.{0,60}.xlsx",HTML_data,ignore.case = T)
 data_URL2 <- substring(HTML_data,Matchtext[1],Matchtext[1]+attr( Matchtext , "match.length")-1)
 
 NG_annex_file <- file.path(GHGI_file,paste0(GHGI_yr,"_ghgi_natural_gas_systems_annex36_tables.xlsx"))
-download.file(data_URL2,NG_annex_file,quiet=T,method="curl")
+utils::download.file(data_URL2,NG_annex_file,quiet=T,method="curl")
 unlink(download_dest)
 ################################################################################
 #grab landfill data
@@ -90,9 +90,11 @@ GHGI_landfill_total <- Waste_files[grep("*CH4 Emissions from Landfills \\(kt CH4
 GHGI_landfill_total <- utils::read.csv(GHGI_landfill_total,skip = 1)
 #get the required data
 GHGI_landfill_total <- sapply(GHGI_landfill_total[GHGI_landfill_total$Activity=="MSW net CH4 Emissions",-1],FUN = function(x){as.numeric(gsub(",","",x))})
-GHGI_landfill_total <- as.data.frame(t(GHGI_landfill_total))
-names(GHGI_landfill_total) <- gsub("X","",names(GHGI_landfill_total))
-GHGI_landfill_total <- GHGI_landfill_total[,GHGI_landfill_total>2010]
+GHGI_landfill_total <- as.data.frame(GHGI_landfill_total)
+GHGI_landfill_total$Year <- gsub("X","",rownames(GHGI_landfill_total))
+rownames(GHGI_landfill_total) <- NULL
+colnames(GHGI_landfill_total) <- c("Emissions","Year")
+GHGI_landfill_total <- GHGI_landfill_total[GHGI_landfill_total$Year>2010,]
 ################################################################################
 #grab the NG distribution data
 
@@ -110,8 +112,8 @@ GHGI_Emission_Factor_sheet <- gsub("Table ","",
 first_row <- which(readxl::read_xlsx(NG_annex_file,sheet = GHGI_Activity_sheet,.name_repair = "minimal")[,1]=="Segment/Source")
 GHGI_Activity <- readxl::read_xlsx(NG_annex_file,sheet = GHGI_Activity_sheet,skip=first_row,col_names = T)
 
-first_row <- which(read_xlsx(NG_annex_file,sheet = GHGI_Emission_Factor_sheet,.name_repair = "minimal")[,1]=="Segment/Source")
-GHGI_Emission_Factors <- read_xlsx(NG_annex_file,sheet = GHGI_Emission_Factor_sheet,skip=first_row,col_names = T)
+first_row <- which(readxl::read_xlsx(NG_annex_file,sheet = GHGI_Emission_Factor_sheet,.name_repair = "minimal")[,1]=="Segment/Source")
+GHGI_Emission_Factors <- readxl::read_xlsx(NG_annex_file,sheet = GHGI_Emission_Factor_sheet,skip=first_row,col_names = T)
 
 #relevant years for this work
 EF_years <- suppressWarnings(as.numeric(colnames(GHGI_Emission_Factors))>2010)
@@ -184,8 +186,8 @@ GHGI_Emission_sheet <- gsub("Table ","",
                             GHGI_index[sapply(GHGI_index[,2],FUN=function(x){grep(pattern="CH4 Emissions \\(kt\\) for Natural Gas Systems",x)}),1])
 first_row <- which(readxl::read_xlsx(NG_annex_file,sheet = GHGI_Activity_sheet,.name_repair = "minimal")[,1]=="Segment/Source")
 GHGI_Activity <- readxl::read_xlsx(NG_annex_file,sheet = GHGI_Activity_sheet,skip=first_row,col_names = T)
-first_row <- which(read_xlsx(NG_annex_file,sheet = GHGI_Emission_sheet,.name_repair = "minimal")[,1]=="Segment/Source")
-GHGI_Emissions <- read_xlsx(NG_annex_file,sheet = GHGI_Emission_sheet,skip=first_row,col_names = T)
+first_row <- which(readxl::read_xlsx(NG_annex_file,sheet = GHGI_Emission_sheet,.name_repair = "minimal")[,1]=="Segment/Source")
+GHGI_Emissions <- readxl::read_xlsx(NG_annex_file,sheet = GHGI_Emission_sheet,skip=first_row,col_names = T)
 
 #relevant years for this work
 Emission_years <- suppressWarnings(as.numeric(colnames(GHGI_Emissions))>2010)
@@ -266,7 +268,6 @@ GHGI_stationary_combustion[,-1] <- apply(GHGI_stationary_combustion[,-1], 2, FUN
 ################################################################################
 #cleanup
 
-unlink(NG_annex_file)
 unlink(GHGI_file,recursive=T)
 ################################################################################
 #save each GHGI dataset

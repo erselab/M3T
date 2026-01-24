@@ -12,8 +12,8 @@ Trycatch_downloader(URL, output_location = NULL, method, error_message = "")
 \item{output_location}{Character.  The path and filename for the data to be
 saved to, if it is being saved.}
 
-\item{method}{Character.  One of save, JSON, or vect.  Save will save it as
-a file using output_location, JSON will direct load it into R using the
+\item{method}{Character.  One of save, JSON, or vect.  Save will save it as a
+file using output_location, JSON will direct load it into R using the
 jsonlite package, and vect will directly load it into R using terra's vect
 function (points or polygons, e.g., .shp or .gpkg)}
 
@@ -28,12 +28,9 @@ uses a repeat and trycatch loop in case there is poor internet
 connectivity.  It will attempt the download up to 5 times before failing.
 Includes user updates throughout as well.
 }
-\examples{
+\author{
+Kris Hajny, \email{kris.hajny@gmail.com}
 
-data_URL <- "https://www2.census.gov/geo/tiger/TIGER2022/STATE/2022/tl_2022_us_state20.zip"
-out_file <- tempfile(fileext = ".zip")
-Trycatch_downloader(
-  URL = data_URL, output_location = out_file, method = "save",
-  error_message = paste("Census tigerlines could not be downloaded using link:", data_URL)
-)
+Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
 }
+\keyword{internal}

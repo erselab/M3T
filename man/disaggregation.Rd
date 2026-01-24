@@ -68,32 +68,17 @@ is available at \url{https://doi.org/10.3334/ORNLDAAC/1741}.
 See references \href{https://doi.org/10.1029/2020JD032974}{Vulcan} and
 \href{https://doi.org/10.1002/2017JD027359}{ACES}
 }
-\examples{
-aces_res <- rast(paste0(ACES_directory,"/Sectoral/",ACES_year,'_Annual_ACES_Residential.nc'))
-res_totals <- c('mains_ER_total_res',
-                'serv_ER_total_res',
-                'MnR_ER_total_res',
-                'meter_ER_total_res',
-                'upset_ER_total_res',
-                'post_meter_ER_total_res')
-cover_all <- list(extract(aces_res,all_merge_LCC_domain,weights=T,exact=T,cells=T))
-disaggregation(aces_res,
-               res_totals,
-               agg_level="state",
-               NEI_input=all_merge_LCC_state,
-               cover_all,
-               out_envir=environment())
-}
 \references{
 \href{https://doi.org/10.1029/2020JD032974}{Vulcan}
 
 \href{https://doi.org/10.1002/2017JD027359}{ACES}
 }
 \seealso{
-\itemize{
-\item \code{\link[=NG_distribution]{NG_distribution()}} Calculates methane emissions for the natural gas distribution sector.
-\item \code{\link[=Transmission]{Transmission()}} Calculates methane emissions for the natural gas transmission sector.
-}
+\code{\link[=NG_distribution]{NG_distribution()}} Calculates methane emissions for the natural gas
+distribution sector.
+
+\code{\link[=Stationary_combustion]{Stationary_combustion()}} Calculates methane emissions for the stationary
+combustion sector.
 }
 \author{
 Joe Pitt, \email{madeup@wisc.edu}
@@ -102,3 +87,4 @@ Kris Hajny, \email{blank@fake.edu}
 
 Israel Lopez-Coto, \email{test@test.edu}
 }
+\keyword{internal}

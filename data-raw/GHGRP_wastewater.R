@@ -8,7 +8,7 @@ data_URL <- "https://data.epa.gov/dmapservice/ghg.ii_subpart_level_information/c
 utils::download.file(data_URL,ghgrp_wastewater_file,quiet=T)
 ################################################################################
 #load in - no need to subset
-GHGRP_wastewater <- read.csv(ghgrp_wastewater_file)
+GHGRP_wastewater <- utils::read.csv(ghgrp_wastewater_file)
 
 ################################################################################
 #save

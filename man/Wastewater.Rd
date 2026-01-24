@@ -38,76 +38,74 @@ Wastewater(
 }
 \arguments{
 \item{input_directory}{Character providing the full filepath to save/load
-raw input data}
+input data.  Automatically defined in \code{\link{CH4_inventory_build}} from
+the input \code{run_directory}.}
 
 \item{output_directory}{Character providing the full filepath to save
-processed data}
+processed data as created in \code{\link{CH4_inventory_build}}}
 
-\item{Wastewater_use_CWNS}{Logical.  Pulled from config file.  Indicating
-whether or not to use the clean watershed needs survey to get the flow for
-municipal wastewater treatment plants.  Either CWNS or the DMR data must be
-used, though both can be.}
+\item{Wastewater_use_CWNS}{Logical.  Pulled from \code{\link{M3T_config}}.}
 
-\item{Wastewater_use_DMR}{Logical.  Pulled from config file.  Indicating
-whether or not to use discharge monitoring report data to get the flow for
-municipal wastewater treatment plants.  Either CWNS or the DMR data must be
-used, though both can be.}
+\item{Wastewater_use_DMR}{Logical.  Pulled from \code{\link{M3T_config}}.}
 
-\item{Wastewater_Municipal_Method_Moore_EF}{Logical.  Pulled from config file.
-Indicating whether or not to use the emission factor to relate flow and
-emissions determined in Moore et al.  Either moore linear, moore EF, or the
-GHGI must be used, though any combination can be.}
+\item{Wastewater_Municipal_Method_Moore_EF}{Logical.  Pulled from \code{\link{M3T_config}}.}
 
-\item{Wastewater_Municipal_Method_GHGI}{Logical.  Pulled from config file.
-Indicating whether or not to downscale the greenhouse gas inventory national
-total emissions using flow as the proxy.  Either moore linear, moore EF, or
-the GHGI must be used, though any combination can be.}
+\item{Wastewater_Municipal_Method_GHGI}{Logical.  Pulled from \code{\link{M3T_config}}.}
 
-\item{domain}{SpatVector polygon outlining the desired output area}
+\item{Wastewater_national_septic}{Logical.  Pulled from \code{\link{M3T_config}}.}
+
+\item{Wastewater_state_septic}{Logical.  Pulled from \code{\link{M3T_config}}.}
+
+\item{domain}{SpatVector polygon outlining the desired output area as created
+in \code{\link{CH4_inventory_build}}.}
 
 \item{domain_template}{SpatRaster providing the desired output grid, including
-the desired resolution and coordinate reference system}
+the desired resolution and coordinate reference system as created in
+\code{\link{CH4_inventory_build}}.}
 
 \item{GHGRP_facility_data}{Data.frame with the GHGRP location data for all
-years and states.  See
-https://www.epa.gov/enviro/envirofacts-data-service-api}
+years and states as prepared in \code{\link{CH4_inventory_build}} using the
+\code{Source_GHGRP_facility_data} provided in \code{\link{M3T_config}}.}
 
-\item{inventory_year}{Numeric indicating the desired year of data to use.}
+\item{Source_GHGRP_wastewater}{Character.  Pulled from \code{\link{M3T_config}}.}
 
-\item{National_wastewater_info}{Data frame with 2 columns and 2 rows.  Pulled
-from config file.  The first column is "Year" listing the year 1990 and the
-inventory_year.  The second column is "Septic_Fraction" and lists the
-national septic fraction for both years.  Used to scale states from
-Wastewater_State_info when calculating septic emissions using state-level
-data.}
+\item{Source_CWNS}{Character.  Pulled from \code{\link{M3T_config}}.}
 
-\item{Wastewater_State_info}{Data frame with 4 columns and 1 row for each
-state.  Pulled from config file.  Column 1 is "State" and provides the state
-abbreviation.  Column 2 is Population and contains the state's current
-population.  Column 3 is "Septic_Fraction" and provides as a decimal the
-percent of people in that state with septic systems.  Column 4 is method and
-is either "scaled" or "reported" for each state.  This data frame is only
-used if calculating septic emissions using state-level data.  "scaled"
-states have 1990 septic fraction and are to be scaled to inventory_year
-using the national change in the septic fraction.  "reported" states have
-the septic fraction that is to be used.}
+\item{Source_DMR}{Character.  Pulled from \code{\link{M3T_config}}.}
 
-\item{Total_national_open_or_low_int_area}{Numeric.  Pulled from config file.
-National total of developed open space and developed low intensity land
-cover from the national land cover database from Table 7 of Homer et al.}
+\item{Source_State_population_data}{Character.  Pulled from \code{\link{M3T_config}}.}
 
-\item{State_Tigerlines}{SpatVector.  United States Census Bureau county
-shapefile.  Available at
-\url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.
-Only relevant if verbose=TRUE.}
+\item{inventory_year}{Numeric indicating the desired year of data to use.  The
+closest available will be used if unavailable with a user update.}
 
-\item{County_Tigerlines}{SpatVector.  United States Census Bureau county
-shapefile.  Available at
-\url{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}.
-Only relevant if verbose=TRUE.}
+\item{National_wastewater_info}{Data.frame.  Pulled from \code{\link{M3T_config}}.}
 
-\item{plot_directory}{Character providing the full filepath to save figures.
-Only relevant if verbose = TRUE.}
+\item{Wastewater_State_info}{Data.frame.  Pulled from \code{\link{M3T_config}}.}
+
+\item{Wastewater_reported_State_info}{Data.frame.  Pulled from \code{\link{M3T_config}}.}
+
+\item{GHGI_wastewater_data}{Data.frame.  Pulled from \code{\link{M3T_config}}.}
+
+\item{GHGI_data_yr}{Integer providing the year of data to use for the
+\href{https://www.epa.gov/ghgreporting}{Environmental Protection Agency
+(EPA) Greenhouse Gas Reporting Program (GHGRP) data}.}
+
+\item{Total_national_open_or_low_int_area}{Numeric.  Pulled from \code{\link{M3T_config}}.}
+
+\item{state_name_list}{Character vector listing all states within the desired
+domain as created in \code{\link{CH4_inventory_build}}.}
+
+\item{County_Tigerlines}{SpatVector. \strong{Optional}.
+\href{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}{US
+Census Tigerlines} files for visualization. Only relevant if \code{verbose} = TRUE.}
+
+\item{plot_directory}{Character. \strong{Optional}. Provides the full filepath
+to save figures. Only relevant if \code{verbose} = TRUE.}
+
+\item{State_CB}{SpatVector. \strong{Optional}.
+\href{https://www.census.gov/geographies/mapping-files/tme-series/geo/cartographic-boundary.html}{US
+Census Cartographic Boundary} files for visualization. Only relevant if
+\code{verbose} = TRUE.}
 
 \item{verbose}{Logical indicating whether to save additional output.  This
 includes up to 11 csv files including summarized and detailed information
@@ -115,67 +113,6 @@ for all municipal wastewater treatment plants within the domain and
 industrial wastewater plants.  It also includes up to 5 plots of the gridded
 methane emissions.  Up to 2 for municipal wastewater treatment facilities,
 up to 2 for septic, and 1 for industrial wastewater treatment facilities}
-
-\item{DMR_file}{Character providing the full filepath to the discharge
-monitoring report data available at
-\url{https://echo.epa.gov/trends/loading-tool/water-pollution-search}.  Set
-the industry type to Publicly Owned Treatment Works in the search tool, set
-the year, and select wastewater flow under the pollutant categories.  After
-searching, scroll to the bottom table where flow separated by facility is
-shown and select download all data.  This will produce a csv with 3 rows as
-header, columns as different variables and rows as different facilities. The
-variables Facility Name, Facility Latitude, Facility Longitude and Average
-Flow (MGD) are used.  There is an example file in the package's datasets
-folder that has been successfully used in this code available for reference.}
-
-\item{CWNS_file}{Character providing the full filepath to the 2012 Clean
-Watershed Needs report data or the folder containing the 2022 data from the
-report -  available at
-\url{https://www.epa.gov/cwns/clean-watersheds-needs-survey-cwns-2012-report-and-data}
-and
-\url{https://www.epa.gov/cwns/clean-watersheds-needs-survey-cwns-2022-report-and-data},
-respectively. For 2012, find the data download link near the bottom of the
-page.  This will download all data as an access database.  To convert to a
-useable excel file:
-\itemize{
-\item Open mdb file in Microsoft Access
-\item Go to Create tab -> Query Wizard
-\item Select Simple Query Wizard
-\item Choose the first table you want (SUMMARY_FACILITY)
-\item Click the double right arrow to take all columns
-\item Repeat for other table (SUMMARY_FACILITY_FLOW)
-\item Click Finish
-\item In the left hand pane, make sure you have selected to view all Access objects
-\item Your query should be here at the bottom – right click on it and select to export to Excel (.xlsx)
-\item Note that Access seems to automatically save this query to the access file
-}
-The resulting excel file should have a separate row for each facility and
-different columns for different variables.  FACILITY_NAME, LATITUDE,
-LONGITUDE, HORIZONTAL_COORDINATE_DATUM, and EXIST_MUNICIPAL are used.  There
-is an example file in the package's datasets folder that has been
-successfully used in this code available for reference.
-
-For the 2022 data there is a link to the data dashboard which has a data
-download tab.  Download the data as CSVs.}
-
-\item{GHGI_national_wastewater_nonseptic}{Numeric.  Pulled from config file.
-Indicates the GHGI national non-septic wastewater methane emissions in
-kilotons per year.  This is in a table titled "Domestic Wastewater CH4
-Emissions from Septic and Centralized Systems".  This is the sum of all
-entries other than septic.  The GHGI is available at
-\url{https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks}.}
-
-\item{GHGI_national_wastewater_septic}{Numeric.  Pulled from config file.
-Indicates the GHGI national septic wastewater methane emissions in kilotons
-per year.  This is in a table titled "Domestic Wastewater CH4 Emissions from
-Septic and Centralized Systems".  This is the septic entry.  The GHGI is
-available at
-\url{https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks}.}
-
-\item{GHGI_septic_EF}{Numeric. Pulled from config file.  Indicates the
-emission factor used to calculate septic emissions in grams of methane per
-person per day.  This is in a table titled "Variables and Data Sources for
-CH4 Emisions from Septic Systems".}
 }
 \value{
 Nothing is returned from the function, but the main outputs are up to
@@ -293,44 +230,6 @@ The GHGRP is available at \url{https://www.epa.gov/ghgreporting}
 See references \href{https://doi.org/10.1016/j.isprsjprs.2020.02.019}{Homer et
 al.} and \href{https://doi.org/10.1021/acs.est.2c05373}{Moore et al.}
 }
-\examples{
-library(terra)
-grid_bbox=cbind(c(-76.65,-73.65),c(38.97,40.97))
-grid_res=0.01
-grid_crs="epsg:4326"
-grid <- rast(nrows=diff(range(grid_bbox[,2]))/grid_res,
-             ncols=diff(range(grid_bbox[,1]))/grid_res, xmin=min(grid_bbox[,1]),
-             xmax=max(grid_bbox[,1]), ymin=min(grid_bbox[,2]), ymax=max(grid_bbox[,2]),
-             crs=grid_crs)
-grid_vect <- as.polygons(ext(grid),crs=grid_crs)
-
-Wastewater(DMR_file='~/../Desktop/in/DMR_2022_from_8_10_2023.csv',
-           CWNS_file='~/../Desktop/in/CWNS_merged_data_2012.xlsx',
-           input_directory="~/../Desktop/in/",
-           output_directory="~/../Desktop/out/",
-           Wastewater_use_CWNS=TRUE,
-           Wastewater_use_DMR=TRUE,
-           Wastewater_Municipal_Method_Moore_EF=TRUE,
-           Wastewater_Municipal_Method_GHGI=TRUE,
-           domain=grid_vect,
-           domain_template=grid,
-           GHGRP_facility_data="~/../Desktop/in/GHGRP/facility_info.csv",
-           inventory_year=2018,
-           National_wastewater_info=data.frame("Year"=c(1990,2018),
-                                               "Septic_Fraction"=c(0.241,0.171)),
-           Wastewater_State_info=data.frame("State"=c("DE", "MD", "NJ", "NY", "PA"),
-                                            "Population"=c(966985,6042153,8891730,19544098,12809107),
-                                            "Septic_Fraction"=c(0.257,0.181,0.116,0.159,0.245),
-                                            "Method"=c("scaled","scaled","scaled","reported","scaled")),
-           GHGI_national_wastewater_nonseptic=246,
-           GHGI_national_wastewater_septic=227,
-           GHGI_septic_EF=10.7,
-           Total_national_open_or_low_int_area=352032,
-           verbose=TRUE,
-           State_Tigerlines=vect("~/../Desktop/in/State_Tigerlines/tl_2018_us_state.shp"),
-           County_Tigerlines=vect("~/../Desktop/in/County_Tigerlines/tl_2018_us_county.shp"),
-           plot_directory="~/../Desktop/plots/")
-}
 \references{
 \href{https://doi.org/10.1016/j.isprsjprs.2020.02.019}{Homer et
 al.}
@@ -338,15 +237,18 @@ al.}
 \href{https://doi.org/10.1021/acs.est.2c05373}{Moore et al.}
 }
 \seealso{
-\itemize{
-\item \code{\link[=CH4_inventory_build]{CH4_inventory_build()}} Calculates methane inventory using settings provided in config.
-\item \code{\link[=NLCD_open_and_low_int]{NLCD_open_and_low_int()}} Calculates the fraction of low intensity urban land cover in each pixel.
-}
+\code{\link[=CH4_inventory_build]{CH4_inventory_build()}} Calculates methane inventory using settings
+provided in config.
+
+\code{\link[=NLCD_open_and_low_int]{NLCD_open_and_low_int()}} Calculates the fraction of low intensity urban land
+cover in each pixel.
+
+\link{M3T_config} Generates the config function with user-editable settings used
+throughout processing.
 }
 \author{
-Joe Pitt, \email{madeup@wisc.edu}
+Kris Hajny, \email{kris.hajny@gmail.com}
 
-Kris Hajny, \email{blank@fake.edu}
-
-Israel Lopez-Coto, \email{test@test.edu}
+Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
 }
+\keyword{internal}

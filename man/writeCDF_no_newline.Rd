@@ -14,13 +14,9 @@ writeCDF_no_newline(input_raster, ...)
 outputting a new line after running.  Improves flow of periodic user
 updates within the package.
 }
-\examples{
+\author{
+Kris Hajny, \email{kris.hajny@gmail.com}
 
-f <- system.file("ex/elev.tif", package = "terra")
-r <- rast(f)
-fname <- paste0(tempfile(), ".nc")
-rr <- writeCDF(r, fname,
-  overwrite = TRUE, varname = "alt",
-  longname = "elevation in m above sea level", unit = "m"
-)
+Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
 }
+\keyword{internal}

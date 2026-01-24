@@ -2,7 +2,7 @@
 % Please edit documentation in R/Plotting_individual_sectors.R
 \name{not_log_plot}
 \alias{not_log_plot}
-\title{Create a visual}
+\title{Create a linear scale visual}
 \usage{
 not_log_plot(
   input,
@@ -13,8 +13,7 @@ not_log_plot(
   plot_directory,
   domain,
   County_Tigerlines,
-  State_CB,
-  Urban_Tigerlines
+  State_CB
 )
 }
 \arguments{
@@ -25,22 +24,36 @@ emissions.}
 plot.  The plot will have no main title if not provided.}
 
 \item{zlim_min}{\strong{Optional} numeric providing the minimum value for the
-colorscale of the plot, representing the gridded methane in nmol/m2/s.  Will
-default to the minimum of the data if not provided.}
+colorscale of the plot, representing the log-scale gridded methane in
+nmol/m2/s.  Will default to the minimum of the data if not provided.}
 
 \item{zlim_max}{\strong{Optional} numeric equivalent to zlim_min, but for the
 maximum value.}
 
 \item{filename}{\strong{Optional} character providing the output filename for
 the plot.  Will default to a png with the name of the input if not provided,
-unless the plot is for an entire sector, rather than subsector.  This will
-use the same default filename, but place it in a separate subfolder.}
+unless the plot is for an entire sector, rather than subsector.  This is
+determined by checking input's name includes "Summed". This will use the
+same default filename, but place it in a separate subfolder.}
+
+\item{plot_directory}{Character. \strong{Optional}. Provides the full filepath
+to save figures. Only relevant if \code{verbose} = TRUE.}
+
+\item{domain}{SpatVector polygon outlining the desired output area as created
+in \code{\link{CH4_inventory_build}}.}
+
+\item{County_Tigerlines}{SpatVector.
+\href{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}{US
+Census Tigerlines} files for visualization.}
+
+\item{State_CB}{SpatVector.
+\href{https://www.census.gov/geographies/mapping-files/tme-series/geo/cartographic-boundary.html}{US
+Census Cartographic Boundary} files for visualization.}
 }
 \value{
 This function returns nothing, but does produce a plot with the
 gridded methane data colored with NA values set to black. All axes are
-clearly labeled and state, county, and, if relevant, focus city boundaries
-are overlaid in greys and white.
+clearly labeled and state and county, boundaries are overlaid.
 }
 \description{
 This is a simple helper function for ease of use.  It builds
@@ -52,19 +65,11 @@ CH4_inventory_build.  It allows for reasonable default scales/titles or set
 ones, e.g., if wanting to hold the colorscale constant across multiple
 similar sectors/subsectors.
 }
-\examples{
-not_log_plot(septic_flux,filename="Wastewater_dom_septic_national",
-             "Domestic Wastewater - Septic\n national EPA septic distributed using \ndeveloped open space/low intensity land cover",
-             global(min(septic_flux,septic_flux2),min),
-             global(max(septic_flux,septic_flux2),max))
-}
 \seealso{
 \code{\link[=log_plot]{log_plot()}} plots the data in simple log-scale visuals.
 }
 \author{
-Joe Pitt, \email{madeup@wisc.edu}
+Kris Hajny, \email{kris.hajny@gmail.com}
 
-Kris Hajny, \email{blank@fake.edu}
-
-Israel Lopez-Coto, \email{test@test.edu}
+Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
 }

@@ -13,8 +13,7 @@ log_plot(
   plot_directory,
   domain,
   County_Tigerlines,
-  State_CB,
-  Urban_Tigerlines
+  State_CB
 )
 }
 \arguments{
@@ -33,8 +32,23 @@ maximum value.}
 
 \item{filename}{\strong{Optional} character providing the output filename for
 the plot.  Will default to a png with the name of the input if not provided,
-unless the plot is for an entire sector, rather than subsector.  This will
-use the same default filename, but place it in a separate subfolder.}
+unless the plot is for an entire sector, rather than subsector.  This is
+determined by checking input's name includes "Summed". This will use the
+same default filename, but place it in a separate subfolder.}
+
+\item{plot_directory}{Character. \strong{Optional}. Provides the full filepath
+to save figures. Only relevant if \code{verbose} = TRUE.}
+
+\item{domain}{SpatVector polygon outlining the desired output area as created
+in \code{\link{CH4_inventory_build}}.}
+
+\item{County_Tigerlines}{SpatVector.
+\href{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}{US
+Census Tigerlines} files for visualization.}
+
+\item{State_CB}{SpatVector.
+\href{https://www.census.gov/geographies/mapping-files/tme-series/geo/cartographic-boundary.html}{US
+Census Cartographic Boundary} files for visualization.}
 }
 \value{
 This function returns nothing, but does produce a plot with the
@@ -52,20 +66,14 @@ CH4_inventory_build.  It allows for reasonable default scales/titles or set
 ones, e.g., if wanting to hold the colorscale constant across multiple
 similar sectors/subsectors.
 }
-\examples{
-log_plot(central_flux,filename="Wastewater_dom_central",
-title="Domestic Wastewater -\n EPA total distributed using \nClean Watersheds Needs Survey")
-}
 \seealso{
-\itemize{
-\item \code{\link[=prep_plot_data]{prep_plot_data()}} calculate the log base 10 and remove infinities (i.e., 0's).
-\item \code{\link[=not_log_plot]{not_log_plot()}} plots the data in simple linear-scale visuals.
-}
+\code{\link[=prep_plot_data]{prep_plot_data()}} calculate the log base 10 and remove infinities (i.e.,
+0's).
+
+\code{\link[=not_log_plot]{not_log_plot()}} plots the data in simple linear-scale visuals.
 }
 \author{
-Joe Pitt, \email{madeup@wisc.edu}
+Kris Hajny, \email{kris.hajny@gmail.com}
 
-Kris Hajny, \email{blank@fake.edu}
-
-Israel Lopez-Coto, \email{test@test.edu}
+Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
 }

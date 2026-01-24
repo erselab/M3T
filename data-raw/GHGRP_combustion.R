@@ -16,12 +16,10 @@
 #"reported" value.
 
 
-input_directory <- "D:/MMMT STUFF/All inventory data/Automated/"
-
 ################################################################################
 #download, load in and combine the emission data appropriately
 
-ghgrp_combustion_file <- file.path(input_directory,"GHGRP","combustion_C.csv")
+ghgrp_combustion_file <- tempfile(".csv")
 
 data_URL <- "https://data.epa.gov/dmapservice/ghg.c_subpart_level_information/csv"
 download.file(data_URL,ghgrp_combustion_file,quiet=T)

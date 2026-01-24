@@ -1,14 +1,13 @@
 ## code to prepare census tigerlines (state, county, urban) and cartographic
 ## boundary files for all available years starting in 2010
 
-output_directory <- "D:/MMMT STUFF/All inventory data/Automated/"
-# output_directory <- "G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Manuscript/All inventory data/Automated/"
+# output_directory <- "D:/MMMT STUFF/All inventory data/Automated/"
+output_directory <- "G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Manuscript/All inventory data/Prepared inventory data/"
 
-library(terra)
 ################################################################################
 #First see what's available by searching the FTP as an html
 download_location <- tempfile(fileext = ".html")
-Trycatch_downloader("https://www2.census.gov/geo/tiger/",download_location,method = "save")
+utils::download.file("https://www2.census.gov/geo/tiger/",download_location,quiet = T)
 Census_file_list=readLines(download_location)
 pattern <- "TIGER[[:digit:]]{4}/"
 Census_years <- grep(pattern,Census_file_list,value=T)
@@ -19,7 +18,7 @@ Census_years <- Census_years[Census_years>2010]
 invisible(file.remove(download_location))
 
 ################################################################################
-#download data
+#download tigerlines data
 for(inventory_year in Census_years){
   #Every 10 years the census updates the urban areas.  Just round down to the
   #nearest decade.  2020 and 21 use 2010 still, though 2020 has both and a
@@ -31,13 +30,13 @@ for(inventory_year in Census_years){
   
   #2010 is formatted differently
   if(inventory_year==2010){
-    Census_filenames <- c(paste0(output_directory,"State_Tigerlines/tl_",inventory_year,"_us_state",UAC_year,".shp"),
-                          paste0(output_directory,"Urban_Tigerlines/tl_",inventory_year,"_us_uac",UAC_year,".shp"),
-                          paste0(output_directory,"County_Tigerlines/tl_",inventory_year,"_us_county",UAC_year,".shp"))
+    Census_filenames <- c(file.path(output_directory,paste0("State_Tigerlines/tl_",inventory_year,"_us_state",UAC_year,".shp")),
+                          file.path(output_directory,paste0("Urban_Tigerlines/tl_",inventory_year,"_us_uac",UAC_year,".shp")),
+                          file.path(output_directory,paste0("County_Tigerlines/tl_",inventory_year,"_us_county",UAC_year,".shp")))
   }else{
-    Census_filenames <- c(paste0(output_directory,"State_Tigerlines/tl_",inventory_year,"_us_state.shp"),
-                          paste0(output_directory,"Urban_Tigerlines/tl_",inventory_year,"_us_uac",UAC_year,".shp"),
-                          paste0(output_directory,"County_Tigerlines/tl_",inventory_year,"_us_county.shp"))
+    Census_filenames <- c(file.path(output_directory,paste0("State_Tigerlines/tl_",inventory_year,"_us_state.shp")),
+                          file.path(output_directory,paste0("Urban_Tigerlines/tl_",inventory_year,"_us_uac",UAC_year,".shp")),
+                          file.path(output_directory,paste0("County_Tigerlines/tl_",inventory_year,"_us_county.shp")))
   }
   
   #2011 has no urban tigerlines
@@ -68,17 +67,26 @@ for(inventory_year in Census_years){
   download_location <- tempfile(fileext = ".zip")
   #download each to a temp file then unzip to the input directory
   for(A in 1:length(Census_FTP_URLs)){
-    download.file(Census_FTP_URLs[A],download_location,quiet=T,overwrite=T)
-    utils::unzip(download_location,exdir=file.path(output_directory,c("State_Tigerlines","Urban_Tigerlines","County_Tigerlines")[A]))
+    utils::download.file(Census_FTP_URLs[A],download_location,quiet=T,overwrite=T)
+    
+    #2011 has no urban tigerlines
+    if(inventory_year==2011){
+      utils::unzip(download_location,exdir=file.path(output_directory,c("State_Tigerlines","County_Tigerlines")[A]))
+    }else{
+      utils::unzip(download_location,exdir=file.path(output_directory,c("State_Tigerlines","Urban_Tigerlines","County_Tigerlines")[A]))
+    }
     #delete the temp file
     unlink(download_location)
   }
   cat("\rFinished downloading",inventory_year,"- there are",sum(Census_years>inventory_year),"years left               ")
 }
+################################################################################
+#download 1 CB file
 
 #only need a single file here - purely for visualization
-download.file("https://www2.census.gov/geo/tiger/GENZ2024/gpkg/cb_2024_us_all_500k.zip",download_location,quiet=T,overwrite=T)
+utils::download.file("https://www2.census.gov/geo/tiger/GENZ2024/gpkg/cb_2024_us_all_500k.zip",download_location,quiet=T,overwrite=T)
 utils::unzip(download_location,exdir=file.path(output_directory,"Cartographic_Boundary_500k"))
+
 #delete the temp file
 unlink(download_location)
 
@@ -108,28 +116,31 @@ Urban_output <- file.path(output_directory,"combined_urban_tigerlines.gpkg")
 CB_output <- file.path(output_directory,"Cropped_state_CB.gpkg")
 
 #save as gpkg to add to
-writeVector(State_Tigerlines,State_output,overwrite=T,layer='2011')
-writeVector(County_Tigerlines,County_output,overwrite=T,layer='2012')
-writeVector(Urban_Tigerlines,Urban_output,overwrite=T,layer='2011')
-writeVector(State_CB,CB_output,overwrite=T,layer='2024')
+terra::writeVector(State_Tigerlines,State_output,overwrite=T,layer='2011')
+terra::writeVector(County_Tigerlines,County_output,overwrite=T,layer='2012')
+terra::writeVector(Urban_Tigerlines,Urban_output,overwrite=T,layer='2011')
+terra::writeVector(State_CB,CB_output,overwrite=T,layer='2024')
 
 #loop through each yr and add as a new layer in the gpkg
 for(A in 2:length(state_files)){
   yr <- strsplit(basename(state_files[A]),"_")[[1]][2]
   
   State_Tigerlines <- terra::vect(state_files[A])
-  Urban_Tigerlines <- terra::vect(urban_files[A])
+  County_Tigerlines <- terra::vect(county_files[A])
   
   State_Tigerlines <- State_Tigerlines[!State_Tigerlines$STUSPS %in% c("AK","AS","MP","PR","HI","GU","VI"),]
+  County_Tigerlines <- terra::mask(County_Tigerlines,State_Tigerlines)
   
-  writeVector(State_Tigerlines,State_output,insert=T,overwrite=T,layer=yr)
-  writeVector(Urban_Tigerlines,Urban_output,insert=T,overwrite=T,layer=yr)
+  terra::writeVector(State_Tigerlines,State_output,insert=T,overwrite=T,layer=yr)
+  terra::writeVector(County_Tigerlines,County_output,insert=T,overwrite=T,layer=yr)
   
-  #no county data for 2011, so skip A that's 2012 for the others
-  if(A>2){
-    County_Tigerlines <- terra::vect(county_files[A-1])
-    County_Tigerlines <- terra::mask(County_Tigerlines,State_Tigerlines)
-    writeVector(County_Tigerlines,County_output,insert=T,overwrite=T,layer=yr)
+  
+  if(A<=length(urban_files)){
+    #no 2011 for urban, so just process separately
+    yr <- strsplit(basename(urban_files[A]),"_")[[1]][2]
+    
+    Urban_Tigerlines <- terra::vect(urban_files[A])
+    terra::writeVector(Urban_Tigerlines,Urban_output,insert=T,overwrite=T,layer=yr)
   }
   cat("\rFinished cropping and combining",yr,"- there are",length(state_files)-A,"left                       ")
 }

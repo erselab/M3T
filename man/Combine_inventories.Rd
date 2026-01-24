@@ -17,19 +17,40 @@ Combine_inventories(
 }
 \arguments{
 \item{output_directory}{Character providing the full filepath to save
-processed data}
+processed data as created in \code{\link{CH4_inventory_build}}}
 
-\item{separate_thermo}{Logical.  Pulled from config file.  Indicating whether
-or not to save partial inventories: one that is only thermogenic sources,
-and one that is only non-thermogenic sources.}
+\item{separate_thermo}{Logical.  Pulled from \code{\link{M3T_config}}.}
+
+\item{plot_directory}{Character. \strong{Optional}. Provides the full filepath
+to save figures. Only relevant if \code{verbose} = TRUE.}
+
+\item{County_Tigerlines}{SpatVector. \strong{Optional}.
+\href{https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html}{US
+Census Tigerlines} files for visualization. Only relevant if \code{verbose} = TRUE.}
+
+\item{State_CB}{SpatVector. \strong{Optional}.
+\href{https://www.census.gov/geographies/mapping-files/tme-series/geo/cartographic-boundary.html}{US
+Census Cartographic Boundary} files for visualization. Only relevant if
+\code{verbose} = TRUE.}
+
+\item{domain}{SpatVector polygon outlining the desired output area as created
+in \code{\link{CH4_inventory_build}}.}
+
+\item{domain_template}{SpatRaster providing the desired output grid, including
+the desired resolution and coordinate reference system as created in
+\code{\link{CH4_inventory_build}}.}
+
+\item{verbose}{Logical indicating whether to save visuals. This is a single
+plot of the average gridded methane emissions across all variations on a log
+scale}
 }
 \value{
 Nothing is returned from the function, but the main outputs are many
 netcdf files of the methane emissions across all sectors.  Given the large
 number of possible files and variations, they are titled
-"Combined_inventory_combination_1.nc" increasing numerically.  A csv is also
-saved that details what variations were used for each sector for each
-inventory.
+"Combined_inventory_combination_#.nc" with # increasing numerically.  A csv
+titled "Combined_inventory_key.csv" is also saved that details what
+variations were used for each sector for each inventory.
 }
 \description{
 \code{Combine_inventories} writes a netcdf for every unique
@@ -81,18 +102,16 @@ instead:
 }
 }
 }
-\examples{
-library(terra)
-Combine_inventories <- function(output_directory="~/../Desktop/out/",
-                               separate_thermo=T)
-}
 \seealso{
-\code{\link[=CH4_inventory_build]{CH4_inventory_build()}} Calculates methane inventory using settings provided in config.
+\code{\link[=CH4_inventory_build]{CH4_inventory_build()}} Calculates methane inventory using settings
+provided in config.
+
+\link{M3T_config} Generates the config function with user-editable settings used
+throughout processing.
 }
 \author{
-Joe Pitt, \email{madeup@wisc.edu}
+Kris Hajny, \email{kris.hajny@gmail.com}
 
-Kris Hajny, \email{blank@fake.edu}
-
-Israel Lopez-Coto, \email{test@test.edu}
+Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
 }
+\keyword{internal}

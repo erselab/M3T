@@ -1,8 +1,8 @@
 ## code to prepare `GEPA` dataset goes here
 
-library(jsonlite)
-library(terra)
-library(ncdf4)
+
+input_directory <- "G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Manuscript/All inventory data/Prepared inventory data/"
+
 ################################################################################
 #Zenodo API to download the appropriate GEPA v2 file.
 #https://zenodo.org/records/8367082
@@ -34,6 +34,7 @@ for(A in 1:length(GEPA_URL)){
 ################################################################################
 #load in the file and split into the fossil fuel and non-fossil components we need
 
+GEPA_landfill_sector <- c("emi_ch4_5A1_Landfills_Industrial")
 GEPA_non_thermo_sectors <- c("emi_ch4_5A1_Landfills_Industrial",
                              "emi_ch4_5B1_Composting",
                              "emi_ch4_3A_Enteric_Fermentation",
@@ -58,35 +59,42 @@ GEPA_thermo_sectors <- c("emi_ch4_1A_Combustion_Mobile",
 GEPA <- terra::rast(file.path(output_dir,GEPA_files[1]))
 
 #subset to the 2 types of GEPA data we need
+GEPA_landfills <- GEPA[[which(names(GEPA) %in% GEPA_landfill_sector)]]
 GEPA_non_thermo <- GEPA[[which(names(GEPA) %in% GEPA_non_thermo_sectors)]]
 GEPA_thermo <- GEPA[[which(names(GEPA) %in% GEPA_thermo_sectors)]]
 
 #sum across layers for those that are multiple individual sectors
+GEPA_landfills <- sum(GEPA_landfills)
 GEPA_non_thermo <- sum(GEPA_non_thermo)
 GEPA_thermo <- sum(GEPA_thermo)
 
+Combined_GEPA_landfills <- GEPA_landfills
 Combined_GEPA_non_thermo <- GEPA_non_thermo
 Combined_GEPA_thermo <- GEPA_thermo
 
 for(A in 2:length(GEPA_files)){
   GEPA <- terra::rast(file.path(output_dir,GEPA_files[A]))
   
+  GEPA_landfills <- GEPA[[which(names(GEPA) %in% GEPA_landfill_sector)]]
   GEPA_non_thermo <- GEPA[[which(names(GEPA) %in% GEPA_non_thermo_sectors)]]
   GEPA_thermo <- GEPA[[which(names(GEPA) %in% GEPA_thermo_sectors)]]
+  GEPA_landfills <- sum(GEPA_landfills)
   GEPA_non_thermo <- sum(GEPA_non_thermo)
   GEPA_thermo <- sum(GEPA_thermo)
   
+  Combined_GEPA_landfills <- c(Combined_GEPA_landfills,GEPA_landfills)
   Combined_GEPA_non_thermo <- c(Combined_GEPA_non_thermo,GEPA_non_thermo)
   Combined_GEPA_thermo <- c(Combined_GEPA_thermo,GEPA_thermo)
 }
 
+names(Combined_GEPA_landfills) <- year_list
 names(Combined_GEPA_non_thermo) <- year_list
 names(Combined_GEPA_thermo) <- year_list
 ################################################################################
 #save
 
-usethis::use_data(Combined_GEPA_non_thermo, overwrite = TRUE)
-usethis::use_data(Combined_GEPA_thermo, overwrite = TRUE)
-
+terra::writeRaster(Combined_GEPA_landfills,file.path(input_directory,"Combined_GEPA_landfills.tif"),overwrite=T)
+terra::writeRaster(Combined_GEPA_non_thermo,file.path(input_directory,"Combined_GEPA_non_thermo.tif"),overwrite=T)
+terra::writeRaster(Combined_GEPA_thermo,file.path(input_directory,"Combined_GEPA_thermo.tif"),overwrite=T)
 
 unlink(output_dir,recursive = T)

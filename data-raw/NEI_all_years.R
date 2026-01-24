@@ -1,12 +1,9 @@
 ## code to prepare `NEI_all_years` dataset goes here
 
-
-library(jsonlite)
 ################################################################################
 #download
 
 #this data takes longer than the default timeout - increase
-default_timeout <- options("timeout")
 options("timeout"=60*20)
 
 #set output location
@@ -60,8 +57,7 @@ NEI_data_orig <- NEI_data_orig[NEI_data_orig$SECTOR %in% required_sectors,]
 
 NEI_all_years <- NEI_data_orig
 
-options("timeout"=default_timeout)
-
+NEI_all_years <- NEI_all_years[,c("COUNTY FIPS","EMISSIONS","INVENTORY YEAR","SECTOR","STATE","STATE FIPS")]
 ################################################################################
 #save
 
