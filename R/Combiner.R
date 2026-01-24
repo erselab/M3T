@@ -48,31 +48,27 @@
 #'   }
 #' }
 #'
-#'@param output_directory Character providing the full filepath to save
-#'  processed data
-#'@param separate_thermo Logical.  Pulled from config file.  Indicating whether
-#'  or not to save partial inventories: one that is only thermogenic sources,
-#'  and one that is only non-thermogenic sources.
+#'@inheritParams Municipal_solid_waste
 #'
+#'@param separate_thermo Logical.  Pulled from \code{\link{M3T_config}}.
+#'@param verbose Logical indicating whether to save visuals. This is a single
+#'  plot of the average gridded methane emissions across all variations on a log
+#'  scale
 #'@returns Nothing is returned from the function, but the main outputs are many
 #'  netcdf files of the methane emissions across all sectors.  Given the large
 #'  number of possible files and variations, they are titled
-#'  "Combined_inventory_combination_1.nc" increasing numerically.  A csv is also
-#'  saved that details what variations were used for each sector for each
-#'  inventory.
+#'  "Combined_inventory_combination_#.nc" with # increasing numerically.  A csv
+#'  titled "Combined_inventory_key.csv" is also saved that details what
+#'  variations were used for each sector for each inventory.
 #'
-#'@examples
-#'library(terra)
-#'Combine_inventories <- function(output_directory="~/../Desktop/out/",
-#'                                separate_thermo=T)
-#'@author Joe Pitt, \email{madeup@@wisc.edu}
-#'@author Kris Hajny, \email{blank@@fake.edu}
-#'@author Israel Lopez-Coto, \email{test@@test.edu}
-#'@export
-#'@seealso [CH4_inventory_build()] Calculates methane inventory using settings provided in config.
+#'@inherit CH4_inventory_build author
+#'@inherit Municipal_solid_waste seealso
+#'@keywords internal
 
-
-
+#@examples
+#library(terra)
+#Combine_inventories <- function(output_directory="~/../Desktop/out/",
+#                                separate_thermo=T)
 
 
 
@@ -81,7 +77,7 @@
 #a not wetcharts biogenic CH4 or in general just wants anthropogenic
 
 
-
+#edit to include a mean, max, and min - and also for thermo/non-thermo
 
 
 
