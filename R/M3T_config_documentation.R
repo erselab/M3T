@@ -25,7 +25,7 @@
 #' Method Variations
 #' \itemize{
 #'   \item{\bold{Use_ACES} - logical stating whether the \href{https://doi.org/10.3334/ORNLDAAC/1943}{ACES CO2 inventory} should be used to downscale the stationary combustion and natural gas distribution emissions. Default TRUE.}
-#'   \item{\bold{Use_Vulcan} - logical stating whether the \href{https://earth.gov/ghgcenter/data-catalog/vulcan-ffco2-yeargrid-v4}{Vulcan CO2 inventory} should be used to downscale the stationary combustion and natural gas distribution emissions. Default TRUE.}
+#'   \item{\bold{Use_Vulcan} - logical stating whether the \href{https://doi.org/10.5281/zenodo.15446748}{Vulcan CO2 inventory} should be used to downscale the stationary combustion and natural gas distribution emissions. Default TRUE.}
 #'   \item{\bold{Combine_sectors} - logical stating whether sectors should be summed to create all possible unique inventory combinations across variations. Be aware that with many variations this can create >1,000 inventories. Default TRUE.}
 #'   \item{\bold{Separate_thermo} - logical stating whether combined inventories should also be calculated separately for thermogenic (i.e., natural gas) and non-thermogenic sources. Be aware that this will triple the number of inventories created. Default FALSE.}
 #'   }
@@ -38,8 +38,8 @@
 #'   \item{\bold{Source_GHGRP_combustion} - character stating "M3T", "download", or a filepath pointing to the needed file. Data on facility combustion emissions (subpart C) from the \href{https://enviro.epa.gov/envirofacts/metadata/table/ghg/c_subpart_level_information}{EPA Greenhouse Gas Reporting Program's Envirofacts API}. Used for the landfill and natural gas transmission sectors as these sources report to subpart C. Default "M3T".}
 #'   \item{\bold{Source_GHGRP_NG} - character stating "M3T", "download", or a filepath pointing to the needed file. Data on petroleum and natural gas system facility-level emissions (subpart W) from the \href{https://enviro.epa.gov/envirofacts/metadata/table/ghg/w_subpart_level_information}{EPA Greenhouse Gas Reporting Program's Envirofacts API}. Used for the natural gas distribution and natural gas transmission sectors as these sources report to subpart W. Default "M3T".}
 #'   \item{\bold{Source_GHGI} - character stating "M3T", "download", or a filepath pointing to a directory with the needed files. The main text and annex tables from the \href{https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks-1990-2022}{EPA Greenhouse Gas Inventory}. Optionally used for the landfill, natural gas distribution, natural gas transmission, and stationary combustion sectors to get the national activity and emission factor data used. Default "M3T".}
-#'   \item{\bold{Source_ACES} - character stating "M3T", "download", or a filepath pointing to a directory with the needed files. Annual rasters of the industrial, residential, electric production, and commercial sectors from the \href{https://doi.org/10.3334/ORNLDAAC/1943}{ACES CO2 inventory}. Optionally used to downscale stationary combustion and natural gas distribution methane emissions. Code to convert the hourly data to annual is available on the \href{https://zenodo.org/}{companion Zenodo}. Default "M3T".}
-#'   \item{\bold{Source_Vulcan} - character stating "M3T", "download", or a filepath pointing to a directory with the needed files. Annual rasters of the industrial, residential, electric production, and commercial sectors from the \href{https://earth.gov/ghgcenter/data-catalog/vulcan-ffco2-yeargrid-v4}{Vulcan v4.0 CO2 inventory}. Optionally used to downscale stationary combustion and natural gas distribution methane emissions. Default "M3T".}
+#'   \item{\bold{Source_ACES} - character stating "M3T" or a filepath pointing to a directory with the needed files.  \bold{Cannot} be set to "download" as there is no simple way to automatically download these files, they are hundreds of gigabytes, and annualizing them is considerably time consuming. Annual rasters of the industrial, residential, electric production, and commercial sectors from the \href{https://doi.org/10.3334/ORNLDAAC/1943}{ACES CO2 inventory}. Optionally used to downscale stationary combustion and natural gas distribution methane emissions. Code to convert the hourly data to annual is available on the \href{https://zenodo.org/}{companion Zenodo}. Default "M3T".}
+#'   \item{\bold{Source_Vulcan} - character stating "download" or a filepath pointing to a directory with the needed files.  \bold{Cannot} be set to "M3T" as there is no version saved within the package - it relies on publicly available versions of the data so there is no need. Annual rasters of the industrial, residential, electric production, and commercial sectors from the \href{https://doi.org/10.5281/zenodo.15446748}{Vulcan v4.0 CO2 inventory}. Optionally used to downscale stationary combustion and natural gas distribution methane emissions. Default "download".}
 #'   }
 #' }
 #'
@@ -106,8 +106,8 @@
 #'
 #' Accessing Datasets
 #' \itemize{
-#'   \item{\bold{Source_EIA_NG_file} - character stating "M3T", "download", or a filepath pointing to the needed file. \href{https://www.eia.gov/naturalgas/ngqs/#?report=RP4&year1=2020&year2=2020&company=Name}{EIA Form 176} - the Annual Report of Natural and supplemental Gas Supply and Disposition that includes sold natural gas volume by company and customer type. Can be downloaded using a button in the topright on the webpage. Default "M3T".}
-#'   \item{\bold{Source_PHMSA_file} - character stating "M3T", "download", or a filepath pointing to the needed file. The \href{https://www.phmsa.dot.gov/data-and-statistics/pipeline/gas-distribution-gas-gathering-gas-transmission-hazardous-liquids}{Pipeline and Hazardous Material Safety Administration (PHMSA)} - the Gas Distribution Annual Data that includes miles of pipe by company and type. Default "M3T".}
+#'   \item{\bold{Source_EIA_NG_file} - character stating "M3T", or a filepath pointing to the needed file. \bold{Cannot} be set to "download" as there is no simple way to automatically download these files. \href{https://www.eia.gov/naturalgas/ngqs/#?report=RP4&year1=2020&year2=2020&company=Name}{EIA Form 176} - the Annual Report of Natural and supplemental Gas Supply and Disposition that includes sold natural gas volume by company and customer type. Can be downloaded as an xlsx file using a button in the topright on the webpage. Default "M3T".}
+#'   \item{\bold{Source_PHMSA_file} - character stating "M3T", or a filepath pointing to the needed file. \bold{Cannot} be set to "download" as there is no simple way to automatically download these files. The \href{https://www.phmsa.dot.gov/data-and-statistics/pipeline/gas-distribution-gas-gathering-gas-transmission-hazardous-liquids}{Pipeline and Hazardous Material Safety Administration (PHMSA)} Gas Distribution Annual Data that includes miles of pipe by company and type. Default "M3T".}
 #'   \item{\bold{Source_GHGRP_LDC} - character stating "M3T", "download", or a filepath pointing to a directory with the needed file. The EPA GHGRP table \href{https://enviro.epa.gov/envirofacts/metadata/table/ghg/w_local_dist_companies_details}{Envirofacts local distribution companies details} if before 2015 or \href{https://enviro.epa.gov/envirofacts/metadata/table/ghg/ef_w_equip_leaks_ngdist_leaks}{Envirofacts natural gas distribution leaks} and \href{https://enviro.epa.gov/envirofacts/metadata/table/ghg/ef_w_equip_leaks_pop_count}{Envirofacts population counts} otherwise that include the number of metering and regulating (MR) stations and transmission-distribution transfer (TD) stations for each GHGRP reporting company. Default "M3T".}
 #'   }
 #'
@@ -176,7 +176,7 @@
 #'
 #' Emission Factors and similar
 #' \itemize{
-#'   \item{\bold{stationary_combustion_GHGI_data} - data.frame with columns "State", "com_coal", "ind_coal", "elec_coal", "res_petr", "com_petr", "ind_petr", "elec_petr", "com_gas", "ind_gas", "elec_gas", "res_wood", "com_wood", "ind_wood", and "elec_wood" or "GHGI" to indicate this data should be pulled automatically from GHGI files. State should be "US_EPA" and each column should list the Tera BTU of energy consumed for the economic sector - fuel combination. Res = residential, com = commercial, ind = industrial, elec = electric, and petr = petroleum. Res_coal is 0 in the US and res_gas is handled separately. Default is "GHGI", which pulls this information from the \href{https://www.epa.gov/ghgemissions/natural-gas-and-petroleum-systems-ghg-inventory-additional-information-1990-2022-ghg}{EPA Greenhouse Gas Inventory annex files}.}
+#'   \item{\bold{stationary_combustion_GHGI_data} - data.frame with columns "State", "com_coal", "ind_coal", "elec_coal", "res_petr", "com_petr", "ind_petr", "elec_petr", "com_gas", "ind_gas", "elec_gas", "res_wood", "com_wood", "ind_wood", and "elec_wood" or "GHGI" to indicate this data should be pulled automatically from GHGI files. State should be "US_EPA" and each column should list the trillion British Thermal Units (TBTU) of energy consumed for the economic sector - fuel combination. Res = residential, com = commercial, ind = industrial, elec = electric, and petr = petroleum. Res_coal is 0 in the US and res_gas is handled separately. Default is "GHGI", which pulls this information from the \href{https://www.epa.gov/ghgemissions/natural-gas-and-petroleum-systems-ghg-inventory-additional-information-1990-2022-ghg}{EPA Greenhouse Gas Inventory annex files}.}
 #'   \item{\bold{stationary_combustion_emission_factors} - data.frame with columns "com_coal", "ind_coal", "elec_coal", "res_petr", "com_petr", "ind_petr", "elec_petr", "com_gas", "ind_gas", "elec_gas", "res_wood", "com_wood", "ind_wood", and "elec_wood". Each column should list the emission factor in g/Giga Joule for the economic sector - fuel combination. Res = residential, com = commercial, ind = industrial, elec = electric, and petr = petroleum. Res_coal is 0 in the US and res_gas is handled separately. Default is \href{https://www.ipcc-nggip.iges.or.jp/public/2006gl/vol2.html}{Intergovernmental Panel on Climate Change (IPCC)} 2006 volume 2, energy tables 2.2 through 2.5, except the natural gas electric sector which comes from \href{https://doi.org/10.1021/acs.est.9b01875}{Hajny et al., 2019}.}
 #'   }
 #' }
@@ -230,7 +230,7 @@
 #' Emission Factors and similar
 #' \itemize{
 #'   \item{\bold{GHGI_wastewater_data} - data.frame with columns "EF", "Septic.Emissions", "Nonseptic.Emissions", and "year". The estimated national total emissions in kt/yr from the Environmental Protection Agency's (EPA) \href{https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks-1990-2022}{Greenhouse Gas Inventory (GHGI)}. Septic is provided and nonseptic is the sum of all other entries in the table titled "Domestic Wastewater CH4 Emissions from Septic and Centralized Systems", though years before 2019 were formatted differently. Default is GHGI data from 2010 - 2022.}
-#'   \item{\bold{Total_national_open_or_low_int_area} - Integer representing the national total of "developed open space" and "developed low intensity" land cover in km2 from the National Land Cover Database (NLCD). Default to the value in Table 7 of that was published in \href{https://doi.org/10.1016/j.isprsjprs.2020.02.019}{Homer et al., 2020}.}
+#'   \item{\bold{Total_national_open_or_low_int_area} - Numeric representing the national total of "developed open space" and "developed low intensity" land cover in km2 from the National Land Cover Database (NLCD). Default to the value in Table 7 of that was published in \href{https://doi.org/10.1016/j.isprsjprs.2020.02.019}{Homer et al., 2020}.}
 #'   \item{\bold{Wastewater_State_info} - data.frame with columns "State", "Septic_Fraction", and "Method" with method being either "scaled" or "reported". These methods are relevant to the state septic variation. The scaled approach scales the septic fraction based on the change in the national septic fraction as described below in the National_wastewater_info. The reported approach uses the value provided. Default is a data frame with data for all states using reported when available from the \href{https://www.census.gov/programs-surveys/ahs/data/interactive/ahstablecreator.html?s_areas=00000&s_year=2021&s_tablename=TABLE1&s_bygroup1=1&s_bygroup2=1&s_filtergroup1=1&s_filtergroup2=1}{U.S. Census American Housing Survey} in the Plumbing, Water, and Sewage Disposal survey, pulling the appropriate year from Wastewater_reported_State_info described below.}
 #'   \item{\bold{Wastewater_reported_State_info} - data.frame with columns "State", "Year", and "Septic_Fraction". Provides the reported data for states and years available to update the wastewater_state_info where needed. Default is all reported Census data available from 2010 to 2023.}
 #'   \item{\bold{National_wastewater_info} - data.frame with columns "Year", and "Septic_Fraction". Provides the reported national data used if the method variation Wastewater_national_septic is true. Default is all reported data from 1990 to 2023.}
@@ -308,11 +308,15 @@
 #' @aliases M3T_config
 #' @export
 #' @seealso
-#' * [M3T_get_config] Get config options
-#' * [M3T_set_config] Set config options for the current R session
-#' * [CH4_inventory_build] Calculates methane inventory using settings provided in config.
-#' * [terra::terraOptions] Options for the terra package
-#' * [base::options] Options in base R
+#' [M3T_get_config] Get config options
+#' 
+#' [M3T_set_config] Set config options for the current R session
+#' 
+#' [CH4_inventory_build] Calculates methane inventory using settings provided in config.
+#' 
+#' [terra::terraOptions] Options for the terra package
+#' 
+#' [base::options] Options in base R
 NULL
 
 
