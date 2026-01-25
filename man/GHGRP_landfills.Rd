@@ -3,30 +3,10 @@
 \docType{data}
 \name{GHGRP_landfills}
 \alias{GHGRP_landfills}
-\title{#' Data from the Environmental Protection Agency's (EPA) Greenhouse Gas
-#' Reporting Program (GHGRP)
-#'
-#' A subset of data from the GHGRP
-#'
-#' Data for all facilities with GHGRP data
-#'
-#' @format ## \code{GHGRP_facility_data} A data frame with 136,005 rows, and 6 columns:
-#' \describe{
-#'   \item{facility_id}{Unique GHGRP ID for each facility}
-#'   \item{facility_name}{Name of facility}
-#'   \item{latitude}{Facility location coordinates}
-#'   \item{longitude}{Facility location coordinates}
-#'   \item{state}{State that the facility operates in}
-#'   \item{year}{Year of data}
-#' }
-#' @source
-#' \url{https://enviro.epa.gov/envirofacts/metadata/table/ghg/pub_dim_facility}
-'GHGRP_facility_data'
-Data from the Environmental Protection Agency's (EPA) Greenhouse Gas
+\title{Data from the Environmental Protection Agency's (EPA) Greenhouse Gas
 Reporting Program (GHGRP)}
 \format{
-\subsection{\code{GHGRP_landfills} A data frame with 16,444 rows, and 7 columns:}{
-
+\code{GHGRP_landfills} A data frame with 16,444 rows, and 7 columns:
 \describe{
 \item{facility_id}{Unique GHGRP ID for each facility}
 \item{year}{Year of data}
@@ -35,7 +15,6 @@ Reporting Program (GHGRP)}
 \item{ghg_quantity}{emissions of methane in metric tons of methane per year}
 \item{HH_modeled}{emissions of methane in metric tons of methane per year as estimated using a first order decay model (method HH-6), required for all reporting landfills}
 \item{HH_collection_efficiency}{emissions of methane in metric tons of methane per year as estimated using a back calculation with the amount of landfill gas captured and an estimated collection efficiency (method HH-8), required for all reporting landfills with a gas collection system}
-}
 }
 }
 \source{

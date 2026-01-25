@@ -5,13 +5,11 @@
 \alias{CWNS_2022}
 \title{2022 Clean Watershed Needs Survey (CWNS) data on waste water treatment plants}
 \format{
-\subsection{\code{CWNS_2022} A data frame with 13,270 rows and 3 columns:}{
-
+\code{CWNS_2022} A data frame with 13,270 rows and 3 columns:
 \describe{
 \item{LATITUDE}{Facility location coordinates}
 \item{LONGITUDE}{Facility location coordinates}
 \item{EXIST_MUNICIPAL}{Annual flow of municipal wastewater through a facility in millions of gallons per day}
-}
 }
 }
 \source{

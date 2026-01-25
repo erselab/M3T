@@ -6,8 +6,7 @@
 \title{Data from the Environmental Protection Agency's (EPA) Greenhouse Gas
 Inventory (GHGI)}
 \format{
-\subsection{\code{GHGI_stationary_combustion} A data frame with data year as}{
-
+\code{GHGI_stationary_combustion} A data frame with data year as
 rownames, 12 rows, and 15 columns:
 \describe{
 \item{State}{US_EPA for all entries}
@@ -25,7 +24,6 @@ rownames, 12 rows, and 15 columns:
 \item{com_wood}{national wood use by the commercial sector in trillions of BTU}
 \item{ind_wood}{national wood use by the industrial sector in trillions of BTU}
 \item{elec_wood}{national wood use by the electric production sector in trillions of BTU}
-}
 }
 }
 \source{

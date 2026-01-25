@@ -6,11 +6,9 @@
 \title{The total "Developed, Open" and "Developed, Low Intensity" in the Continental
 US (CONUS) land area}
 \format{
-\subsection{\code{Total_national_open_or_low_int_area} A list with 14 entries named}{
-
-by year, each with numeric values representing the total of this land cover
-for the year across CONUS.
-}
+\code{Total_national_open_or_low_int_area} A vector with 14 entries
+named by year, each with numeric values representing the total of this land
+cover for the year across CONUS + AK.
 }
 \source{
 \url{https://doi.org/10.5066/P94UXNTS}

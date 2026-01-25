@@ -6,12 +6,10 @@
 \title{Data from the Environmental Protection Agency's (EPA) Greenhouse Gas
 Inventory (GHGI)}
 \format{
-\subsection{\code{GHGI_landfill_total} A data frame with 12 rows and 2 columns:}{
-
+\code{GHGI_landfill_total} A data frame with 12 rows and 2 columns:
 \describe{
 \item{Year}{Year of data}
 \item{Emissions}{National total emissions in kilotons/year for municipal solid waste as reported in the GHGI}
-}
 }
 }
 \source{

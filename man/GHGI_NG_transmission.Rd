@@ -6,14 +6,12 @@
 \title{Data from the Environmental Protection Agency's (EPA) Greenhouse Gas
 Inventory (GHGI)}
 \format{
-\subsection{\code{GHGI_NG_transmission} A list of data frames:}{
-
+\code{GHGI_NG_transmission} A list of data frames:
 \describe{
 \item{GHGI_Pipeline_Activity}{Pipeline equipment count or length of pipeline in meters with columns representing years and rows representing type}
 \item{GHGI_Pipeline_Emissions}{Pipeline equipment emissions in mol/s with columns representing years and rows representing type}
 \item{GHGI_transmission_compressors_Activity}{Transmission compressor counts with columns representing years and rows representing material}
 \item{GHGI_transmission_compressors_Emissions}{Transmission compressor emissions in mol/s with columns representing years and rows representing type}
-}
 }
 }
 \source{

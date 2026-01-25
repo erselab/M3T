@@ -6,8 +6,7 @@
 \title{Data from the Environmental Protection Agency's (EPA) National Emissions
 Inventory (NEI)}
 \format{
-\subsection{\code{NEI_all_years} A data frame with 2,323 rows, and 5 columns:}{
-
+\code{NEI_all_years} A data frame with 2,323 rows, and 5 columns:
 \describe{
 \item{COUNTY FIPS}{Federal Information Processing Standards (FIPS) code for the county}
 \item{EMISSIONS}{Emissions of carbon monoxide (CO) in short tons per year}
@@ -15,7 +14,6 @@ Inventory (NEI)}
 \item{SECTOR}{Economic sector and fuel combination}
 \item{STATE}{State abbreviation}
 \item{STATE FIPS}{Federal Information Processing Standards (FIPS) code for the state}
-}
 }
 }
 \source{

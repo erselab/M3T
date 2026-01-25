@@ -6,8 +6,7 @@
 \title{Data from the Environmental Protection Agency's (EPA) Greenhouse Gas
 Reporting Program (GHGRP)}
 \format{
-\subsection{\code{GHGRP_LDC} A data frame with 2,222 rows, and 7 columns:}{
-
+\code{GHGRP_LDC} A data frame with 2,222 rows, and 7 columns:
 \describe{
 \item{facility_id}{Unique GHGRP ID for each utility}
 \item{reporting_year}{Year of data}
@@ -16,7 +15,6 @@ Reporting Program (GHGRP)}
 \item{N_of_above_grade_non_T_D_MR_stations}{Count of above grade (meaning above the finished ground level of structures) metering and regulating stations that measure gas flow and regulate the gas pressure in the line}
 \item{N_of_below_grade_T_D_transfer_stations}{Count of below grade (meaning below the finished ground level of structures) transfer and distribution stations that switch gas from transmission lines to distribution lines}
 \item{N_of_below_grade_non_T_D_MR_stations}{Count of below grade (meaning below the finished ground level of structures) metering and regulating stations that measure gas flow and regulate the gas pressure in the line}
-}
 }
 }
 \source{

@@ -3,36 +3,16 @@
 \docType{data}
 \name{GHGRP_wastewater}
 \alias{GHGRP_wastewater}
-\title{#' Data from the Environmental Protection Agency's (EPA) Greenhouse Gas
-#' Reporting Program (GHGRP)
-#'
-#' A subset of data from the GHGRP
-#'
-#' Data for petroleum and natural gas systems
-#'
-#' @format ## \code{GHGRP_subpartW_emissions} A data frame with 503,060 rows, and 5 columns:
-#' \describe{
-#'   \item{facility_id}{Unique GHGRP ID for each facility}
-#'   \item{facility_name}{Name of facility}
-#'   \item{industry_segment}{Segment of the industry the facility operates under (e.g., onshore natural gas processing, onshore petroleum and natrual gas production)}
-#'   \item{reporting_year}{Year of data}
-#'   \item{total_reported_ch4_emissions}{emissions of methane in metric tons of methane per year}
-#' }
-#' @source
-#' \url{https://enviro.epa.gov/envirofacts/metadata/table/ghg/ef_w_emissions_source_ghg}
-'GHGRP_subpartW_emissions'
-Data from the Environmental Protection Agency's (EPA) Greenhouse Gas
+\title{Data from the Environmental Protection Agency's (EPA) Greenhouse Gas
 Reporting Program (GHGRP)}
 \format{
-\subsection{\code{GHGRP_wastewater} A data frame with 1,821 rows, and 5 columns:}{
-
+\code{GHGRP_wastewater} A data frame with 1,821 rows, and 5 columns:
 \describe{
 \item{facility_id}{Unique GHGRP ID for each facility}
 \item{facility_name}{Name of facility}
 \item{ghg_name}{greenhouse gas name - filtered to all methane}
 \item{ghg_quantity}{emissions of methane in metric tons of methane per year}
 \item{reporting_year}{Year of data}
-}
 }
 }
 \source{

@@ -6,15 +6,13 @@
 \title{Data from the Environmental Protection Agency's (EPA) Greenhouse Gas
 Reporting Program (GHGRP)}
 \format{
-\subsection{\code{GHGRP_combustion} A data frame with 68,122 rows, and 5 columns:}{
-
+\code{GHGRP_combustion} A data frame with 68,122 rows, and 5 columns:
 \describe{
 \item{facility_id}{Unique GHGRP ID for each facility}
 \item{facility_name}{Name of facility}
 \item{ghg_name}{greenhouse gas name - filtered to all methane}
 \item{ghg_quantity}{emissions of methane in metric tons of methane per year}
 \item{year}{Year of data}
-}
 }
 }
 \source{

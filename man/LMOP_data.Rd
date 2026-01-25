@@ -6,15 +6,13 @@
 \title{Data from the Environmental Protection Agency's (EPA) Landfill Methane
 Outreach Program (LMOP)}
 \format{
-\subsection{\code{LMOP_data} A data frame with 2,323 rows, and 5 columns:}{
-
+\code{LMOP_data} A data frame with 2,323 rows, and 5 columns:
 \describe{
 \item{GHGRP ID}{Unique GHGRP ID for each facility if there is a corresponding facility}
 \item{Latitude}{Facility location coordinates}
 \item{Longitude}{Facility location coordinates}
 \item{Landfill Name}{Facility name}
 \item{Year Landfill Opened}{Year the landfill opened}
-}
 }
 }
 \source{

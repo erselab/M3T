@@ -6,15 +6,13 @@
 \title{Data from the EIA State Energy Data System (SEDS) for all continental US
 states and all relevant years available at the time}
 \format{
-\subsection{\code{EIA_SEDS} A data frame with 8,918 rows and 5 columns:}{
-
+\code{EIA_SEDS} A data frame with 8,918 rows and 5 columns:
 \describe{
 \item{period}{Year of data}
 \item{seriesId}{ID code of the fuel and sector}
 \item{seriesDescription}{description of the seriesId}
 \item{stateId}{State abbreviation for the data}
 \item{value}{Consumed fuel for the corresponding state, year, fuel, and sector in billions of BTU}
-}
 }
 }
 \source{

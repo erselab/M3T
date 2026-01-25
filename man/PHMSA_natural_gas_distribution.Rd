@@ -6,8 +6,7 @@
 \title{Pipelines and Hazardous Materials Safety Administration (PHMSA) Gas
 Distribution Annual Data}
 \format{
-\subsection{\code{PHMSA_natural_gas_distribution} A data frame with 21,321 rows and}{
-
+\code{PHMSA_natural_gas_distribution} A data frame with 21,321 rows and
 14 columns:
 \describe{
 \item{OPERATOR_NAME}{Utility name}
@@ -24,7 +23,6 @@ Distribution Annual Data}
 \item{NUM_SRVS_cp_steel}{Total number of cathodically protected steel (bare or coated) and "other" service lines in the system at the end of the year}
 \item{NUM_SRVS_plastic}{Total number of plastic service lines in the system at the end of the year}
 \item{NUM_SRVS_copper_iron}{Total number of copper, cast iron, ductile iron, and reconditioned cast iron service lines in the system at the end of the year}
-}
 }
 }
 \source{

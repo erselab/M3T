@@ -5,14 +5,12 @@
 \alias{CWNS_2012}
 \title{2012 Clean Watershed Needs Survey (CWNS) data on waste water treatment plants}
 \format{
-\subsection{\code{CWNS_2012} A data frame with 13,360 rows and 4 columns:}{
-
+\code{CWNS_2012} A data frame with 13,360 rows and 4 columns:
 \describe{
 \item{LATITUDE}{Facility location coordinates}
 \item{LONGITUDE}{Facility location coordinates}
 \item{EXIST_MUNICIPAL}{Annual flow of municipal wastewater through a facility in millions of gallons per day}
 \item{HORIZONTAL_COORDINATE_DATUM}{Information regarding the mapping used in the coordinates}
-}
 }
 }
 \source{

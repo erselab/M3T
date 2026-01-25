@@ -7,15 +7,13 @@
 Foundation-Level Data (HIFLD) that has since been discontinued.  For this
 work it has been processed to map to GHGRP facilities}
 \format{
-\subsection{\code{HIFLD_NG_data} A data frame with 2,302 rows, and 5 columns:}{
-
+\code{HIFLD_NG_data} A data frame with 2,302 rows, and 5 columns:
 \describe{
 \item{LATITUDE}{Facility location coordinates}
 \item{LONGITUDE}{Facility location coordinates}
 \item{GHGRP ID}{Unique GHGRP ID for each facility if there is a corresponding facility}
 \item{STATE}{State that the facility operates in}
 \item{NAME}{Facility name}
-}
 }
 }
 \source{

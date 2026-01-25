@@ -6,15 +6,13 @@
 \title{Data from the Environmental Protection Agency's (EPA) Greenhouse Gas
 Inventory (GHGI)}
 \format{
-\subsection{\code{GHGI_NG_distribution} A list of data frames:}{
-
+\code{GHGI_NG_distribution} A list of data frames:
 \describe{
 \item{GHGI_MnR_EF}{Meter and regulating station emission factors in mol/s with columns representing years and rows representing type}
 \item{GHGI_MnR_Activity}{Meter and regulating station counts with columns representing years and rows representing type}
 \item{GHGI_services}{Service line emission factors in mol/s with columns representing years and rows representing material}
 \item{GHGI_meters}{Meter emission factors in mol/s with columns representing years and rows representing customer type}
 \item{GHGI_maintenance}{Maintenance/mishap emission factors in mol/s with columns representing years and rows representing type}
-}
 }
 }
 \source{

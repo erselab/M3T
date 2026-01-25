@@ -3,30 +3,10 @@
 \docType{data}
 \name{EIA_NG_data}
 \alias{EIA_NG_data}
-\title{#' The wastewater flow from municipal wastewater treatment facilities across the
-#' United States
-#'
-#' Wastewater flow rates in millions of gallons per day
-#'
-#' Discharge monitoring report (DMR) data on flow and location for municipal
-#' wastewater treatment plants in the US.
-#'
-#' @format ## \code{DMR_data} A data frame with 222,661 rows and 6 columns:
-#' \describe{
-#'   \item{Facility_Name}{Facility name}
-#'   \item{State}{State the facility is in}
-#'   \item{Facility_Latitude}{Facility location coordinates}
-#'   \item{Facility_Longitude}{Facility location coordinates}
-#'   \item{Average_Daily_Flow__MGD_}{Annual flow of municipal wastewater through a facility in millions of gallons per day}
-#'   \item{year}{Year of data}
-#' }
-#' @source \url{https://echo.epa.gov/trends/loading-tool/water-pollution-search}
-'DMR_data'
-Data from EIA Form 176 - the Annual Report of Natural and supplemental Gas
+\title{Data from EIA Form 176 - the Annual Report of Natural and supplemental Gas
 Supply and Disposition}
 \format{
-\subsection{\code{EIA_NG_data} A data frame with 28,553 rows and 10 columns:}{
-
+\code{EIA_NG_data} A data frame with 28,553 rows and 10 columns:
 \describe{
 \item{EIA_Year}{Year of data}
 \item{EIA_State}{State the utility operates in}
@@ -38,7 +18,6 @@ Supply and Disposition}
 \item{EIA_Industrial_Total_Customers}{Number of industrial customers}
 \item{EIA_Electric_Total_Volume_(Mcf)}{Volume of natural gas delivered to electric production customers in thousand cubic feet}
 \item{EIA_Electric_Total_Customers}{Number of electric production customers}
-}
 }
 }
 \source{

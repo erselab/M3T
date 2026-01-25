@@ -6,11 +6,9 @@
 \title{The total "Developed, Open" and "Developed, Low Intensity" land cover by
 state in the Continental US}
 \format{
-\subsection{\code{wastewater_state_septic_area} A list with 14 entries named by}{
-
+\code{wastewater_state_septic_area} A list with 14 entries named by
 year, each with a vector representing the total of this land cover for each
 state. Rownames are state abbreviations.
-}
 }
 \source{
 \url{https://doi.org/10.5066/P94UXNTS}
