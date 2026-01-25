@@ -294,7 +294,7 @@
 #'
 #' Accessing Datasets
 #' \itemize{
-#'   \item{\bold{Source_GEPA} - character stating "M3T", "download", or a filepath pointing to the needed file. The \href{https://zenodo.org/records/8367082}{gridded Environmental Protection Agency (GEPA) anthropogenic methane inventory} .nc file. Default "M3T".}
+#'   \item{\bold{Source_GEPA} - character stating "download", or a filepath pointing to the needed file. \bold{Cannot} be set to "M3T" as there is no version saved within the package - it relies on publicly available versions of the data so there is no need. The \href{https://zenodo.org/records/8367082}{gridded Environmental Protection Agency (GEPA) anthropogenic methane inventory} .nc file. Default "download".}
 #'   }
 #' }
 
