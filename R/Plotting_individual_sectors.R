@@ -90,14 +90,14 @@ log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
   #set filename to the proper path and use input data as filename if none was
   #provided
   if(missing(filename)){
-    #save to a separate folder if the input is a summed_sector
-    if(grepl(pattern="Summed",x=substitute(input))){
-      outputname <- file.path(plot_directory,"Summed_Sectors",substitute(input))
-    }else{
-      outputname <- file.path(plot_directory,substitute(input))
-    }
+    outputname <- file.path(plot_directory,substitute(input))
   }else{
     outputname <- file.path(plot_directory,filename)
+  }
+  
+  #save to a separate folder if the input is a summed_sector
+  if(grepl(pattern="Summed",x=outputname)){
+    outputname <- file.path(plot_directory,"Summed_Sectors",basename(outputname))
   }
   
   #can't plot an all NA plot.  Would rather plot it as all 0 (not log) than not
@@ -247,15 +247,16 @@ not_log_plot <- function(input,title,zlim_min=NULL,zlim_max=NULL,
   plot_type="continuous"
   
   if(missing(filename)){
-    if(grepl(pattern="Summed",x=substitute(input))){
-      outputname <- file.path(plot_directory,"Summed_Sectors",substitute(input))
-    }else{
-      outputname <- file.path(plot_directory,substitute(input))
-    }
+    outputname <- file.path(plot_directory,substitute(input))
   }else{
     outputname <- file.path(plot_directory,filename)
   }
   
+  #save to a separate folder if the input is a summed_sector
+  if(grepl(pattern="Summed",x=outputname)){
+    outputname <- file.path(plot_directory,"Summed_Sectors",basename(outputname))
+  }
+
   if(all(is.na(terra::values(input)) | terra::values(input)==0)){
     plot_type="classes"
     terra::values(input) <- 0
