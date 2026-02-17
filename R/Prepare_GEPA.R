@@ -128,12 +128,10 @@ Prepare_GEPA <- function(inventory_year,
   
   if(Source_GEPA=="download"){
     Trycatch_downloader(URL=GEPA_URL,output_location=GEPA_file,method="save")
-  }else if(Source_GEPA=="default"){
-    #UPDATE TO ZENODO
   }else{
     invisible(file.copy(Source_GEPA,GEPA_file,overwrite = T))
   }
-
+  
   ################################################################################
   #load in the file and split into the fossil fuel and non-fossil components we need
   
@@ -142,36 +140,6 @@ Prepare_GEPA <- function(inventory_year,
   #convert units
   #molec/cm2/s to nmol/m2/s
   GEPA <- GEPA*(1e9*100^2)/(6.022141e+23)
-  
-  #aggregate/disaggregate to a similar resolution
-  domain_trans <- terra::project(domain_template,terra::crs(GEPA))
-  domain_res <- terra::res(domain_trans)
-  if(any(domain_res<terra::res(GEPA))){
-    #crop to the domain + buffer first to speed up process
-    GEPA <- terra::crop(GEPA,terra::ext(domain_trans)*1.1,snap="out")
-    GEPA <- terra::disagg(GEPA,round(terra::res(GEPA)/domain_res,3),"near")
-    
-    #reproject to exact domain now.  Here using nearest neighbor to prevent only
-    #1 row/column of higher res pixels on the border of each GEPA pixel from
-    #being interpolated.
-    GEPA <- terra::project(GEPA,domain_template,method="near")
-    GEPA <- terra::mask(GEPA,domain)
-    
-    #account for pixels partially within the domain
-    cover <- terra::extract(GEPA[[1]],domain,weights=T,exact=T,cells=T)
-    GEPA[cover[,'cell']] <- GEPA[cover[,'cell']]*cover[,'weight']
-  }else if(any(domain_res>terra::res(GEPA))){
-    GEPA <- terra::crop(GEPA,terra::project(domain,GEPA),snap="out")
-    GEPA <- terra::mask(GEPA,terra::project(domain,GEPA),touches=T,updatevalue=0)
-    cover <- terra::extract(GEPA,terra::project(domain,GEPA),weights=T,exact=T,cells=T)
-    GEPA[cover[,'cell']] <- GEPA[cover[,'cell']]*cover[,'weight']
-    GEPA=terra::extend(GEPA,fill=0,
-                       terra::ext(GEPA)+(terra::res(terra::project(domain_template,terra::crs(GEPA)))*5))
-    
-    #reproject to exact domain now using an average to effectively aggregate
-    #while reprojecting instead.
-    GEPA <- terra::project(GEPA,domain_template,method="average")
-  }
   
   GEPA_non_thermo_sectors <- c("emi_ch4_5B1_Composting",
                                "emi_ch4_3A_Enteric_Fermentation",
@@ -198,10 +166,52 @@ Prepare_GEPA <- function(inventory_year,
   GEPA_landfill <- GEPA$emi_ch4_5A1_Landfills_Industrial
   GEPA_non_thermo <- GEPA[[which(names(GEPA) %in% GEPA_non_thermo_sectors)]]
   GEPA_thermo <- GEPA[[which(names(GEPA) %in% GEPA_thermo_sectors)]]
-
+  
   #sum across layers for those that are multiple individual sectors
   GEPA_non_thermo <- sum(GEPA_non_thermo)
   GEPA_thermo <- sum(GEPA_thermo)
+  
+  ################################################################################
+  #remap to domain
+  
+  Domain_reproj <- function(input){
+    if(any(domain_res<terra::res(GEPA))){
+      #crop to the domain + buffer first to speed up process
+      input <- terra::crop(input,terra::ext(domain_trans)*1.1,snap="out")
+      input <- terra::disagg(input,round(terra::res(input)/domain_res,3),"near")
+      
+      #reproject to exact domain now.  Here using nearest neighbor to prevent only
+      #1 row/column of higher res pixels on the border of each input pixel from
+      #being interpolated.
+      input <- terra::project(input,domain_template,method="near")
+      input <- terra::mask(input,domain)
+    }else if(any(domain_res>terra::res(GEPA))){
+      input <- terra::crop(input,terra::project(domain,input),snap="out")
+      input <- terra::mask(input,terra::project(domain,input),touches=T,updatevalue=0)
+      cover <- terra::extract(input,terra::project(domain,input),weights=T,exact=T,cells=T)
+      input[cover[,'cell']] <- input[cover[,'cell']]*cover[,'weight']
+      input=terra::extend(input,fill=0,
+                          terra::ext(input)+(terra::res(terra::project(domain_template,terra::crs(input)))*5))
+      
+      #reproject to exact domain now using an average to effectively aggregate
+      #while reprojecting instead.
+      input <- terra::project(input,domain_template,method="average")
+      
+      #this approach will not NA out areas outside polygon domains - do so now.
+      #Pixels with no data across all sectors and are outside the domain.  It's
+      #possible for something to be very slightly outside the domain and non zero
+      #due to the reprojecting and this will retain any such data.
+      input[terra::mask(sum(input),domain,inverse=T)==0] <- NA
+    }
+    return(input)
+  }
+  
+  domain_trans <- terra::project(domain_template,terra::crs(GEPA))
+  domain_res <- terra::res(domain_trans)
+  
+  GEPA_landfill <- Domain_reproj(GEPA_landfill)
+  GEPA_non_thermo <- Domain_reproj(GEPA_non_thermo)
+  GEPA_thermo <- Domain_reproj(GEPA_thermo)
   
   ################################################################################
   #Save the output
@@ -257,21 +267,23 @@ Prepare_GEPA <- function(inventory_year,
                  State_CB=State_CB)
     
     Summed_GEPA_inventory_subset <- sum(GEPA_landfill,GEPA_non_thermo,GEPA_thermo,na.rm=T)
-    not_log_plot(Summed_GEPA_inventory_subset,
-                 "Gridded EPA Inventory -\nOnly sectors used",
-                 plot_directory=plot_directory,
-                 domain=domain,County_Tigerlines=County_Tigerlines,
-                 State_CB=State_CB)
+    log_plot(Summed_GEPA_inventory_subset,
+             "Gridded EPA Inventory -\nOnly sectors used\nSaturated low end",
+             plot_directory=plot_directory,
+             zlim_min=-3,
+             domain=domain,County_Tigerlines=County_Tigerlines,
+             State_CB=State_CB)
     
-    Summed_GEPA_saturated <- sum(GEPA,na.rm=T)
-    not_log_plot(Summed_GEPA_saturated,
-                 "Gridded EPA Inventory - \nAll sectors, saturated colorscale to match sectors used",
-                 plot_directory=plot_directory,
-                 zlim_min=as.numeric(terra::global(Summed_GEPA_inventory_subset,min,na.rm=T)),
-                 zlim_max=as.numeric(terra::global(Summed_GEPA_inventory_subset,max,na.rm=T)),
-                 domain=domain,County_Tigerlines=County_Tigerlines,
-                 State_CB=State_CB)
+    #remove the pixel area layer when summing
+    Summed_GEPA_saturated <- sum(GEPA[[-grep("grid_cell_area",names(GEPA))]],na.rm=T)
+    log_plot(Summed_GEPA_saturated,
+             "Gridded EPA Inventory - \nAll sectors, saturated colorscale to match sectors used",
+             plot_directory=plot_directory,
+             zlim_min=-3,
+             zlim_max=log10(as.numeric(terra::global(Summed_GEPA_inventory_subset,max,na.rm=T))),
+             domain=domain,County_Tigerlines=County_Tigerlines,
+             State_CB=State_CB)
   }
-  cat("Finished pulling remaining sectors from gridded EPA inventory: Prepare_GEPA in",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
+  cat("Finished pulling remaining sectors from gridded EPA inventory: Prepare_GEPA at",format(Sys.time(),"%H:%M"),"with a total runtime of",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
 }
 
