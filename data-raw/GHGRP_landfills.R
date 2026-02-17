@@ -52,6 +52,4 @@ GHGRP_landfills <- merge(ghgrp_landfill_only_emissions,
 colnames(GHGRP_landfills) <- gsub("equation_hh6_result","HH_modeled",colnames(GHGRP_landfills))
 colnames(GHGRP_landfills) <- gsub("equation_hh8_result","HH_collection_efficiency",colnames(GHGRP_landfills))
 
-GHGRP_landfills <- GHGRP_landfills[GHGRP_landfills$ghg_name=="methane",]
-
 usethis::use_data(GHGRP_landfills, overwrite = TRUE)

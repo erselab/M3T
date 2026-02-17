@@ -85,16 +85,16 @@ unlink(download_dest)
 #find the relevant folder and file using regex of folder names and file headers
 Waste_folder <- list.files(GHGI_file,pattern="*Waste*",full.names = T)
 Waste_files <- list.files(pattern=".csv",Waste_folder,full.names=T)
-GHGI_landfill_total <- sapply(Waste_files,readLines,n=1)
-GHGI_landfill_total <- Waste_files[grep("*CH4 Emissions from Landfills \\(kt CH4\\)*",GHGI_landfill_total)]
-GHGI_landfill_total <- utils::read.csv(GHGI_landfill_total,skip = 1)
+GHGI_landfill_total_M3T <- sapply(Waste_files,readLines,n=1)
+GHGI_landfill_total_M3T <- Waste_files[grep("*CH4 Emissions from Landfills \\(kt CH4\\)*",GHGI_landfill_total_M3T)]
+GHGI_landfill_total_M3T <- utils::read.csv(GHGI_landfill_total_M3T,skip = 1)
 #get the required data
-GHGI_landfill_total <- sapply(GHGI_landfill_total[GHGI_landfill_total$Activity=="MSW net CH4 Emissions",-1],FUN = function(x){as.numeric(gsub(",","",x))})
-GHGI_landfill_total <- as.data.frame(GHGI_landfill_total)
-GHGI_landfill_total$Year <- gsub("X","",rownames(GHGI_landfill_total))
-rownames(GHGI_landfill_total) <- NULL
-colnames(GHGI_landfill_total) <- c("Emissions","Year")
-GHGI_landfill_total <- GHGI_landfill_total[GHGI_landfill_total$Year>2010,]
+GHGI_landfill_total_M3T <- sapply(GHGI_landfill_total_M3T[GHGI_landfill_total_M3T$Activity=="MSW net CH4 Emissions",-1],FUN = function(x){as.numeric(gsub(",","",x))})
+GHGI_landfill_total_M3T <- as.data.frame(GHGI_landfill_total_M3T)
+GHGI_landfill_total_M3T$Year <- gsub("X","",rownames(GHGI_landfill_total_M3T))
+rownames(GHGI_landfill_total_M3T) <- NULL
+colnames(GHGI_landfill_total_M3T) <- c("Emissions","Year")
+GHGI_landfill_total_M3T <- GHGI_landfill_total_M3T[GHGI_landfill_total_M3T$Year>2010,]
 ################################################################################
 #grab the NG distribution data
 
@@ -272,7 +272,7 @@ unlink(GHGI_file,recursive=T)
 ################################################################################
 #save each GHGI dataset
 
-usethis::use_data(GHGI_landfill_total, overwrite = TRUE)
+usethis::use_data(GHGI_landfill_total_M3T, overwrite = TRUE)
 usethis::use_data(GHGI_NG_distribution, overwrite = TRUE)
 usethis::use_data(GHGI_NG_transmission, overwrite = TRUE)
 usethis::use_data(GHGI_stationary_combustion, overwrite = TRUE)

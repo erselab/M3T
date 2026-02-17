@@ -9,7 +9,7 @@ EIA_API_key <- "1kLep4UApTZKwdOrDkW6J8qlO0niiw8ej0JPliyc"
 
 #CONUS subset including DC
 SEDS_state_name_list <- datasets::state.abb[!datasets::state.abb %in% c("AK","AS","MP","PR","HI","GU","VI")]
-SEDS_state_name_list <- sort(c(SEDS_state_name_list,"DC"))
+SEDS_state_name_list <- c(sort(c(SEDS_state_name_list,"DC")),"US")
 
 SEDS_filename <- tempfile(fileext = ".csv")
 
