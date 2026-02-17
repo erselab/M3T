@@ -8,16 +8,16 @@ Supply and Disposition}
 \format{
 \code{EIA_NG_data} A data frame with 28,553 rows and 10 columns:
 \describe{
-\item{EIA_Year}{Year of data}
-\item{EIA_State}{State the utility operates in}
-\item{EIA_Residential_Total_Volume_(Mcf)}{Volume of natural gas delivered to residential customers in thousand cubic feet}
-\item{EIA_Residential_Total_Customers}{Number of residential customers}
-\item{EIA_Commercial_Total_Volume_(Mcf)}{Volume of natural gas delivered to commercial customers in thousand cubic feet}
-\item{EIA_Commercial_Total_Customers}{Number of commercial customers}
-\item{EIA_Industrial_Total_Volume_(Mcf)}{Volume of natural gas delivered to industrial customers in thousand cubic feet}
-\item{EIA_Industrial_Total_Customers}{Number of industrial customers}
-\item{EIA_Electric_Total_Volume_(Mcf)}{Volume of natural gas delivered to electric production customers in thousand cubic feet}
-\item{EIA_Electric_Total_Customers}{Number of electric production customers}
+\item{Year}{Year of data}
+\item{State}{State the utility operates in}
+\item{Residential_Total_Volume_(Mcf)}{Volume of natural gas delivered to residential customers in thousand cubic feet}
+\item{Residential_Total_Customers}{Number of residential customers}
+\item{Commercial_Total_Volume_(Mcf)}{Volume of natural gas delivered to commercial customers in thousand cubic feet}
+\item{Commercial_Total_Customers}{Number of commercial customers}
+\item{Industrial_Total_Volume_(Mcf)}{Volume of natural gas delivered to industrial customers in thousand cubic feet}
+\item{Industrial_Total_Customers}{Number of industrial customers}
+\item{Electric_Total_Volume_(Mcf)}{Volume of natural gas delivered to electric production customers in thousand cubic feet}
+\item{Electric_Total_Customers}{Number of electric production customers}
 }
 }
 \source{

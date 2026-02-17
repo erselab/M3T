@@ -7,6 +7,8 @@
 Combine_inventories(
   output_directory,
   separate_thermo,
+  Create_summary_combinations,
+  Create_individual_combinations,
   plot_directory,
   County_Tigerlines,
   State_CB,

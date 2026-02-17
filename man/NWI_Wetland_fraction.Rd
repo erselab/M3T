@@ -10,9 +10,7 @@ NWI_Wetland_fraction(
   output_directory,
   domain,
   domain_template,
-  state_name_list,
-  Use_SOCCR1,
-  Use_SOCCR2
+  state_name_list
 )
 }
 \arguments{
@@ -32,10 +30,6 @@ the desired resolution and coordinate reference system as created in
 
 \item{state_name_list}{Character vector listing all states within the desired
 domain as created in \code{\link{CH4_inventory_build}}.}
-
-\item{Use_SOCCR1}{Logical.  Pulled from \code{\link{M3T_config}}.}
-
-\item{Use_SOCCR2}{Logical.  Pulled from \code{\link{M3T_config}}.}
 }
 \value{
 Nothing is returned from the function, but the main outputs are TIFF
