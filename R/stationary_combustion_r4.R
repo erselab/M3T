@@ -244,36 +244,40 @@ Stationary_combustion <- function(input_directory,
   SEDS_state_name_list <- c(state_name_list,"US")
   SEDS_filename <- file.path(input_directory,"EIA","SEDS.csv")
   
-  if(Source_EIA_SEDS_data=="download"){
-    #see https://www.eia.gov/opendata/browser/seds.  Filtered to only sectors,
-    #states, and years of interest here.  All in billion BTU/yr units (last
-    #digit B instead of P - short tons)
-
-    SEDS_URL <- paste0("https://api.eia.gov/v2/seds/data/?frequency=annual&data[0]=value&facets[seriesId][]=CLCCB",
-                       "&facets[seriesId][]=CLEIB&facets[seriesId][]=CLICB&facets[seriesId][]=NGCCB&facets[seriesId][]=NGEIB&facets[seriesId][]=NGICB&facets[seriesId][]=PACCB&facets[seriesId][]=PAEIB&facets[seriesId][]=PAICB&facets[seriesId][]=PARCB&facets[seriesId][]=WDRCB&facets[seriesId][]=WWCCB&facets[seriesId][]=WWEIB&facets[seriesId][]=WWICB",
-                       paste0("&facets[stateId][]=",SEDS_state_name_list,collapse = ""),
-                       "&start=",SEDS_yr-1,"&end=",SEDS_yr+1,
-                       "&sort[0][column]=seriesId&sort[0][direction]=asc&offset=0&api_key=",EIA_API_key)
-    
-    #download directly into R and keep only the data table
-    EIA_raw_data <- Trycatch_downloader(SEDS_URL,output_location=NULL,method="JSON",
-                                        error_message=paste0("\nEIA State Energy Data System data could not be downloaded using API link: ",SEDS_URL,"\n\nmake sure you have an active EIA API key in the config!"))
-    EIA_raw_data <- EIA_raw_data$response$data
-    
-    #frustratingly, the API seems inconsistent. Sometimes 2022 - 2022 grabs
-    #only 2022.  Other times doing that gives you no data, and you have to set
-    #to 2021 - 2022 or 2022 - 2023 to get the data you want.  This is just to
-    #handle these cases.  Download desired year +/-1, then filter to just the
-    #year of interest.
-    EIA_raw_data <- EIA_raw_data[EIA_raw_data$period==SEDS_yr,]
-    
-    utils::write.csv(file = SEDS_filename,x = EIA_raw_data,row.names = F)
-  }else if(Source_EIA_SEDS_data=="default"){
+  if(Source_EIA_SEDS_data=="M3T"){
     #UPDATE TO ZENODO
+    EIA_raw_data <- M3T::EIA_SEDS
+    EIA_raw_data <- EIA_raw_data[EIA_raw_data$period==SEDS_yr,]
   }else{
-    invisible(file.copy(Source_EIA_SEDS_data,SEDS_filename,overwrite = T))
+    if(Source_EIA_SEDS_data=="download"){
+      #see https://www.eia.gov/opendata/browser/seds.  Filtered to only sectors,
+      #states, and years of interest here.  All in billion BTU/yr units (last
+      #digit B instead of P - short tons)
+      
+      SEDS_URL <- paste0("https://api.eia.gov/v2/seds/data/?frequency=annual&data[0]=value&facets[seriesId][]=CLCCB",
+                         "&facets[seriesId][]=CLEIB&facets[seriesId][]=CLICB&facets[seriesId][]=NGCCB&facets[seriesId][]=NGEIB&facets[seriesId][]=NGICB&facets[seriesId][]=PACCB&facets[seriesId][]=PAEIB&facets[seriesId][]=PAICB&facets[seriesId][]=PARCB&facets[seriesId][]=WDRCB&facets[seriesId][]=WWCCB&facets[seriesId][]=WWEIB&facets[seriesId][]=WWICB",
+                         paste0("&facets[stateId][]=",SEDS_state_name_list,collapse = ""),
+                         "&start=",SEDS_yr-1,"&end=",SEDS_yr+1,
+                         "&sort[0][column]=seriesId&sort[0][direction]=asc&offset=0&api_key=",EIA_API_key)
+      
+      #download directly into R and keep only the data table
+      EIA_raw_data <- Trycatch_downloader(SEDS_URL,output_location=NULL,method="JSON",
+                                          error_message=paste0("\nEIA State Energy Data System data could not be downloaded using API link: ",SEDS_URL,"\n\nmake sure you have an active EIA API key in the config!"))
+      EIA_raw_data <- EIA_raw_data$response$data
+      
+      #frustratingly, the API seems inconsistent. Sometimes 2022 - 2022 grabs
+      #only 2022.  Other times doing that gives you no data, and you have to set
+      #to 2021 - 2022 or 2022 - 2023 to get the data you want.  This is just to
+      #handle these cases.  Download desired year +/-1, then filter to just the
+      #year of interest.
+      EIA_raw_data <- EIA_raw_data[EIA_raw_data$period==SEDS_yr,]
+      
+      utils::write.csv(file = SEDS_filename,x = EIA_raw_data,row.names = F)
+    }else{
+      invisible(file.copy(Source_EIA_SEDS_data,SEDS_filename,overwrite = T))
+    }
+    EIA_raw_data <- utils::read.csv(SEDS_filename,header=T)
   }
-  EIA_raw_data <- utils::read.csv(SEDS_filename,header=T)
   
   ################################################################################
   #prepare SEDS data
@@ -354,69 +358,84 @@ Stationary_combustion <- function(input_directory,
                                        sum)
   names(domain_total_ch4) <- c('Sector', 'domain_ch4_emiss')
   
-  cat("Finished loading and preparing SEDS data at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
+  cat("Finished loading and preparing SEDS data at",format(Sys.time(),"%H:%M"),"\n")
   ################################################################################
   #Now load in the NEI data
   #see https://enviro.epa.gov/envirofacts/metadata/model/nei
   
   NEI_filename <- file.path(input_directory,"NEI","CO_data.csv")
   
-  if(Source_NEI_data=="download"){
-    #identify the closest NEI year to the inventory_year that has data
-    NEI_options <- seq(2011,2060,by=3)
-    NEI_year <- NEI_options[which.min(abs(NEI_options-inventory_year))]
+  if(Source_NEI_data=="M3T"){
+    #UPDATE TO ZENODO
+    NEI_data_orig <- M3T::NEI_all_years
     
-    #if unavailable, find the most recent that is
-    for(NEI_year in rev(NEI_options[NEI_options<=NEI_year])){
-      data_URL <- paste0("https://data.epa.gov/dmapservice/nei.county_sector_summary/inventory_year/equals/",
-                         NEI_year,"/1:1/json/")
-      test_url <- jsonlite::fromJSON(data_URL)
-      if(length(test_url)>0){
-        break
-      }
-    }
+    NEI_options <- unique(NEI_data_orig$`INVENTORY YEAR`)
+    NEI_year <- NEI_options[which.min(abs(NEI_options-inventory_year))]
     
     #update the user if this isn't actually the inventory_year
     if(inventory_year!=NEI_year){
       cat(paste0("NEI is every 3 years and does not have an inventory for ",inventory_year,".  Using ",NEI_year," as the nearest available data.\n"))
     }
     
-    #download NEI - filtered to CO, yr, and states
-    data_URL <- paste0("https://data.epa.gov/dmapservice/nei.county_sector_summary/pollutant_code/equals/CO/inventory_year/equals/",NEI_year,"/st_abbrv/in/",paste(state_name_list,collapse=","),"/json/")
-    NEI_data_orig <- Trycatch_downloader(data_URL,output_location=NULL,method="JSON",
-                                         error_message=paste0("\nNational Emissions Inventory could not be downloaded using API link: ",data_URL))
-    
-    #download sector codes
-    data_URL <- "https://data.epa.gov/dmapservice/nei.sectors/json"
-    NEI_sector_codes <- Trycatch_downloader(data_URL,output_location=NULL,method="JSON",
-                                            error_message=paste0("\nNational Emissions Inventory sector code data not be downloaded using API link: ",data_URL))
-    
-    #Rewrite the sector codes from numeric to text descriptions.  Method from
-    #(https://stackoverflow.com/a/50898694)
-    NEI_data_orig$sector_code[NEI_data_orig$sector_code %in% NEI_sector_codes$sector_code] <- 
-      NEI_sector_codes$ei_sector[match(NEI_data_orig$sector_code,NEI_sector_codes$sector_code,nomatch=0)]
-    
-    #change the column names to match those of the xlsx downloaded equivalent, to
-    #be consistent with older versions of the code.  Just renaming a few columns.
-    colnames(NEI_data_orig) <- toupper(gsub("_"," ",
-                                            gsub("st_abbrv","state",
-                                                 gsub("county_name","county",
-                                                      gsub("sector_code","SECTOR",
-                                                           gsub("uom","unit of measure",colnames(NEI_data_orig)))))))
-    
-    utils::write.csv(NEI_data_orig,NEI_filename,row.names = F)
-  }else if(Source_NEI_data=="default"){
-    #UPDATE TO ZENODO
+    NEI_data_orig <- NEI_data_orig[NEI_data_orig$`INVENTORY YEAR`==NEI_year,]
   }else{
-    invisible(file.copy(Source_NEI_data,NEI_filename,overwrite = T))
+    if(Source_NEI_data=="download"){
+      #identify the closest NEI year to the inventory_year that has data
+      NEI_options <- seq(2011,2060,by=3)
+      NEI_year <- NEI_options[which.min(abs(NEI_options-inventory_year))]
+      
+      #if unavailable, find the most recent that is
+      for(NEI_year in rev(NEI_options[NEI_options<=NEI_year])){
+        data_URL <- paste0("https://data.epa.gov/dmapservice/nei.county_sector_summary/inventory_year/equals/",
+                           NEI_year,"/1:1/json/")
+        test_url <- jsonlite::fromJSON(data_URL)
+        if(length(test_url)>0){
+          break
+        }
+      }
+      
+      #update the user if this isn't actually the inventory_year
+      if(inventory_year!=NEI_year){
+        cat(paste0("NEI is every 3 years and does not have an inventory for ",inventory_year,".  Using ",NEI_year," as the nearest available data.\n"))
+      }
+      
+      #download NEI - filtered to CO, yr, and states
+      data_URL <- paste0("https://data.epa.gov/dmapservice/nei.county_sector_summary/pollutant_code/equals/CO/inventory_year/equals/",NEI_year,"/st_abbrv/in/",paste(state_name_list,collapse=","),"/json/")
+      NEI_data_orig <- Trycatch_downloader(data_URL,output_location=NULL,method="JSON",
+                                           error_message=paste0("\nNational Emissions Inventory could not be downloaded using API link: ",data_URL))
+      
+      #download sector codes
+      data_URL <- "https://data.epa.gov/dmapservice/nei.sectors/json"
+      NEI_sector_codes <- Trycatch_downloader(data_URL,output_location=NULL,method="JSON",
+                                              error_message=paste0("\nNational Emissions Inventory sector code data not be downloaded using API link: ",data_URL))
+      
+      #Rewrite the sector codes from numeric to text descriptions.  Method from
+      #(https://stackoverflow.com/a/50898694)
+      NEI_data_orig$sector_code[NEI_data_orig$sector_code %in% NEI_sector_codes$sector_code] <- 
+        NEI_sector_codes$ei_sector[match(NEI_data_orig$sector_code,NEI_sector_codes$sector_code,nomatch=0)]
+      
+      #change the column names to match those of the xlsx downloaded equivalent, to
+      #be consistent with older versions of the code.  Just renaming a few columns.
+      colnames(NEI_data_orig) <- toupper(gsub("_"," ",
+                                              gsub("st_abbrv","state",
+                                                   gsub("county_name","county",
+                                                        gsub("sector_code","SECTOR",
+                                                             gsub("uom","unit of measure",colnames(NEI_data_orig)))))))
+      
+      utils::write.csv(NEI_data_orig,NEI_filename,row.names = F)
+    }else{
+      invisible(file.copy(Source_NEI_data,NEI_filename,overwrite = T))
+    }
+    
+    #load and rename column names.  loading from csv replaces spaces with periods,
+    #switch back (note this could cause errors in other cases as other special
+    #characters may also be replaced by periods)
+    NEI_data_orig <- utils::read.csv(NEI_filename,header=T)
+    colnames(NEI_data_orig) <- gsub("\\."," ",colnames(NEI_data_orig))
+    NEI_data_orig$`COUNTY FIPS` <- sprintf("%03d",NEI_data_orig$`COUNTY FIPS`)
   }
   ################################################################################
-  #load and rename column names.  loading from csv replaces spaces with periods,
-  #switch back (note this could cause errors in other cases as other special
-  #characters may also be replaced by periods)
-  NEI_data_orig <- utils::read.csv(NEI_filename,header=T)
-  colnames(NEI_data_orig) <- gsub("\\."," ",colnames(NEI_data_orig))
-  NEI_data_orig$`COUNTY FIPS` <- sprintf("%03d",NEI_data_orig$`COUNTY FIPS`)
+  #prep NEI for processing
   
   #convert all character columns to factor
   for(A in 1:ncol(NEI_data_orig)){
@@ -609,7 +628,7 @@ Stationary_combustion <- function(input_directory,
   #process emissions at the state scale
   
   if(stationary_combustion_by_state){
-    cat("This step is memory intensive!  Disaggregating state total emissions to individual counties using Vulcan/ACES at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
+    cat("This step is memory intensive!  Disaggregating state total emissions to individual counties using Vulcan/ACES at",format(Sys.time(),"%H:%M"),"\n")
     if(Use_ACES){
       #mask to only keep those counties that are at least partly within the domain
       all_merge_LCC_state <- terra::mask(all_merge_state,domain)
@@ -657,13 +676,13 @@ Stationary_combustion <- function(input_directory,
     }
     rm(all_merge_LCC_state)
     
-    cat("\rFinished disaggregating state-scale emissions using Vulcan/ACES at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start                                 \n")
+    cat("\rFinished disaggregating state-scale emissions using Vulcan/ACES at",format(Sys.time(),"%H:%M"),"                                 \n")
   }
   ################################################################################
   #now at the domain scale
   
   if(stationary_combustion_by_domain){
-    cat("Disaggregating domain total emissions to individual counties using Vulcan/ACES at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
+    cat("Disaggregating domain total emissions to individual counties using Vulcan/ACES at",format(Sys.time(),"%H:%M"),"\n")
     if(Use_ACES){
       #mask to only keep those counties that are at least partly within the domain
       all_merge_LCC_domain <- terra::mask(all_merge_domain,domain)
@@ -708,7 +727,7 @@ Stationary_combustion <- function(input_directory,
     }
     rm(all_merge_LCC_domain)
     
-    cat("\rFinished disaggregating domain-scale emissions using Vulcan/ACES at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start                                \n")
+    cat("\rFinished disaggregating domain-scale emissions using Vulcan/ACES at",format(Sys.time(),"%H:%M"),"                                \n")
   }
   ################################################################################
   #write a function to save the output in an organized fashion
@@ -1202,5 +1221,5 @@ Stationary_combustion <- function(input_directory,
       }
     }
   }
-  cat("Finished stationary combustion sector: Stationary_combustion in",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
+  cat("Finished stationary combustion sector: Stationary_combustion at",format(Sys.time(),"%H:%M"),"with a total runtime of",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
 }

@@ -165,6 +165,8 @@ Transmission <- function(input_directory,
   
   #EIA inter and intrastate transmission pipeline map from the EIA atlas
   pipes_EIA_file <- file.path(input_directory,"EIA","EIA_transmission_pipeline_map.geojson")
+  
+  #if source = "M3T", the file already exists
   if(Source_EIA_transmission_file=="download"){
     #download via API, load directly in then save.  Saving with downloader
     #directly instead caused a memory issue so only a small amount of data was
@@ -174,8 +176,6 @@ Transmission <- function(input_directory,
     data_URL <- "https://services2.arcgis.com/FiaPA4ga0iQKduv3/arcgis/rest/services/Natural_Gas_Interstate_and_Intrastate_Pipelines_1/FeatureServer/0/query?outFields=*&where=1%3D1&f=geojson"
     pipes_EIA <- Trycatch_downloader(data_URL,method="vect",error_message=paste0("Unable to download EIA pipeline data at: ",data_URL))
     terra::writeVector(pipes_EIA,pipes_EIA_file,overwrite=T)
-  }else if(Source_EIA_transmission_file=="default"){
-    #UPDATE TO ZENODO
   }else{
     invisible(file.copy(Source_EIA_transmission_file,pipes_EIA_file,overwrite = T))
   }
@@ -186,12 +186,14 @@ Transmission <- function(input_directory,
   #Deprecated HIFLD transmission compressor locations manually merged with GHGRP
   #compressors from 2010 to 2025 to avoid double counting
   HIFLD_compressor_file <- file.path(input_directory,"HIFLD_Natural_Gas_Compressor_Stations_updated.xlsx")
-  if(Source_HIFLD_compressor_file=="default"){
+  
+  if(Source_HIFLD_compressor_file=="M3T"){
     #UPDATE TO ZENODO
+    compressors_HIFLD <- M3T::HIFLD_NG_data
   }else{
     invisible(file.copy(Source_HIFLD_compressor_file,HIFLD_compressor_file,overwrite = T))
+    compressors_HIFLD <- readxl::read_excel(HIFLD_compressor_file)
   }
-  compressors_HIFLD <- readxl::read_excel(HIFLD_compressor_file)
   compressors_HIFLD <- terra::vect(compressors_HIFLD,geom=c("LONGITUDE", "LATITUDE"),crs="epsg:4326")
   # compressors_HIFLD=vect("https://services1.arcgis.com/Hp6G80Pky0om7QvQ/arcgis/rest/services/Natural_Gas_Compressor_Stations/FeatureServer/0/query?where=1%3D1&outFields=*&outSR=4326&f=json")
   
@@ -290,7 +292,7 @@ Transmission <- function(input_directory,
   
   # suppressWarnings(rm(GHGI_transmission_compressors,GHGI_Pipeline,GHGI_Activity,GHGI_Emissions,first_row,Data_list,
   #                     Engine_transmission_fraction,Turbine_transmission_fraction))
-  cat("Finished loading all input data at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
+  cat("Finished loading all input data at",format(Sys.time(),"%H:%M"),"\n")
   ################################################################################
   #process the transmission pipeline data
   
@@ -416,5 +418,5 @@ Transmission <- function(input_directory,
              domain=domain,County_Tigerlines=County_Tigerlines,
              State_CB=State_CB)
   }
-  cat("Finished natural gas transmission sector: Transmission in",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
+  cat("Finished natural gas transmission sector: Transmission at",format(Sys.time(),"%H:%M"),"with a total runtime of",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
 }
