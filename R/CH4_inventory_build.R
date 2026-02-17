@@ -83,6 +83,10 @@ CH4_inventory_build <- function(run_directory,
   ################################################################################
   #Create input/output directories
   
+  #very minor, but saw issues running vector layers with ~/.. type paths.
+  #Convert here just in case.
+  run_directory <- normalizePath(run_directory)
+  
   input_directory <- file.path(run_directory,"in")
   output_directory <- file.path(run_directory,"out")
   dir.create(input_directory,showWarnings = F,recursive = T)
@@ -97,7 +101,6 @@ CH4_inventory_build <- function(run_directory,
   dir.create(file.path(input_directory,"GHGRP"),showWarnings = F)
   dir.create(file.path(input_directory,"EIA"),showWarnings = F)
   dir.create(file.path(input_directory,"NEI"),showWarnings = F)
-  
   ################################################################################
   #save run settings to a text file for reference with the output
   
@@ -156,21 +159,31 @@ CH4_inventory_build <- function(run_directory,
   #change options for use within this function
   
   #change the datatype to higher res and turn off progress bars
-  default_terra <- terra::terraOptions(print=F)
+  M3T_terra <- terra::terraOptions(print=F)
   terra::terraOptions(datatype=M3T_config$Terra_datatype,
                       progress=M3T_config$Terra_progress)
   
   #increase the timeout, particularly important if using downloads
-  default_timeout <- options("timeout")
+  M3T_timeout <- options("timeout")
   options("timeout"=M3T_config$Base_timeout)
   
-  #Reset these options to defaults once finished
-  on.exit(options("timeout"=default_timeout), add = TRUE)
-  on.exit(terra::terraOptions(datatype=default_terra$datatype,
-                              progress=default_terra$progress), add = TRUE)
+  #Reset these options to M3Ts once finished
+  on.exit(options("timeout"=M3T_timeout), add = TRUE)
+  on.exit(terra::terraOptions(datatype=M3T_terra$datatype,
+                              progress=M3T_terra$progress), add = TRUE)
   
   ################################################################################
-  #function to download vulcan v4.0 files
+  #Download necessary data from Zenodo
+  
+  if(any(M3T_get_config()=="M3T")){
+    #UPDATE TO ZENODO
+    
+    invisible(file.copy(list.files("G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Manuscript/All inventory data/Prepared inventory data/M3T_Zenodo_data/Processed/",full.names = T),
+                        input_directory,recursive=T))
+    
+  }
+  ################################################################################
+  #function to download vulcan v4.0 files if M3T_config$Source_Vulcan="download"
   
   Download_vulcan <- function(){
     #Zenodo API
@@ -208,60 +221,54 @@ CH4_inventory_build <- function(run_directory,
     }
     
     ACES_directory <- file.path(input_directory,"ACES V2.0")
-    if(M3T_config$Source_ACES=="default"){
+    if(M3T_config$Source_ACES=="M3T"){
       #UPDATE TO ZENODO
-      aces_res <- terra::rast(file.path(ACES_directory,paste0(ACES_year,'_Annual_ACES_Residential.nc')))
-      #aces crs is not properly interpreted so force it
-      terra::crs(aces_res) <- "+proj=lcc +lat_0=40 +lon_0=-97 +lat_1=33 +lat_2=45 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
-      aces_com <- terra::rast(file.path(ACES_directory,paste0(ACES_year,'_Annual_ACES_Commercial.nc')))
-      terra::crs(aces_com) <- "+proj=lcc +lat_0=40 +lon_0=-97 +lat_1=33 +lat_2=45 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
-      aces_ind <- terra::rast(file.path(ACES_directory,paste0(ACES_year,'_Annual_ACES_Industrial.nc')))
-      terra::crs(aces_ind) <- "+proj=lcc +lat_0=40 +lon_0=-97 +lat_1=33 +lat_2=45 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
-      aces_elec <- terra::rast(file.path(ACES_directory,paste0(ACES_year,'_Annual_ACES_Elec.nc')))
-      terra::crs(aces_elec) <- "+proj=lcc +lat_0=40 +lon_0=-97 +lat_1=33 +lat_2=45 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
+      aces_res <- terra::rast(file.path(ACES_directory,paste0('ACES_annual_Residential_',ACES_year,'.nc')))
+      aces_com <- terra::rast(file.path(ACES_directory,paste0('ACES_annual_Commercial_',ACES_year,'.nc')))
+      aces_ind <- terra::rast(file.path(ACES_directory,paste0('ACES_annual_Industrial_',ACES_year,'.nc')))
+      aces_elec <- terra::rast(file.path(ACES_directory,paste0('ACES_annual_Elec_',ACES_year,'.nc')))
     }else{
       dir.create(ACES_directory,showWarnings = F)
       invisible(file.copy(list.files(M3T_config$Source_ACES,full.names = T),
                           ACES_directory,overwrite=T,recursive=T))
       
-      aces_res <- terra::rast(file.path(ACES_directory,paste0(ACES_year,'_Annual_ACES_Residential.nc')))
-      #aces crs is not properly interpreted so force it
-      terra::crs(aces_res) <- "+proj=lcc +lat_0=40 +lon_0=-97 +lat_1=33 +lat_2=45 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
-      aces_com <- terra::rast(file.path(ACES_directory,paste0(ACES_year,'_Annual_ACES_Commercial.nc')))
-      terra::crs(aces_com) <- "+proj=lcc +lat_0=40 +lon_0=-97 +lat_1=33 +lat_2=45 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
-      aces_ind <- terra::rast(file.path(ACES_directory,paste0(ACES_year,'_Annual_ACES_Industrial.nc')))
-      terra::crs(aces_ind) <- "+proj=lcc +lat_0=40 +lon_0=-97 +lat_1=33 +lat_2=45 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
-      aces_elec <- terra::rast(file.path(ACES_directory,paste0(ACES_year,'_Annual_ACES_Elec.nc')))
-      terra::crs(aces_elec) <- "+proj=lcc +lat_0=40 +lon_0=-97 +lat_1=33 +lat_2=45 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
+      aces_res <- terra::rast(file.path(ACES_directory,paste0('ACES_annual_Residential_',ACES_year,'.nc')))
+      aces_com <- terra::rast(file.path(ACES_directory,paste0('ACES_annual_Commercial_',ACES_year,'.nc')))
+      aces_ind <- terra::rast(file.path(ACES_directory,paste0('ACES_annual_Industrial_',ACES_year,'.nc')))
+      aces_elec <- terra::rast(file.path(ACES_directory,paste0('ACES_annual_Elec_',ACES_year,'.nc')))
     }
   }
   
   if(M3T_config$Use_Vulcan & (M3T_config$Process_stationary_combustion | M3T_config$Process_natural_gas_distribution)){
     #year of Vulcan v4.0 data.
-    vulcan_year <- (2010:2021)[which.min(abs(2010:2021 - inventory_year))]
-    if(inventory_year!=vulcan_year){
-      cat("Vulcan does not include",inventory_year,"using",vulcan_year,"as the nearest data available\n")
+    vulcan_year <- which.min(abs(2010:2015 - inventory_year))
+    # vulcan_year <- (2010:2021)[which.min(abs(2010:2021 - inventory_year))]
+    # if(inventory_year!=vulcan_year){
+    if(inventory_year!=(2010:2015)[vulcan_year]){
+      cat("Vulcan does not include",inventory_year,"using",(2010:2015)[vulcan_year],"as the nearest data available\n")
     }
     
     vulcan_directory <- file.path(input_directory,"Vulcan_v4.0")
     dir.create(vulcan_directory,showWarnings = F)
-    if(M3T_config$Source_Vulcan=="download"){
-      cat("Downloading sectoral Vulcan v4.0 CO2 emissions maps now.\n\n")
-      Download_vulcan()
-      
-      vu_res <- terra::rast(file.path(vulcan_directory,paste0("v4.res.co2.usa.1km.lcc.mn.",vulcan_year,".tif")))
-      vu_com <- terra::rast(file.path(vulcan_directory,paste0("v4.com.co2.usa.1km.lcc.mn.",vulcan_year,".tif")))
-      vu_ind <- terra::rast(file.path(vulcan_directory,paste0("v4.ind.co2.usa.1km.lcc.mn.",vulcan_year,".tif")))
-      vu_elec <- terra::rast(file.path(vulcan_directory,paste0("v4.elc.co2.usa.1km.lcc.mn.",vulcan_year,".tif")))
-    }else{
-      invisible(file.copy(list.files(M3T_config$Source_Vulcan,full.names = T),
-                          vulcan_directory,overwrite=T,recursive=T))
-      
-      vu_res <- terra::rast(file.path(vulcan_directory,paste0("v4.res.co2.usa.1km.lcc.mn.",vulcan_year,".tif")))
-      vu_com <- terra::rast(file.path(vulcan_directory,paste0("v4.com.co2.usa.1km.lcc.mn.",vulcan_year,".tif")))
-      vu_ind <- terra::rast(file.path(vulcan_directory,paste0("v4.ind.co2.usa.1km.lcc.mn.",vulcan_year,".tif")))
-      vu_elec <- terra::rast(file.path(vulcan_directory,paste0("v4.elc.co2.usa.1km.lcc.mn.",vulcan_year,".tif")))
+    #only download if files not already available
+    if(length(list.files(vulcan_directory)) < 4){
+      if(M3T_config$Source_Vulcan=="download"){
+        cat("Downloading sectoral Vulcan v4.0 CO2 emissions maps now.\n\n")
+        Download_vulcan()
+      }else{
+        invisible(file.copy(list.files(M3T_config$Source_Vulcan,full.names = T),
+                            vulcan_directory,overwrite=T,recursive=T))
+      }
     }
+    # vu_res <- terra::rast(file.path(vulcan_directory,paste0("v4.res.co2.usa.1km.lcc.mn.",vulcan_year,".tif")))
+    # vu_com <- terra::rast(file.path(vulcan_directory,paste0("v4.com.co2.usa.1km.lcc.mn.",vulcan_year,".tif")))
+    # vu_ind <- terra::rast(file.path(vulcan_directory,paste0("v4.ind.co2.usa.1km.lcc.mn.",vulcan_year,".tif")))
+    # vu_elec <- terra::rast(file.path(vulcan_directory,paste0("v4.elc.co2.usa.1km.lcc.mn.",vulcan_year,".tif")))
+    
+    vu_res <- terra::rast(file.path(vulcan_directory,paste0("Vulcan_v3_US_annual_1km_residential_mn.nc4")),lyr=vulcan_year)
+    vu_com <- terra::rast(file.path(vulcan_directory,paste0("Vulcan_v3_US_annual_1km_commercial_filt.nc")),lyr=vulcan_year)
+    vu_ind <- terra::rast(file.path(vulcan_directory,paste0("Vulcan_v3_US_annual_1km_industrial_mn.nc4")),lyr=vulcan_year)
+    vu_elec <- terra::rast(file.path(vulcan_directory,paste0("Vulcan_v3_US_annual_1km_elec_prod_mn.nc4")),lyr=vulcan_year)
   }
   ################################################################################
   #some early error checking, mostly looking at config.  Are the options
@@ -281,7 +288,7 @@ CH4_inventory_build <- function(run_directory,
   if(length(problem_source_entries)>0){
     error_found <- TRUE
     problem_source_entries <- paste(problem_source_entries,collapse=", ")
-    error_text <- paste0(error_text,"\n\nMust set all data sources to \"default\", \"download\", or a file path. ",problem_source_entries," are set incorrectly (either not text in \"\" or empty).")
+    error_text <- paste0(error_text,"\n\nMust set all data sources to \"M3T\", \"download\", or a file path. ",problem_source_entries," are set incorrectly (either not text in \"\" or empty).")
   }
   
   if(M3T_config$Process_landfills & !(isa(M3T_config$GHGI_landfill_total,"numeric") | M3T_config$GHGI_landfill_total=="GHGI")){
@@ -329,14 +336,24 @@ CH4_inventory_build <- function(run_directory,
     error_text <- paste0(error_text,"\n\nMust set M3T_config$Process_wastewater to FALSE or set M3T_config$Wastewater_national_septic and/or M3T_config$Wastewater_state_septic to TRUE as these are the only methods available in the package to calculate septic emissions")
   }
   
-  if(M3T_config$Process_wetlands_and_inland_waters & (!M3T_config$Use_SOCCR1 & !M3T_config$Use_SOCCR2 & !M3T_config$Use_Wetcharts)){
+  if(M3T_config$Process_wetlands_and_inland_waters & !(M3T_config$Use_SOCCR1 | M3T_config$Use_SOCCR2) & !M3T_config$Use_Wetcharts){
     error_found <- TRUE
     error_text <- paste0(error_text,"\n\nMust set M3T_config$Process_wetlands_and_inland_waters to FALSE or set M3T_config$Use_SOCCR1 and/or M3T_config$Use_SOCCR2 and/or M3T_config$Use_Wetcharts to TRUE as these are the only methods available in the package to calculate wetland/inland water emissions")
+  }
+  
+  if(M3T_config$Process_wetlands_and_inland_waters & M3T_config$Use_Wetcharts & M3T_config$Source_wetland_NLCD!="M3T" & !file.exists(M3T_config$Source_wetland_NLCD)){
+    error_found <- TRUE
+    error_text <- paste0(error_text,"\n\nMust set M3T_config$Process_wetlands_and_inland_waters or M3T_config$Use_Wetcharts to FALSE or set M3T_config$Source_wetland_NLCD to \"M3T\" to use preprocessed wetcharts or set M3T_config$Source_wetland_NLCD to the filepath for the raw wetcharts data to use")
   }
   
   if(M3T_config$Process_wastewater & sum(!unique(M3T_config$Wastewater_State_info$Method) %in% c("scaled","reported"))){
     error_found <- TRUE
     error_text <- paste0(error_text,"\n\nMust set M3T_config$Process_wastewater to FALSE or set M3T_config$Wastewater_State_info method values to either scaled or reported for all entries")
+  }
+  
+  if(M3T_config$Combine_sectors & !(M3T_config$Create_summary_combinations | M3T_config$Create_individual_combinations)){
+    error_found <- TRUE
+    error_text <- paste0(error_text,"\n\nMust set M3T_config$Combine_sectors to FALSE or set either M3T_config$Create_summary_combinations or M3T_config$Create_individual_combinations to TRUE")
   }
   
   if(error_found){
@@ -419,21 +436,44 @@ CH4_inventory_build <- function(run_directory,
       #delete the temp file
       unlink(download_location)
     }
-  }else if(M3T_config$Source_Tigerlines_data=="default"){
+    #load them in
+    County_Tigerlines <- terra::vect(Census_filenames[1])
+    State_Tigerlines <- terra::vect(Census_filenames[2])
+    Urban_Tigerlines <- terra::vect(Census_filenames[3])
+  }else if(M3T_config$Source_Tigerlines_data=="M3T"){
     #UPDATE TO ZENODO
+    
+    State_yrs <- as.numeric(terra::vector_layers(file.path(input_directory,"combined_state_tigerlines.gpkg")))
+    
+    #define the closest and alert user if not = inventory year
+    Census_match_yr <- as.character(State_yrs[which.min(abs(State_yrs - inventory_year))])
+    if(inventory_year!=Census_match_yr){
+      cat("M3T census data does not include",inventory_year,"using",Census_match_yr,"for Tigerline data as the nearest data available\n")
+    }
+    
+    #load them in
+    County_Tigerlines <- terra::vect(file.path(input_directory,"combined_county_tigerlines.gpkg"),layer=Census_match_yr)
+    State_Tigerlines <- terra::vect(file.path(input_directory,"combined_state_tigerlines.gpkg"),layer=Census_match_yr)
+    if(Census_match_yr=="2011"){
+      Urban_Tigerlines <- terra::vect(file.path(input_directory,"combined_urban_tigerlines.gpkg"),layer="2012")
+    }else{
+      Urban_Tigerlines <- terra::vect(file.path(input_directory,"combined_urban_tigerlines.gpkg"),layer=Census_match_yr)
+    }
   }else{
     invisible(file.copy(sort(M3T_config$Source_Tigerlines_data),Census_filenames,overwrite=T))
+    #load them in
+    County_Tigerlines <- terra::vect(Census_filenames[1])
+    State_Tigerlines <- terra::vect(Census_filenames[2])
+    Urban_Tigerlines <- terra::vect(Census_filenames[3])
+    
   }
   
-  #load them in
-  County_Tigerlines <- terra::vect(Census_filenames[1])
-  State_Tigerlines <- terra::vect(Census_filenames[2])
-  Urban_Tigerlines <- terra::vect(Census_filenames[3])
-  
-  #project to match the domain (crs)
-  State_Tigerlines <- terra::project(State_Tigerlines,domain_crs)
-  County_Tigerlines <- terra::project(County_Tigerlines,domain_crs)
-  Urban_Tigerlines <- terra::project(Urban_Tigerlines,domain_crs)
+  if(domain_crs!=terra::crs(State_Tigerlines)){
+    #project to match the domain (crs)
+    State_Tigerlines <- terra::project(State_Tigerlines,domain_crs)
+    County_Tigerlines <- terra::project(County_Tigerlines,domain_crs)
+    Urban_Tigerlines <- terra::project(Urban_Tigerlines,domain_crs)
+  }
   
   #remove UAC_year from the end of each urban tigerlines name
   names(Urban_Tigerlines) <- sapply(names(Urban_Tigerlines),FUN=function(x){substr(x,1,nchar(x)-2)})
@@ -455,16 +495,12 @@ CH4_inventory_build <- function(run_directory,
     if(!file.exists(cb_file)){
       if(M3T_config$Source_Cartographic_Boundaries_data=="download"){
         #first download cb file - same as tigerlines, but excluding water boundaries
-        if(!file.exists(cb_file)){
-          download_location <- tempfile(fileext = ".zip")
-          Trycatch_downloader("https://www2.census.gov/geo/tiger/GENZ2024/gpkg/cb_2024_us_all_500k.zip",download_location,"save",
-                              "Failed to download cartographic boundary files at: https://www2.census.gov/geo/tiger/GENZ2024/gpkg/cb_2024_us_all_500k.zip")
-          utils::unzip(download_location,exdir=file.path(input_directory,"Cartographic_Boundary_500k"))
-          #delete the temp file
-          unlink(download_location)
-        }
-      }else if(M3T_config$Source_Cartographic_Boundaries_data=="default"){
-        #UPDATE TO ZENODO
+        download_location <- tempfile(fileext = ".zip")
+        Trycatch_downloader("https://www2.census.gov/geo/tiger/GENZ2024/gpkg/cb_2024_us_all_500k.zip",download_location,"save",
+                            "Failed to download cartographic boundary files at: https://www2.census.gov/geo/tiger/GENZ2024/gpkg/cb_2024_us_all_500k.zip")
+        utils::unzip(download_location,exdir=file.path(input_directory,"Cartographic_Boundary_500k"))
+        #delete the temp file
+        unlink(download_location)
       }else{
         invisible(file.copy(M3T_config$Source_Cartographic_Boundaries_data,cb_file,overwrite=T))
       }
@@ -542,12 +578,17 @@ CH4_inventory_build <- function(run_directory,
   ################################################################################
   # Now crop/mask the tigerlines to the domain
   
-  #subset to just those relevant for the domain.  For state it's any state that
-  #touches the domain at all.  For county, it's only those within the states
-  #(i.e., not those touching but outside the states, crop vs mask for vectors).
-  #Urban are no longer needed
-  State_Tigerlines <- terra::mask(State_Tigerlines,mask=domain)
-  County_Tigerlines <- terra::crop(County_Tigerlines,State_Tigerlines)
+  #only bother if at least some states are outside the domain (i.e., domain !=
+  #CONUS).  Only relevant if source_tigerlines = M3T, but common enough to be
+  #worthwhile given the time required to crop county tigerlines
+  if(!all(terra::relate(State_Tigerlines,domain,"within"))){
+    #subset to just those relevant for the domain.  For state it's any state that
+    #touches the domain at all.  For county, it's only those within the states
+    #(i.e., not those touching but outside the states, crop vs mask for vectors).
+    #Urban are no longer needed
+    State_Tigerlines <- terra::mask(State_Tigerlines,mask=domain)
+    County_Tigerlines <- terra::crop(County_Tigerlines,State_Tigerlines)
+  }
   
   #sort by state abbreviation
   State_Tigerlines <- State_Tigerlines[order(State_Tigerlines$STUSPS),]
@@ -555,7 +596,7 @@ CH4_inventory_build <- function(run_directory,
   #save the states in the domain for use in some functions
   state_name_list <- State_Tigerlines$STUSPS
   
-  if(verbose==T){
+  if(verbose==T & !all(terra::relate(State_Tigerlines,domain,"within"))){
     State_CB <- terra::crop(State_CB,State_Tigerlines)
   }
   
@@ -575,8 +616,9 @@ CH4_inventory_build <- function(run_directory,
   #the Envirofacts API.
   
   if(M3T_config$Process_landfills | M3T_config$Process_natural_gas_distribution | M3T_config$Process_natural_gas_transmission | M3T_config$Process_wastewater){
-    GHGRP_facility_data_file <- file.path(input_directory,"GHGRP","facility_info.csv")
+    GHGRP_facility_data_file <- file.path(input_directory,"GHGRP","facility_data.csv")
     
+    #source = M3T means the zenodo file will be used and the file already exists
     if(!file.exists(GHGRP_facility_data_file)){
       if(M3T_config$Source_GHGRP_facility_data=="download"){
         #download data and read in an R dataframe.  Cannot filter to year as
@@ -587,8 +629,6 @@ CH4_inventory_build <- function(run_directory,
         data_URL <- "https://data.epa.gov/dmapservice/ghg.pub_dim_facility/CSV"
         Trycatch_downloader(URL = data_URL,method = "save",output_location = GHGRP_facility_data_file,
                             error_message = paste0("Greenhouse Gas Reporting Program data could not be downloaded using API link: ",data_URL))
-      }else if(M3T_config$Source_GHGRP_facility_data=="default"){
-        #UPDATE TO ZENODO
       }else{
         invisible(file.copy(M3T_config$Source_GHGRP_facility_data,GHGRP_facility_data_file,overwrite=T))
       }
@@ -606,6 +646,7 @@ CH4_inventory_build <- function(run_directory,
     #NATURAL GAS SYSTEMS
     ghgrp_oil_and_gas_file <- file.path(input_directory,"/GHGRP/Oil_and_gas_W.csv")
     
+    #source = M3T means the zenodo file will be used and the file already exists
     if(!file.exists(ghgrp_oil_and_gas_file)){
       if(M3T_config$Source_GHGRP_NG=="download"){
         #download the relevant LDC-sector data
@@ -613,8 +654,6 @@ CH4_inventory_build <- function(run_directory,
         data_URL <- "https://data.epa.gov/dmapservice/ghg.ef_w_emissions_source_ghg/csv"
         Trycatch_downloader(URL = data_URL,method = "save",output_location = ghgrp_oil_and_gas_file,
                             error_message = paste0("Greenhouse Gas Reporting Program data could not be downloaded using API link: ",data_URL))
-      }else if(M3T_config$Source_GHGRP_NG=="default"){
-        #UPDATE TO ZENODO
       }else{
         invisible(file.copy(M3T_config$Source_GHGRP_NG,ghgrp_oil_and_gas_file,overwrite = T))
       }
@@ -625,22 +664,25 @@ CH4_inventory_build <- function(run_directory,
     
     
     #COMBUSTION
-    ghgrp_combustion_file <- file.path(input_directory,"GHGRP","combustion_C.csv")
-    
-    if(!file.exists(ghgrp_combustion_file)){
-      if(M3T_config$Source_GHGRP_combustion=="download"){
-        data_URL <- "https://data.epa.gov/dmapservice/ghg.c_subpart_level_information/csv"
-        Trycatch_downloader(URL = data_URL,method = "save",output_location = ghgrp_combustion_file,
-                            error_message = paste0("Greenhouse Gas Reporting Program data could not be downloaded using API link: ",data_URL))
-      }else if(M3T_config$Source_GHGRP_combustion=="default"){
-        #UPDATE TO ZENODO
-      }else{
-        ghgrp_combustion_file <- file.path(input_directory,"GHGRP","User_supplied_combustion_file.csv")
-        invisible(file.copy(M3T_config$Source_GHGRP_combustion,file.path(input_directory,"GHGRP",ghgrp_combustion_file),overwrite = T))
+    #source = M3T means the data is already in the package
+    if(M3T_config$Source_GHGRP_combustion!="M3T"){
+      ghgrp_combustion_file <- file.path(input_directory,"GHGRP","combustion_C.csv")
+      
+      if(!file.exists(ghgrp_combustion_file)){
+        if(M3T_config$Source_GHGRP_combustion=="download"){
+          data_URL <- "https://data.epa.gov/dmapservice/ghg.c_subpart_level_information/csv"
+          Trycatch_downloader(URL = data_URL,method = "save",output_location = ghgrp_combustion_file,
+                              error_message = paste0("Greenhouse Gas Reporting Program data could not be downloaded using API link: ",data_URL))
+        }else{
+          ghgrp_combustion_file <- file.path(input_directory,"GHGRP","User_supplied_combustion_file.csv")
+          invisible(file.copy(M3T_config$Source_GHGRP_combustion,file.path(input_directory,"GHGRP",ghgrp_combustion_file),overwrite = T))
+        }
       }
+      GHGRP_combustion_emissions <- utils::read.csv(ghgrp_combustion_file)
+      GHGRP_combustion_emissions <- make_consistent(GHGRP_combustion_emissions)
+    }else{
+      GHGRP_combustion_emissions <- M3T::GHGRP_combustion_emissions
     }
-    GHGRP_combustion_emissions <- utils::read.csv(ghgrp_combustion_file)
-    GHGRP_combustion_emissions <- make_consistent(GHGRP_combustion_emissions)
     
     cat("Finished loading in GHGRP data needed across sectors\n")
   }
@@ -655,36 +697,13 @@ CH4_inventory_build <- function(run_directory,
            M3T_config$GHGI_Pipeline,M3T_config$GHGI_transmission_compressors,
            M3T_config$stationary_combustion_GHGI_data)=="GHGI")){
     
-    if(M3T_config$Source_GHGI=="download"){
-      #Iteratively test GHGI webpages down to 2022 (most recent available when code
-      #was written) to find the newest one available that ALSO has GHGRP data.
-      for(GHGI_file_yr in 2029:2022){
-        data_URL <- paste0("https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks-1990-",GHGI_file_yr)
-        test_url <- suppressWarnings(try(utils::download.file(data_URL,tempfile(".zip"),quiet = T),silent = T))
-        
-        #SEDS too - if processing stationary combustion.  See
-        #https://www.eia.gov/opendata/browser/seds. URL is described in that
-        #sector's code.
-        if(M3T_config$Process_stationary_combustion){
-          SEDS_data_URL <- paste0("https://api.eia.gov/v2/seds/data/?frequency=annual&data[0]=value&facets[seriesId][]=CLCCB",
-                                  "&facets[seriesId][]=CLEIB&facets[seriesId][]=CLICB&facets[seriesId][]=NGCCB&facets[seriesId][]=NGEIB&facets[seriesId][]=NGICB&facets[seriesId][]=PACCB&facets[seriesId][]=PAEIB&facets[seriesId][]=PAICB&facets[seriesId][]=PARCB&facets[seriesId][]=WDRCB&facets[seriesId][]=WWCCB&facets[seriesId][]=WWEIB&facets[seriesId][]=WWICB",
-                                  "&facets[stateId][]=AL",
-                                  "&start=",GHGI_file_yr-1,"&end=",GHGI_file_yr+1,
-                                  "&sort[0][column]=seriesId&sort[0][direction]=asc&offset=0&api_key=",M3T_config$EIA_API_key)
-          SEDS_test_url <- jsonlite::fromJSON(SEDS_data_URL)
-        }else{
-          SEDS_test_url <- list()
-          SEDS_test_url$response$data$period=GHGI_file_yr
-        }
-        
-        if(test_url==0 & (GHGI_file_yr %in% unique(GHGRP_subpartW_emissions$reporting_year)) & (GHGI_file_yr %in% SEDS_test_url$response$data$period)){
-          break
-        }
-      }
+    if(M3T_config$Source_GHGI=="M3T"){
+      #UPDATE TO ZENODO
       
       #use data for the inventory yr, based on the most recent GHGI file
       #(previous yrs are updated).  Exception if inventory yr > GHGI file (I.e.,
       #no data for inventory year).
+      GHGI_file_yr <- max(as.numeric(M3T::GHGI_landfill_total_M3T$Year))
       if(inventory_year>GHGI_file_yr){
         #update user
         cat("GHGI/GHGRP not available for",inventory_year,"using",GHGI_file_yr,"for GHGI data as the nearest data available\n")
@@ -693,278 +712,348 @@ CH4_inventory_build <- function(run_directory,
         GHGI_data_yr <- inventory_year
       }
       
-      #download the webpage and load in the HTML
-      download_dest <- tempfile(fileext = ".html")
-      Trycatch_downloader(URL = data_URL,method = "save",output_location = download_dest,
-                          error_message = paste0("GHGI data could not be webscraped from webpage: ",data_URL))
-      HTML_data <- readChar(download_dest,file.info(download_dest)$size)
+      #pull appropriate year from built in data
+      if(M3T_config$GHGI_landfill_total=="GHGI"){
+        M3T_config$GHGI_landfill_total <- M3T::GHGI_landfill_total_M3T$Emissions[M3T::GHGI_landfill_total_M3T$Year==GHGI_data_yr]
+      }
+      if(M3T_config$GHGI_MnR=="GHGI"){
+        M3T_config$GHGI_MnR <- data.frame("Type"=rownames(M3T::GHGI_NG_distribution$GHGI_MnR_Activity),
+                                          "EF"=M3T::GHGI_NG_distribution$GHGI_MnR_EF[,as.character(GHGI_data_yr)],
+                                          "Total_stations"=M3T::GHGI_NG_distribution$GHGI_MnR_Activity[,as.character(GHGI_data_yr)])
+      }
+      if(M3T_config$GHGI_maintenance=="GHGI"){
+        M3T_config$GHGI_maintenance <- data.frame("Type"=rownames(M3T::GHGI_NG_distribution$GHGI_maintenance),
+                                                  "EF"=M3T::GHGI_NG_distribution$GHGI_maintenance[,as.character(GHGI_data_yr)])
+      }
+      if(M3T_config$GHGI_meters=="GHGI"){
+        M3T_config$GHGI_meters <- data.frame("Type"=rownames(M3T::GHGI_NG_distribution$GHGI_meters),
+                                             "EF"=M3T::GHGI_NG_distribution$GHGI_meters[,as.character(GHGI_data_yr)])
+      }
+      if(M3T_config$GHGI_services=="GHGI"){
+        M3T_config$GHGI_services <- data.frame("Type"=rownames(M3T::GHGI_NG_distribution$GHGI_services),
+                                               "EF"=M3T::GHGI_NG_distribution$GHGI_services[,as.character(GHGI_data_yr)])
+      }
+      if(M3T_config$GHGI_Pipeline=="GHGI"){
+        M3T_config$GHGI_Pipeline <- data.frame("Type"=rownames(M3T::GHGI_NG_transmission$GHGI_Pipeline_Activity),
+                                               "Emissions"=M3T::GHGI_NG_transmission$GHGI_Pipeline_Emissions[,as.character(GHGI_data_yr)],
+                                               "Total_stations"=M3T::GHGI_NG_transmission$GHGI_Pipeline_Activity[,as.character(GHGI_data_yr)])
+      }
+      if(M3T_config$GHGI_transmission_compressors=="GHGI"){
+        M3T_config$GHGI_transmission_compressors <- data.frame("Type"=rownames(M3T::GHGI_NG_transmission$GHGI_transmission_compressors_Activity),
+                                                               "Emissions"=M3T::GHGI_NG_transmission$GHGI_transmission_compressors_Emissions[,as.character(GHGI_data_yr)],
+                                                               "Total_stations"=M3T::GHGI_NG_transmission$GHGI_transmission_compressors_Activity[,as.character(GHGI_data_yr)])
+      }
+      if(M3T_config$stationary_combustion_GHGI_data=="GHGI"){
+        M3T_config$stationary_combustion_GHGI_data <- M3T::GHGI_stationary_combustion[rownames(M3T::GHGI_stationary_combustion) == as.character(GHGI_data_yr),]
+      }
+    }else{
       
-      #Search for https:// - any 60 or fewer characters - main - any
-      #characters.zip in the HTML_data. This should identify the file if it's
-      #named similarly to any other in the 2020's. The HTML_data webpage must
-      #still be up to date though.
-      Matchtext <- regexpr("https://www.epa.gov/.{1,60}main.{0,60}.zip",HTML_data,ignore.case = T)
-      Matchtext_annex <- regexpr("https://www.epa.gov/.{1,60}annex.{0,60}.zip",HTML_data,ignore.case = T)
-      data_URL2 <- substring(HTML_data,Matchtext[1],Matchtext[1]+attr( Matchtext , "match.length")-1)
-      data_URL_annex <- substring(HTML_data,Matchtext_annex[1],Matchtext_annex[1]+attr( Matchtext_annex , "match.length")-1)
-      
-      #Use regex to save the year of the dataset as part of the download for
-      #clarity.  Download and unzip.
-      GHGI_yr <- substr(data_URL2,regexpr("20.{2}",data_URL2)[1],regexpr("20.{2}",data_URL2)[1]+3)
-      GHGI_file <- file.path(input_directory,paste0(GHGI_yr,"_GHGI_tables.zip"))
-      if(!dir.exists(gsub("\\.zip","",GHGI_file))){
-        Trycatch_downloader(URL = data_URL2,method = "save",output_location = GHGI_file,
-                            error_message = paste0("GHGI data could not be downloaded from webpage:\n",data_URL2))
-        utils::unzip(GHGI_file,exdir = file.path(input_directory,paste0(GHGI_yr,"_GHGI_tables")),overwrite=T)
-        
-        #annex too
-        Trycatch_downloader(URL = data_URL_annex,method = "save",output_location = GHGI_file,
-                            error_message = paste0("GHGI data could not be downloaded from webpage:\n",data_URL_annex))
-        utils::unzip(GHGI_file,exdir = file.path(input_directory,paste0(GHGI_yr,"_GHGI_tables")),overwrite=T)
-        
-        #delete zip files
-        unlink(GHGI_file)
-        GHGI_file <- gsub("\\.zip","",GHGI_file)
-        
-        #ID zipped subfolders
-        sub_zips <- list.files(file.path(input_directory,paste0(GHGI_yr,"_GHGI_tables")),pattern = "*.zip",full.names = T)
-        sub_folders <- gsub(".zip","",sub_zips)
-        
-        #just a duplicate of the GHGI folder - delete
-        unlink(sub_zips[grep("Main Text",sub_zips)])
-        sub_zips <- sub_zips[-grep("Main Text",sub_zips)]
-        
-        #unzip subfolders
-        for(A in 1:length(sub_zips)){
-          utils::unzip(zipfile = sub_zips[A],exdir = sub_folders[A],overwrite = T)
-          unlink(sub_zips[A])
+      #have to download the files and pull the data from each file instead
+      if(M3T_config$Source_GHGI=="download"){
+        #Iteratively test GHGI webpages down to 2022 (most recent available when code
+        #was written) to find the newest one available that ALSO has GHGRP data.
+        for(GHGI_file_yr in 2029:2022){
+          data_URL <- paste0("https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks-1990-",GHGI_file_yr)
+          test_url <- suppressWarnings(try(utils::download.file(data_URL,tempfile(".zip"),quiet = T),silent = T))
+          
+          #SEDS too - if processing stationary combustion.  See
+          #https://www.eia.gov/opendata/browser/seds. URL is described in that
+          #sector's code.
+          if(M3T_config$Process_stationary_combustion){
+            SEDS_data_URL <- paste0("https://api.eia.gov/v2/seds/data/?frequency=annual&data[0]=value&facets[seriesId][]=CLCCB",
+                                    "&facets[seriesId][]=CLEIB&facets[seriesId][]=CLICB&facets[seriesId][]=NGCCB&facets[seriesId][]=NGEIB&facets[seriesId][]=NGICB&facets[seriesId][]=PACCB&facets[seriesId][]=PAEIB&facets[seriesId][]=PAICB&facets[seriesId][]=PARCB&facets[seriesId][]=WDRCB&facets[seriesId][]=WWCCB&facets[seriesId][]=WWEIB&facets[seriesId][]=WWICB",
+                                    "&facets[stateId][]=AL",
+                                    "&start=",GHGI_file_yr-1,"&end=",GHGI_file_yr+1,
+                                    "&sort[0][column]=seriesId&sort[0][direction]=asc&offset=0&api_key=",M3T_config$EIA_API_key)
+            SEDS_test_url <- jsonlite::fromJSON(SEDS_data_URL)
+          }else{
+            SEDS_test_url <- list()
+            SEDS_test_url$response$data$period=GHGI_file_yr
+          }
+          
+          if(test_url==0 & (GHGI_file_yr %in% unique(GHGRP_subpartW_emissions$reporting_year)) & (GHGI_file_yr %in% SEDS_test_url$response$data$period)){
+            break
+          }
         }
         
+        #use data for the inventory yr, based on the most recent GHGI file
+        #(previous yrs are updated).  Exception if inventory yr > GHGI file (I.e.,
+        #no data for inventory year).
+        if(inventory_year>GHGI_file_yr){
+          #update user
+          cat("GHGI/GHGRP not available for",inventory_year,"using",GHGI_file_yr,"for GHGI data as the nearest data available\n")
+          GHGI_data_yr <- GHGI_file_yr
+        }else{
+          GHGI_data_yr <- inventory_year
+        }
         
-        
-        
-        
-        
-        #now repeat for the petroleum and NG annex tables
-        NG_annex <- paste0(gsub("inventory-us-greenhouse-gas-emissions-and-sinks",
-                                "natural-gas-and-petroleum-systems-ghg-inventory-additional-information",
-                                data_URL),"-ghg")
-        
-        Trycatch_downloader(URL = NG_annex,method = "save",output_location = download_dest,
+        #download the webpage and load in the HTML
+        download_dest <- tempfile(fileext = ".html")
+        Trycatch_downloader(URL = data_URL,method = "save",output_location = download_dest,
                             error_message = paste0("GHGI data could not be webscraped from webpage: ",data_URL))
         HTML_data <- readChar(download_dest,file.info(download_dest)$size)
         
-        Matchtext <- regexpr("https://www.epa.gov/.{1,100}ghgi_natural_gas_systems.{0,60}.xlsx",HTML_data,ignore.case = T)
+        #Search for https:// - any 60 or fewer characters - main - any
+        #characters.zip in the HTML_data. This should identify the file if it's
+        #named similarly to any other in the 2020's. The HTML_data webpage must
+        #still be up to date though.
+        Matchtext <- regexpr("https://www.epa.gov/.{1,60}main.{0,60}.zip",HTML_data,ignore.case = T)
+        Matchtext_annex <- regexpr("https://www.epa.gov/.{1,60}annex.{0,60}.zip",HTML_data,ignore.case = T)
         data_URL2 <- substring(HTML_data,Matchtext[1],Matchtext[1]+attr( Matchtext , "match.length")-1)
+        data_URL_annex <- substring(HTML_data,Matchtext_annex[1],Matchtext_annex[1]+attr( Matchtext_annex , "match.length")-1)
         
-        NG_annex_file <- file.path(GHGI_file,paste0(GHGI_yr,"_ghgi_natural_gas_systems_annex36_tables.xlsx"))
-        Trycatch_downloader(URL = data_URL2,method = "save",output_location = NG_annex_file,
-                            error_message = paste0("GHGI data could not be downloaded from webpage:\n",data_URL2))
-        unlink(download_dest)
+        #Use regex to save the year of the dataset as part of the download for
+        #clarity.  Download and unzip.
+        GHGI_yr <- substr(data_URL2,regexpr("20.{2}",data_URL2)[1],regexpr("20.{2}",data_URL2)[1]+3)
+        GHGI_file <- file.path(input_directory,paste0(GHGI_yr,"_GHGI_tables.zip"))
+        if(!dir.exists(gsub("\\.zip","",GHGI_file))){
+          Trycatch_downloader(URL = data_URL2,method = "save",output_location = GHGI_file,
+                              error_message = paste0("GHGI data could not be downloaded from webpage:\n",data_URL2))
+          utils::unzip(GHGI_file,exdir = file.path(input_directory,paste0(GHGI_yr,"_GHGI_tables")),overwrite=T)
+          
+          #annex too
+          Trycatch_downloader(URL = data_URL_annex,method = "save",output_location = GHGI_file,
+                              error_message = paste0("GHGI data could not be downloaded from webpage:\n",data_URL_annex))
+          utils::unzip(GHGI_file,exdir = file.path(input_directory,paste0(GHGI_yr,"_GHGI_tables")),overwrite=T)
+          
+          #delete zip files
+          unlink(GHGI_file)
+          GHGI_file <- gsub("\\.zip","",GHGI_file)
+          
+          #ID zipped subfolders
+          sub_zips <- list.files(file.path(input_directory,paste0(GHGI_yr,"_GHGI_tables")),pattern = "*.zip",full.names = T)
+          sub_folders <- gsub(".zip","",sub_zips)
+          
+          #just a duplicate of the GHGI folder - delete
+          unlink(sub_zips[grep("Main Text",sub_zips)])
+          sub_zips <- sub_zips[-grep("Main Text",sub_zips)]
+          
+          #unzip subfolders
+          for(A in 1:length(sub_zips)){
+            utils::unzip(zipfile = sub_zips[A],exdir = sub_folders[A],overwrite = T)
+            unlink(sub_zips[A])
+          }
+          
+          
+          
+          
+          
+          
+          #now repeat for the petroleum and NG annex tables
+          NG_annex <- paste0(gsub("inventory-us-greenhouse-gas-emissions-and-sinks",
+                                  "natural-gas-and-petroleum-systems-ghg-inventory-additional-information",
+                                  data_URL),"-ghg")
+          
+          Trycatch_downloader(URL = NG_annex,method = "save",output_location = download_dest,
+                              error_message = paste0("GHGI data could not be webscraped from webpage: ",data_URL))
+          HTML_data <- readChar(download_dest,file.info(download_dest)$size)
+          
+          Matchtext <- regexpr("https://www.epa.gov/.{1,100}ghgi_natural_gas_systems.{0,60}.xlsx",HTML_data,ignore.case = T)
+          data_URL2 <- substring(HTML_data,Matchtext[1],Matchtext[1]+attr( Matchtext , "match.length")-1)
+          
+          NG_annex_file <- file.path(GHGI_file,paste0(GHGI_yr,"_ghgi_natural_gas_systems_annex36_tables.xlsx"))
+          Trycatch_downloader(URL = data_URL2,method = "save",output_location = NG_annex_file,
+                              error_message = paste0("GHGI data could not be downloaded from webpage:\n",data_URL2))
+          unlink(download_dest)
+        }else{
+          GHGI_file <- gsub("\\.zip","",GHGI_file)
+          NG_annex_file <- file.path(GHGI_file,paste0(GHGI_yr,"_ghgi_natural_gas_systems_annex36_tables.xlsx"))
+        }
       }else{
-        GHGI_file <- gsub("\\.zip","",GHGI_file)
-        NG_annex_file <- file.path(GHGI_file,paste0(GHGI_yr,"_ghgi_natural_gas_systems_annex36_tables.xlsx"))
-      }
-    }else if(M3T_config$Source_GHGI=="default"){
-      #UPDATE TO ZENODO
-      GHGI_file <- file.path(input_directory,"2024_GHGI_tables")
-      NG_annex_file <- file.path(input_directory,"2024_GHGI_tables","2024_ghgi_natural_gas_systems_annex36_tables.xlsx")
-      GHGI_data_yr <- inventory_year
-    }else{
-      GHGI_file <- file.path(input_directory,"User_supplied_GHGI_tables")
-      dir.create(GHGI_file)
-      invisible(file.copy(M3T_config$Source_GHGI,GHGI_file,recursive = T,overwrite=T))
-      NG_annex_file <- list.files(GHGI_file,"_ghgi_natural_gas_systems_annex36_tables.xlsx",full.names = T)
-      GHGI_data_yr <- inventory_year
-    }
-    
-    
-    
-    
-    
-    
-    #grab landfill data
-    if(M3T_config$GHGI_landfill_total=="GHGI"){
-      #find the relevant folder and file using regex of folder names and file headers
-      Waste_folder <- list.files(GHGI_file,pattern="*Waste*",full.names = T)
-      Waste_files <- list.files(Waste_folder,full.names=T)
-      M3T_config$GHGI_landfill_total <- sapply(Waste_files,readLines,n=1)
-      M3T_config$GHGI_landfill_total <- Waste_files[grep("*CH4 Emissions from Landfills \\(kt CH4\\)*",M3T_config$GHGI_landfill_total)]
-      M3T_config$GHGI_landfill_total <- utils::read.csv(M3T_config$GHGI_landfill_total,skip = 1)
-      #get the required data
-      M3T_config$GHGI_landfill_total <- sapply(M3T_config$GHGI_landfill_total[M3T_config$GHGI_landfill_total$Activity=="MSW net CH4 Emissions",-1],FUN = function(x){as.numeric(gsub(",","",x))})
-      M3T_config$GHGI_landfill_total <- as.data.frame(t(M3T_config$GHGI_landfill_total))
-      M3T_config$GHGI_landfill_total <- M3T_config$GHGI_landfill_total[,paste0("X",GHGI_data_yr)]
-    }
-    
-    
-    
-    
-    
-    
-    #grab the NG distribution data
-    if(any(c(M3T_config$GHGI_MnR,M3T_config$GHGI_maintenance,M3T_config$GHGI_meters,M3T_config$GHGI_services)=="GHGI")){
-      #use grep and the index page of the annex file to identify the pages we want
-      GHGI_index <- readxl::read_excel(NG_annex_file,sheet = "Index",.name_repair = "minimal")
-      
-      GHGI_Activity_sheet <- gsub("Table ","",
-                                  GHGI_index[sapply(GHGI_index[,2],FUN=function(x){grep(pattern="Activity Data for Natural Gas Systems Sources",x)}),1])
-      GHGI_Emission_Factor_sheet <- gsub("Table ","",
-                                         GHGI_index[sapply(GHGI_index[,2],FUN=function(x){grep(pattern="Average CH4 Emission Factors \\(kg/unit activity\\) for Natural Gas Systems Sources",x)}),1])
-      
-      #Columns = year, rows = various types of sources.  First row is just to
-      #identify the first row of the tables as there is also header information that
-      #we want to exclude
-      first_row <- which(readxl::read_xlsx(NG_annex_file,sheet = GHGI_Activity_sheet,.name_repair = "minimal")[,1]=="Segment/Source")
-      GHGI_Activity <- readxl::read_xlsx(NG_annex_file,sheet = GHGI_Activity_sheet,skip=first_row,col_names = T)
-      
-      first_row <- which(readxl::read_xlsx(NG_annex_file,sheet = GHGI_Emission_Factor_sheet,.name_repair = "minimal")[,1]=="Segment/Source")
-      GHGI_Emission_Factors <- readxl::read_xlsx(NG_annex_file,sheet = GHGI_Emission_Factor_sheet,skip=first_row,col_names = T)
-      
-      if(M3T_config$GHGI_MnR=="GHGI"){
-        #all the sources we're looking for, written exactly as in the GHGI file
-        Data_list <- c("M&R >300","M&R 100-300","M&R <100","Reg >300","R-Vault >300",
-                       "Reg 100-300","R-Vault 100-300","Reg 40-100","R-Vault 40-100",
-                       "Reg <40")
-        
-        #use sapply to find the row using data list, specify the column as the year and
-        #grab the relevant EF and activity data into a dataframe.
-        
-        #Metering and regulating stations in mol/s/station
-        M3T_config$GHGI_MnR <- data.frame("Type"=Data_list,
-                                          "EF"=as.numeric(unlist(sapply(Data_list,FUN=function(x){GHGI_Emission_Factors[GHGI_Emission_Factors[,1]==x,as.character(GHGI_data_yr)]})))*
-                                            1000/(16.043*60*60*24*365),#convert from kg/yr to mol/s
-                                          "Total_stations"=as.numeric(unlist(sapply(Data_list,FUN=function(x){GHGI_Activity[GHGI_Activity[,1]==x,as.character(GHGI_data_yr)]}))),
-                                          row.names = NULL)
-        
+        GHGI_file <- file.path(input_directory,"User_supplied_GHGI_tables")
+        dir.create(GHGI_file)
+        invisible(file.copy(M3T_config$Source_GHGI,GHGI_file,recursive = T,overwrite=T))
+        NG_annex_file <- list.files(GHGI_file,"_ghgi_natural_gas_systems_annex36_tables.xlsx",full.names = T)
+        GHGI_data_yr <- inventory_year
       }
       
-      #repeat for several other source types
-      if(M3T_config$GHGI_services=="GHGI"){
-        Data_list <- c("Services - Unprotected steel",
-                       "Services Protected steel",
-                       "Services - Plastic",
-                       "Services - Copper")
+      
+      
+      
+      
+      
+      #grab landfill data
+      if(M3T_config$GHGI_landfill_total=="GHGI"){
+        #find the relevant folder and file using regex of folder names and file headers
+        Waste_folder <- list.files(GHGI_file,pattern="*Waste*",full.names = T)
+        Waste_files <- list.files(Waste_folder,full.names=T)
+        M3T_config$GHGI_landfill_total <- sapply(Waste_files,readLines,n=1)
+        M3T_config$GHGI_landfill_total <- Waste_files[grep("*CH4 Emissions from Landfills \\(kt CH4\\)*",M3T_config$GHGI_landfill_total)]
+        M3T_config$GHGI_landfill_total <- utils::read.csv(M3T_config$GHGI_landfill_total,skip = 1)
+        #get the required data
+        M3T_config$GHGI_landfill_total <- sapply(M3T_config$GHGI_landfill_total[M3T_config$GHGI_landfill_total$Activity=="MSW net CH4 Emissions",-1],FUN = function(x){as.numeric(gsub(",","",x))})
+        M3T_config$GHGI_landfill_total <- as.data.frame(t(M3T_config$GHGI_landfill_total))
+        M3T_config$GHGI_landfill_total <- M3T_config$GHGI_landfill_total[,paste0("X",GHGI_data_yr)]
+      }
+      
+      
+      
+      
+      
+      
+      #grab the NG distribution data
+      if(any(c(M3T_config$GHGI_MnR,M3T_config$GHGI_maintenance,M3T_config$GHGI_meters,M3T_config$GHGI_services)=="GHGI")){
+        #use grep and the index page of the annex file to identify the pages we want
+        GHGI_index <- readxl::read_excel(NG_annex_file,sheet = "Index",.name_repair = "minimal")
         
-        #Service emissions in mol/s/event
-        M3T_config$GHGI_services <- data.frame("Type"=Data_list,
-                                               "EF"=as.numeric(unlist(sapply(Data_list,FUN=function(x){GHGI_Emission_Factors[GHGI_Emission_Factors[,1]==x,as.character(GHGI_data_yr)]})))*
+        GHGI_Activity_sheet <- gsub("Table ","",
+                                    GHGI_index[sapply(GHGI_index[,2],FUN=function(x){grep(pattern="Activity Data for Natural Gas Systems Sources",x)}),1])
+        GHGI_Emission_Factor_sheet <- gsub("Table ","",
+                                           GHGI_index[sapply(GHGI_index[,2],FUN=function(x){grep(pattern="Average CH4 Emission Factors \\(kg/unit activity\\) for Natural Gas Systems Sources",x)}),1])
+        
+        #Columns = year, rows = various types of sources.  First row is just to
+        #identify the first row of the tables as there is also header information that
+        #we want to exclude
+        first_row <- which(readxl::read_xlsx(NG_annex_file,sheet = GHGI_Activity_sheet,.name_repair = "minimal")[,1]=="Segment/Source")
+        GHGI_Activity <- readxl::read_xlsx(NG_annex_file,sheet = GHGI_Activity_sheet,skip=first_row,col_names = T)
+        
+        first_row <- which(readxl::read_xlsx(NG_annex_file,sheet = GHGI_Emission_Factor_sheet,.name_repair = "minimal")[,1]=="Segment/Source")
+        GHGI_Emission_Factors <- readxl::read_xlsx(NG_annex_file,sheet = GHGI_Emission_Factor_sheet,skip=first_row,col_names = T)
+        
+        if(M3T_config$GHGI_MnR=="GHGI"){
+          #all the sources we're looking for, written exactly as in the GHGI file
+          Data_list <- c("M&R >300","M&R 100-300","M&R <100","Reg >300","R-Vault >300",
+                         "Reg 100-300","R-Vault 100-300","Reg 40-100","R-Vault 40-100",
+                         "Reg <40")
+          
+          #use sapply to find the row using data list, specify the column as the year and
+          #grab the relevant EF and activity data into a dataframe.
+          
+          #Metering and regulating stations in mol/s/station
+          M3T_config$GHGI_MnR <- data.frame("Type"=Data_list,
+                                            "EF"=as.numeric(unlist(sapply(Data_list,FUN=function(x){GHGI_Emission_Factors[GHGI_Emission_Factors[,1]==x,as.character(GHGI_data_yr)]})))*
+                                              1000/(16.043*60*60*24*365),#convert from kg/yr to mol/s
+                                            "Total_stations"=as.numeric(unlist(sapply(Data_list,FUN=function(x){GHGI_Activity[GHGI_Activity[,1]==x,as.character(GHGI_data_yr)]}))),
+                                            row.names = NULL)
+        }
+        
+        #repeat for several other source types
+        if(M3T_config$GHGI_services=="GHGI"){
+          Data_list <- c("Services - Unprotected steel",
+                         "Services Protected steel",
+                         "Services - Plastic",
+                         "Services - Copper")
+          
+          #Service emissions in mol/s/event
+          M3T_config$GHGI_services <- data.frame("Type"=Data_list,
+                                                 "EF"=as.numeric(unlist(sapply(Data_list,FUN=function(x){GHGI_Emission_Factors[GHGI_Emission_Factors[,1]==x,as.character(GHGI_data_yr)]})))*
+                                                   1000/(16.043*60*60*24*365),#convert from kg/yr to mol/s
+                                                 row.names = NULL)
+        }
+        
+        if(M3T_config$GHGI_meters=="GHGI"){
+          Data_list <- c("Residential",
+                         "Commercial",
+                         "Industrial")
+          
+          #meter emissions in mol/s/meter
+          M3T_config$GHGI_meters <- data.frame("Type"=Data_list,
+                                               "EF"=as.numeric(unlist(sapply(Data_list,FUN=function(x){GHGI_Emission_Factors[which(GHGI_Emission_Factors[,1]==x)[1],as.character(GHGI_data_yr)]})))*
                                                  1000/(16.043*60*60*24*365),#convert from kg/yr to mol/s
                                                row.names = NULL)
+        }
+        
+        if(all(M3T_config$GHGI_maintenance=="GHGI")){
+          Data_list <- c("Pressure Relief Valve Releases",
+                         "Pipeline Blowdown",
+                         "Mishaps (Dig-ins)")
+          
+          M3T_config$GHGI_maintenance <- data.frame("Type"=Data_list,
+                                                    "EF"=as.numeric(unlist(sapply(Data_list,FUN=function(x){GHGI_Emission_Factors[GHGI_Emission_Factors[,1]==x,as.character(GHGI_data_yr)]})))*
+                                                      1000/(16.043*60*60*24*365),#convert from kg/yr to mol/s
+                                                    row.names = NULL)
+          
+          #Event emissions in mol/s/mile of pipeline
+        }
       }
       
-      if(M3T_config$GHGI_meters=="GHGI"){
-        Data_list <- c("Residential",
-                       "Commercial",
-                       "Industrial")
+      
+      
+      
+      
+      
+      #grab the NG transmission data
+      if(any(c(M3T_config$GHGI_Pipeline,M3T_config$GHGI_transmission_compressors)=="GHGI")){
+        #identical to NG distribution one, but emissions and activity instead of
+        #emission factors and activity
+        GHGI_index <- readxl::read_excel(NG_annex_file,sheet = "Index",.name_repair = "minimal")
+        GHGI_Activity_sheet <- gsub("Table ","",
+                                    GHGI_index[sapply(GHGI_index[,2],FUN=function(x){grep(pattern="Activity Data for Natural Gas Systems Sources",x)}),1])
+        GHGI_Emission_sheet <- gsub("Table ","",
+                                    GHGI_index[sapply(GHGI_index[,2],FUN=function(x){grep(pattern="CH4 Emissions \\(kt\\) for Natural Gas Systems",x)}),1])
+        first_row <- which(readxl::read_xlsx(NG_annex_file,sheet = GHGI_Activity_sheet,.name_repair = "minimal")[,1]=="Segment/Source")
+        GHGI_Activity <- readxl::read_xlsx(NG_annex_file,sheet = GHGI_Activity_sheet,skip=first_row,col_names = T)
+        first_row <- which(readxl::read_xlsx(NG_annex_file,sheet = GHGI_Emission_sheet,.name_repair = "minimal")[,1]=="Segment/Source")
+        GHGI_Emissions <- readxl::read_xlsx(NG_annex_file,sheet = GHGI_Emission_sheet,skip=first_row,col_names = T)
         
-        #meter emissions in mol/s/meter
-        M3T_config$GHGI_meters <- data.frame("Type"=Data_list,
-                                             "EF"=as.numeric(unlist(sapply(Data_list,FUN=function(x){GHGI_Emission_Factors[which(GHGI_Emission_Factors[,1]==x)[1],as.character(GHGI_data_yr)]})))*
-                                               1000/(16.043*60*60*24*365),#convert from kg/yr to mol/s
-                                             row.names = NULL)
+        if(M3T_config$GHGI_Pipeline=="GHGI"){
+          #all the sources we're looking for, written exactly as in the GHGI file
+          Data_list <- c("Pipeline Leaks","M&R (Trans. Co. Interconnect)","M&R (Farm Taps + Direct Sales)",
+                         "Pipeline venting")
+          
+          #use sapply to find the row using data list, specify the column as the year
+          #and grab the relevant emissions and activity data into a dataframe.
+          M3T_config$GHGI_Pipeline <- data.frame("Type"=Data_list,
+                                                 "Emissions"=as.numeric(unlist(
+                                                   sapply(Data_list,FUN=function(x){GHGI_Emissions[which(GHGI_Emissions[,1]==x)[1],as.character(GHGI_data_yr)]})))*
+                                                   1E9/(16.043*60*60*24*365),#convert from kt/yr to mol/s
+                                                 "Total_stations"=as.numeric(unlist(
+                                                   sapply(Data_list,FUN=function(x){GHGI_Activity[which(GHGI_Activity[,1]==x)[1],as.character(GHGI_data_yr)]})))*
+                                                   1609.344,#convert from miles to meters
+                                                 row.names = NULL)
+        }
+        
+        if(M3T_config$GHGI_transmission_compressors=="GHGI"){
+          #transmission station total + emissions during operations (vents, flaring,
+          #leaks, exhaust, etc.)
+          Data_list <- c("Station Total Emissions","Dehydrator vents (Transmission)",
+                         "Flaring (Transmission)","Engines (Transmission)",
+                         "Turbines (Transmission)","Engines (Storage)",
+                         "Turbines (Storage)","Generators (Engines)",
+                         "Generators (Turbines)","Pneumatic Devices Transmission",
+                         "Station Venting Transmission")
+          
+          #use sapply to find the row using data list, specify the column as the year
+          #and grab the relevant emissions and activity data into a dataframe.
+          M3T_config$GHGI_transmission_compressors <- data.frame("Type"=Data_list,
+                                                                 "Emissions"=as.numeric(unlist(sapply(Data_list,FUN=function(x){GHGI_Emissions[which(GHGI_Emissions[,1]==x)[1],as.character(GHGI_data_yr)]})))*
+                                                                   1E9/(16.043*60*60*24*365),#convert from kt/yr to mol/s
+                                                                 "Total_stations"=as.numeric(unlist(sapply(Data_list,FUN=function(x){GHGI_Activity[which(GHGI_Activity[,1]==x)[1],as.character(GHGI_data_yr)]}))),
+                                                                 row.names = NULL)
+        }
       }
       
-      if(all(M3T_config$GHGI_maintenance=="GHGI")){
-        Data_list <- c("Pressure Relief Valve Releases",
-                       "Pipeline Blowdown",
-                       "Mishaps (Dig-ins)")
-        
-        M3T_config$GHGI_maintenance <- data.frame("Type"=Data_list,
-                                                  "EF"=as.numeric(unlist(sapply(Data_list,FUN=function(x){GHGI_Emission_Factors[GHGI_Emission_Factors[,1]==x,as.character(GHGI_data_yr)]})))*
-                                                    1000/(16.043*60*60*24*365),#convert from kg/yr to mol/s
-                                                  row.names = NULL)
-        
-        #Event emissions in mol/s/mile of pipeline
-      }
-    }
-    
-    
-    
-    
-    
-    
-    #grab the NG transmission data
-    if(any(c(M3T_config$GHGI_Pipeline,M3T_config$GHGI_transmission_compressors)=="GHGI")){
-      #identical to NG distribution one, but emissions and activity instead of
-      #emission factors and activity
-      GHGI_index <- readxl::read_excel(NG_annex_file,sheet = "Index",.name_repair = "minimal")
-      GHGI_Activity_sheet <- gsub("Table ","",
-                                  GHGI_index[sapply(GHGI_index[,2],FUN=function(x){grep(pattern="Activity Data for Natural Gas Systems Sources",x)}),1])
-      GHGI_Emission_sheet <- gsub("Table ","",
-                                  GHGI_index[sapply(GHGI_index[,2],FUN=function(x){grep(pattern="CH4 Emissions \\(kt\\) for Natural Gas Systems",x)}),1])
-      first_row <- which(readxl::read_xlsx(NG_annex_file,sheet = GHGI_Activity_sheet,.name_repair = "minimal")[,1]=="Segment/Source")
-      GHGI_Activity <- readxl::read_xlsx(NG_annex_file,sheet = GHGI_Activity_sheet,skip=first_row,col_names = T)
-      first_row <- which(readxl::read_xlsx(NG_annex_file,sheet = GHGI_Emission_sheet,.name_repair = "minimal")[,1]=="Segment/Source")
-      GHGI_Emissions <- readxl::read_xlsx(NG_annex_file,sheet = GHGI_Emission_sheet,skip=first_row,col_names = T)
       
-      if(M3T_config$GHGI_Pipeline=="GHGI"){
-        #all the sources we're looking for, written exactly as in the GHGI file
-        Data_list <- c("Pipeline Leaks","M&R (Trans. Co. Interconnect)","M&R (Farm Taps + Direct Sales)",
-                       "Pipeline venting")
-        
-        #use sapply to find the row using data list, specify the column as the year
-        #and grab the relevant emissions and activity data into a dataframe.
-        M3T_config$GHGI_Pipeline <- data.frame("Type"=Data_list,
-                                               "Emissions"=as.numeric(unlist(
-                                                 sapply(Data_list,FUN=function(x){GHGI_Emissions[which(GHGI_Emissions[,1]==x)[1],as.character(GHGI_data_yr)]})))*
-                                                 1E9/(16.043*60*60*24*365),#convert from kt/yr to mol/s
-                                               "Total_stations"=as.numeric(unlist(
-                                                 sapply(Data_list,FUN=function(x){GHGI_Activity[which(GHGI_Activity[,1]==x)[1],as.character(GHGI_data_yr)]})))*
-                                                 1609.344,#convert from miles to meters
-                                               row.names = NULL)
-      }
       
-      if(M3T_config$GHGI_transmission_compressors=="GHGI"){
-        #transmission station total + emissions during operations (vents, flaring,
-        #leaks, exhaust, etc.)
-        Data_list <- c("Station Total Emissions","Dehydrator vents (Transmission)",
-                       "Flaring (Transmission)","Engines (Transmission)",
-                       "Turbines (Transmission)","Engines (Storage)",
-                       "Turbines (Storage)","Generators (Engines)",
-                       "Generators (Turbines)","Pneumatic Devices Transmission",
-                       "Station Venting Transmission")
-        
-        #use sapply to find the row using data list, specify the column as the year
-        #and grab the relevant emissions and activity data into a dataframe.
-        M3T_config$GHGI_transmission_compressors <- data.frame("Type"=Data_list,
-                                                               "Emissions"=as.numeric(unlist(sapply(Data_list,FUN=function(x){GHGI_Emissions[which(GHGI_Emissions[,1]==x)[1],as.character(GHGI_data_yr)]})))*
-                                                                 1E9/(16.043*60*60*24*365),#convert from kt/yr to mol/s
-                                                               "Total_stations"=as.numeric(unlist(sapply(Data_list,FUN=function(x){GHGI_Activity[which(GHGI_Activity[,1]==x)[1],as.character(GHGI_data_yr)]}))),
-                                                               row.names = NULL)
-      }
-    }
-    
-    
-    
-    
-    
-    
-    #grab the stationary combustion data
-    if(M3T_config$stationary_combustion_GHGI_data=="GHGI"){
-      #find the relevant folder and file using regex of folder names and file headers
-      stationary_combustion_folder <- file.path(GHGI_file,"2024 Annex 3 Tables")
-      stationary_combustion_files <- list.files(stationary_combustion_folder,full.names=T)
-      M3T_config$stationary_combustion_GHGI_data <- sapply(stationary_combustion_files,readLines,n=1)
-      M3T_config$stationary_combustion_GHGI_data <- stationary_combustion_files[suppressWarnings(grep("*Fuel Consumption by Stationary Combustion.*\\(TBtu\\)*",M3T_config$stationary_combustion_GHGI_data))]
-      M3T_config$stationary_combustion_GHGI_data <- utils::read.csv(M3T_config$stationary_combustion_GHGI_data,skip = 1)
       
-      #reformat to match SEDS format
-      rownames(M3T_config$stationary_combustion_GHGI_data) <- paste0(rep(M3T_config$stationary_combustion_GHGI_data[seq(1,26,6),1],each=6) , " ",
-                                                                     M3T_config$stationary_combustion_GHGI_data[,1])[1:nrow(M3T_config$stationary_combustion_GHGI_data)]
-      M3T_config$stationary_combustion_GHGI_data <- t(M3T_config$stationary_combustion_GHGI_data)
-      M3T_config$stationary_combustion_GHGI_data <- as.data.frame(matrix(M3T_config$stationary_combustion_GHGI_data[paste0("X",GHGI_data_yr),c("Coal Commercial","Coal Industrial","Coal Electric Power",
-                                                                                                                                               "Petroleum Residential","Petroleum Commercial","Petroleum Industrial","Petroleum Electric Power",
-                                                                                                                                               "Natural Gas Commercial","Natural Gas Industrial","Natural Gas Electric Power",
-                                                                                                                                               "Wood Residential","Wood Commercial","Wood Industrial","Wood Electric Power")],nrow=1))
-      M3T_config$stationary_combustion_GHGI_data <- cbind("US_EPA",M3T_config$stationary_combustion_GHGI_data)
-      colnames(M3T_config$stationary_combustion_GHGI_data) <- c("State",
-                                                                "com_coal","ind_coal","elec_coal",
-                                                                "res_petr","com_petr","ind_petr","elec_petr",
-                                                                "com_gas","ind_gas","elec_gas",
-                                                                "res_wood","com_wood","ind_wood","elec_wood")
-      #make numeric rather than text
-      M3T_config$stationary_combustion_GHGI_data[,-1] <- apply(M3T_config$stationary_combustion_GHGI_data[,-1], 2, FUN=function(x){as.numeric(gsub(",","",x))})
+      
+      
+      #grab the stationary combustion data
+      if(M3T_config$stationary_combustion_GHGI_data=="GHGI"){
+        #find the relevant folder and file using regex of folder names and file headers
+        stationary_combustion_folder <- file.path(GHGI_file,"2024 Annex 3 Tables")
+        stationary_combustion_files <- list.files(stationary_combustion_folder,full.names=T)
+        M3T_config$stationary_combustion_GHGI_data <- sapply(stationary_combustion_files,readLines,n=1)
+        M3T_config$stationary_combustion_GHGI_data <- stationary_combustion_files[suppressWarnings(grep("*Fuel Consumption by Stationary Combustion.*\\(TBtu\\)*",M3T_config$stationary_combustion_GHGI_data))]
+        M3T_config$stationary_combustion_GHGI_data <- utils::read.csv(M3T_config$stationary_combustion_GHGI_data,skip = 1)
+        
+        #reformat to match SEDS format
+        rownames(M3T_config$stationary_combustion_GHGI_data) <- paste0(rep(M3T_config$stationary_combustion_GHGI_data[seq(1,26,6),1],each=6) , " ",
+                                                                       M3T_config$stationary_combustion_GHGI_data[,1])[1:nrow(M3T_config$stationary_combustion_GHGI_data)]
+        M3T_config$stationary_combustion_GHGI_data <- t(M3T_config$stationary_combustion_GHGI_data)
+        M3T_config$stationary_combustion_GHGI_data <- as.data.frame(matrix(M3T_config$stationary_combustion_GHGI_data[paste0("X",GHGI_data_yr),c("Coal Commercial","Coal Industrial","Coal Electric Power",
+                                                                                                                                                 "Petroleum Residential","Petroleum Commercial","Petroleum Industrial","Petroleum Electric Power",
+                                                                                                                                                 "Natural Gas Commercial","Natural Gas Industrial","Natural Gas Electric Power",
+                                                                                                                                                 "Wood Residential","Wood Commercial","Wood Industrial","Wood Electric Power")],nrow=1))
+        M3T_config$stationary_combustion_GHGI_data <- cbind("US_EPA",M3T_config$stationary_combustion_GHGI_data)
+        colnames(M3T_config$stationary_combustion_GHGI_data) <- c("State",
+                                                                  "com_coal","ind_coal","elec_coal",
+                                                                  "res_petr","com_petr","ind_petr","elec_petr",
+                                                                  "com_gas","ind_gas","elec_gas",
+                                                                  "res_wood","com_wood","ind_wood","elec_wood")
+        #make numeric rather than text
+        M3T_config$stationary_combustion_GHGI_data[,-1] <- apply(M3T_config$stationary_combustion_GHGI_data[,-1], 2, FUN=function(x){as.numeric(gsub(",","",x))})
+      }
     }
   }
   ################################################################################
@@ -973,7 +1062,64 @@ CH4_inventory_build <- function(run_directory,
     cat("WARNING - AK & SC did not report to the 2012 clean watershed needs survey. We recommend using the DMR dataset instead - especially if SC is within the domain.\nIf downscaling GHGI data and using the CWNS data, AK & SC wastewater emissions will be apportioned to other states.\n")
     Sys.sleep(3)
   }
+  ################################################################################
+  #do some basic processing to prep NLCD data for the domain if needed
   
+  if(M3T_config$Use_Wetcharts & M3T_config$Source_wetcharts=="M3T"){
+    Wetland_output_directory <- file.path(output_directory,"Wetlands")
+    dir.create(Wetland_output_directory,showWarnings = F)
+    
+    wetcharts <- terra::rast(file.path(input_directory,'combined_NLCD_downscaled_wetcharts.tif'))
+    
+    wetcharts_years <- sapply(strsplit(names(wetcharts),split = "_"),"[[",1)
+    wetcharts_nearest_year <- unique(wetcharts_years)[which.min(abs(as.numeric(unique(wetcharts_years)) - inventory_year))]
+    wetcharts <- wetcharts[[wetcharts_years %in% wetcharts_nearest_year]]
+    if(inventory_year!=wetcharts_nearest_year){
+      cat("Prepared wetcharts does not include",inventory_year,"using",wetcharts_nearest_year,"as the nearest data available\n")
+    }
+    
+    if(any(terra::ext(domain)/terra::ext(State_Tigerlines) > 1.1)){
+      domain_trans <- terra::as.polygons(terra::ext(domain)/terra::ext(State_Tigerlines) * terra::ext(terra::project(State_Tigerlines,wetcharts)))
+      
+      domain_trans <- terra::rast(domain_trans,crs=terra::crs(wetcharts),res=terra::res(terra::project(domain_template,terra::crs(wetcharts))))
+    }else{
+      domain_trans <- terra::project(domain_template,terra::crs(wetcharts))
+    }
+    
+    #crop to the domain + buffer first to speed up process
+    wetcharts <- terra::crop(wetcharts,terra::ext(domain_trans)*1.1,snap="out")
+    wetcharts <- terra::disagg(wetcharts,
+                               round(terra::res(wetcharts)/terra::res(domain_trans),3),
+                               "near")
+    
+    #reproject to exact domain now.  Here using nearest neighbor to prevent
+    #only 1 row/column of higher res pixels on the border of each coarser
+    #pixel from being interpolated.
+    wetcharts <- terra::project(wetcharts,domain_template,method="near")
+    wetcharts <- terra::mask(wetcharts,domain)
+    
+    if(!any(terra::ext(domain)/terra::ext(State_Tigerlines) > 1.1)){
+      #account for pixels partially within the domain
+      cover <- terra::extract(wetcharts[[1]],domain,weights=T,cells=T)
+      wetcharts[cover[,'cell']] <- wetcharts[cover[,'cell']]*cover[,'weight']
+    }
+    
+    wetcharts_models <- sapply(strsplit(names(wetcharts),split = "_"),"[[",3)
+
+    for(A in 1:length(M3T_config$Wetcharts_model_subset)){
+      wetcharts_subset <- terra::mean(wetcharts[[wetcharts_models %in% M3T_config$Wetcharts_model_subset[[A]]]],na.rm=T)
+      
+      writeCDF_no_newline(wetcharts_subset,
+                          file.path(Wetland_output_directory,paste0('Wetcharts_NLCD_Downscaled_subset_',A,'.nc')),
+                          force_v4=TRUE,
+                          varname='methane_emissions',
+                          unit='nmol/m2/s',
+                          longname=paste0('Methane emissions from Wetlands from the Wetcharts models, subset to models ',paste(M3T_config$Wetcharts_model_subset[[A]],collapse = ", ")),
+                          missval=-9999,
+                          overwrite=TRUE)
+    }
+  }
+
   cat("Finished loading config and error checking it. Running individual sectors now\n\n")
   ################################################################################
   #Actually run the functions now, based on the config file
@@ -999,6 +1145,7 @@ CH4_inventory_build <- function(run_directory,
                           County_Tigerlines=County_Tigerlines,
                           State_CB=State_CB)
   }
+  invisible(gc())
   if(M3T_config$Process_natural_gas_distribution){
     NG_distribution(domain=domain,
                     domain_template=domain_template,
@@ -1034,6 +1181,7 @@ CH4_inventory_build <- function(run_directory,
                     County_Tigerlines=County_Tigerlines,
                     State_CB=State_CB)
   }
+  invisible(gc())
   if(M3T_config$Process_natural_gas_transmission){
     Transmission(input_directory=input_directory,
                  GHGI_transmission_compressors=M3T_config$GHGI_transmission_compressors,
@@ -1054,6 +1202,7 @@ CH4_inventory_build <- function(run_directory,
                  County_Tigerlines=County_Tigerlines,
                  State_CB=State_CB)
   }
+  invisible(gc())
   if(M3T_config$Process_stationary_combustion){
     Stationary_combustion(input_directory=input_directory,
                           domain=domain,
@@ -1084,21 +1233,20 @@ CH4_inventory_build <- function(run_directory,
                           plot_directory=plot_directory,
                           State_CB=State_CB)
   }
+  invisible(gc())
   if(M3T_config$Process_wastewater){
     #this if is outside the function as the entire function is to process
-    #wetcharts and the processed version is pulled in default
-    # if(Source_wastewater_NLCD=="default"){
-    #   #UPDATE TO ZENODO
-    #   Wetcharts_file <- file.path(input_directory,"WetCHARTs_v1_3_3_2022.nc")
-    # }else{
-    NLCD_open_and_low_int(input_directory=input_directory,
-                          Source_wastewater_NLCD=M3T_config$Source_wastewater_NLCD,
-                          domain=domain,
-                          domain_template=domain_template,
-                          state_name_list=state_name_list,
-                          State_Tigerlines=State_Tigerlines,
-                          output_directory=output_directory)
-    # }
+    #wetcharts and the processed version is pulled in M3T
+    if(M3T_config$Source_wastewater_NLCD!="M3T"){
+      #UPDATE TO ZENODO
+      NLCD_open_and_low_int(input_directory=input_directory,
+                            Source_wastewater_NLCD=M3T_config$Source_wastewater_NLCD,
+                            domain=domain,
+                            domain_template=domain_template,
+                            state_name_list=state_name_list,
+                            State_Tigerlines=State_Tigerlines,
+                            output_directory=output_directory)
+    }
     Wastewater(input_directory=input_directory,
                output_directory=output_directory,
                Wastewater_use_CWNS=M3T_config$Wastewater_use_CWNS,
@@ -1113,6 +1261,7 @@ CH4_inventory_build <- function(run_directory,
                Source_GHGRP_wastewater=M3T_config$Source_GHGRP_wastewater,
                Source_CWNS=M3T_config$Source_CWNS,
                Source_DMR=M3T_config$Source_DMR,
+               Source_wastewater_NLCD=M3T_config$Source_wastewater_NLCD,
                Source_State_population_data=M3T_config$Source_State_population_data,
                inventory_year=inventory_year,
                National_wastewater_info=M3T_config$National_wastewater_info,
@@ -1128,14 +1277,13 @@ CH4_inventory_build <- function(run_directory,
                State_CB=State_CB,
                plot_directory=plot_directory)
   }
+  invisible(gc())
   if(M3T_config$Process_wetlands_and_inland_waters){
-    if(M3T_config$Use_Wetcharts){
-      #this if is outside the function as the entire function is to process
-      #wetcharts and the processed version is pulled in default
-      # if(Source_wetcharts=="default"){
-      #   #UPDATE TO ZENODO
-      #   Wetcharts_file <- file.path(input_directory,"WetCHARTs_v1_3_3_2022.nc")
-      # }else{
+    if(M3T_config$Use_Wetcharts & M3T_config$Source_wetland_NLCD!="M3T"){
+      #this source if is outside the function as the entire function is to process
+      #wetcharts and the processed version is pulled in M3T
+
+      #UPDATE TO ZENODO
       Disaggregate_Wetcharts(input_directory=input_directory,
                              output_directory=output_directory,
                              domain=domain,
@@ -1149,15 +1297,14 @@ CH4_inventory_build <- function(run_directory,
                              Source_wetland_NLCD=M3T_config$Source_wetland_NLCD,
                              Source_wetcharts=M3T_config$Source_wetcharts,
                              Wetcharts_model_subset=M3T_config$Wetcharts_model_subset)
-      # }
     }
-    NWI_Wetland_fraction(input_directory=input_directory,
-                         output_directory=output_directory,
-                         domain=domain,
-                         domain_template=domain_template,
-                         state_name_list=state_name_list,
-                         Use_SOCCR1=M3T_config$Use_SOCCR1,
-                         Use_SOCCR2=M3T_config$Use_SOCCR2)
+    if(M3T_config$Source_NWI!="M3T"){
+      NWI_Wetland_fraction(input_directory=input_directory,
+                           output_directory=output_directory,
+                           domain=domain,
+                           domain_template=domain_template,
+                           state_name_list=state_name_list)
+    }
     SOCCR_Wetlands(input_directory=input_directory,
                    output_directory=output_directory,
                    plot_directory=plot_directory,
@@ -1168,12 +1315,14 @@ CH4_inventory_build <- function(run_directory,
                    Use_SOCCR2=M3T_config$Use_SOCCR2,
                    Wetland_EFs=M3T_config$Wetland_EFs,
                    verbose=verbose,
+                   State_Tigerlines=State_Tigerlines,
                    County_Tigerlines=County_Tigerlines,
                    State_CB=State_CB,
                    Source_Watershed_file=M3T_config$Source_Watershed_file,
                    Use_Wetcharts=M3T_config$Use_Wetcharts,
                    Wetcharts_model_subset=M3T_config$Wetcharts_model_subset)
   }
+  invisible(gc())
   if(M3T_config$Process_remaining_sectors_from_gridded_EPA){
     Prepare_GEPA(inventory_year=inventory_year,
                  input_directory=input_directory,
@@ -1186,9 +1335,12 @@ CH4_inventory_build <- function(run_directory,
                  domain_template=domain_template,
                  verbose=verbose)
   }
+  invisible(gc())
   if(M3T_config$Combine_sectors){
     Combine_inventories(output_directory=output_directory,
                         separate_thermo=M3T_config$Separate_thermo,
+                        Create_summary_combinations=M3T_config$Create_summary_combinations,
+                        Create_individual_combinations=M3T_config$Create_individual_combinations,
                         plot_directory=plot_directory,
                         County_Tigerlines=County_Tigerlines,
                         domain_template=domain_template,
