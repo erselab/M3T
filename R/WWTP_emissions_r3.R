@@ -268,6 +268,7 @@ Wastewater <- function(input_directory,
                        Source_GHGRP_wastewater,
                        Source_CWNS,
                        Source_DMR,
+                       Source_wastewater_NLCD,
                        Source_State_population_data,
                        inventory_year,
                        National_wastewater_info,
@@ -293,10 +294,14 @@ Wastewater <- function(input_directory,
   ################################################################################
   #load Clean Watershed Needs Survey
   
-  if(Source_CWNS=="default"){
+  if(Source_CWNS=="M3T"){
     #UPDATE TO ZENODO
     CWNS_yr <- which.min(abs(inventory_year - c(2012,2022)))
-    CWNS <- get(c("CWNS_2012","CWNS_2022")[CWNS_yr])
+    if(CWNS_yr==1){
+      CWNS <- M3T::CWNS_2012
+    }else{
+      CWNS <- M3T::CWNS_2022
+    }
     CWNS_yr <- c(2012,2022)[CWNS_yr]
   }else{
     if(dir.exists(Source_CWNS)){
@@ -335,9 +340,10 @@ Wastewater <- function(input_directory,
   DMR_yr <- which.min(abs(inventory_year - (2010:2024)))
   DMR_file <- file.path(input_directory,paste0("DMR_",2010:2024,".csv")[DMR_yr])
   DMR_yr <- (2010:2024)[DMR_yr]
-  if(Source_DMR=="default"){
+  if(Source_DMR=="M3T"){
     #UPDATE TO ZENODO
-    DMR <- DMR_data[DMR_data$year==DMR_yr,]
+    DMR <- utils::read.csv(file.path(input_directory,"DMR_data.csv"))
+    DMR <- DMR[DMR$year==DMR_yr,]
   }else{
     DMR_file <- file.path(input_directory,"User_provided_DMR.csv")
     invisible(file.copy(Source_DMR,DMR_file,overwrite = T))
@@ -349,7 +355,7 @@ Wastewater <- function(input_directory,
     
     #remove those without location data and vect as lat/long assuming WGS
     #(didn't see one explicitly mentioned, little impact on location)
-    DMR_data <- subset(DMR,!is.na(DMR$Facility_Latitude) & !is.na(DMR$Facility_Longitude))
+    DMR <- subset(DMR,!is.na(DMR$Facility_Latitude) & !is.na(DMR$Facility_Longitude))
   }
   
   #vect as lat/long assuming WGS
@@ -400,7 +406,7 @@ Wastewater <- function(input_directory,
   GHGI_national_wastewater_nonseptic <- GHGI_wastewater_data$Nonseptic.Emissions[GHGI_wastewater_data$year==GHGI_data_yr]
   central_EPA_emiss <- GHGI_national_wastewater_nonseptic*1e9/(16.043*365*24*60*60)   #kt/y to mol/s
   
-  cat("Finished loading in municipal treatment plant data at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
+  cat("Finished loading in municipal treatment plant data at",format(Sys.time(),"%H:%M"),"\n")
   
   ################################################################################
   #these are assigned by the below function, but R doesn't see them being
@@ -432,25 +438,6 @@ Wastewater <- function(input_directory,
     #partially weight pixels by fractional coverage, cropped as points so only
     #those within the domain have been rasterized.
     rast_flux <- terra::mask(rast_flux,domain)
-    
-    #save csvs with the facility info
-    if(verbose){
-      if(nrow(input_crop_filt)>0){
-        input_crop_filt_df <- as.data.frame(input_crop_filt)
-        
-        #DMR and CWNS have different capitalizations, but same name - id column
-        name_index <- grep("facility_name",colnames(input_crop_filt_df),ignore.case = T)
-        
-        #a small csv with only the relevant columns and another with all columns
-        utils::write.csv(input_crop_filt, paste0(Wastewater_output_directory,'/',outputname,"_all.csv"),row.names = F)
-        output <- data.frame(input_crop_filt_df[name_index],
-                             terra::geom(input_crop_filt)[,"x"],
-                             terra::geom(input_crop_filt)[,"y"],
-                             input_crop_filt_df$emiss)
-        colnames(output) <- c('Site_Name','Longitude','Latitude','Emission_mol_per_s')
-        utils::write.csv(output,paste0(Wastewater_output_directory,'/',outputname,'.csv'),row.names=FALSE)
-      }
-    }
     
     #save the raster to the active R environment
     assign(x = outputname,rast_flux,envir = parent.env(environment()))
@@ -488,63 +475,69 @@ Wastewater <- function(input_directory,
     }
   }
   
-  cat("Finished calculating municipal treatment plant emissions at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
+  cat("Finished calculating municipal treatment plant emissions at",format(Sys.time(),"%H:%M"),"\n")
   ################################################################################
   #Now septic systems.  First download state population data
+  
+  septic_EPA_emiss <- GHGI_wastewater_data$Septic.Emissions[GHGI_wastewater_data$year==GHGI_data_yr]*1e9/(16.043*365*24*60*60)   #kt/y to mol/s
   
   #load the census population data and estimates then filter to the domain
   #states and inventory year
   
-  #first define the state population dataset filenames - new each decade as
-  #new census' are done
-  if(inventory_year < 2020){
-    State_pop_file <- file.path(input_directory,"2010-2020_state_pop.csv")
-  }else if(inventory_year >= 2020){
-    State_pop_file <- file.path(input_directory,"2020-2024_state_pop.csv")
-  }
-  
-  
-  if(Source_State_population_data=="download"){
-    #Download the state population dataset needed
-    if(!file.exists(State_pop_file)){
-      if(inventory_year < 2020){
-        data_URL <- "https://www2.census.gov/programs-surveys/popest/datasets/2010-2020/state/totals/nst-est2020-alldata.csv"
-        Trycatch_downloader(URL = data_URL,method = "save",output_location = State_pop_file,
-                            error_message = paste0("State population data could not be downloaded using FTP link: ",data_URL))
-      }else if(inventory_year <= 2024){
-        data_URL <- "https://www2.census.gov/programs-surveys/popest/datasets/2020-2024/state/totals/NST-EST2024-ALLDATA.csv"
-        Trycatch_downloader(URL = data_URL,method = "save",output_location = State_pop_file,
-                            error_message = paste0("State population data could not be downloaded using FTP link: ",data_URL))
-      }else{
-        #for every year after the most recent census they output a new file with
-        #the most recent estimates.  Iteratively test from the user input year
-        #going back to 2024 (year code was written) to find the newest one
-        #available.
-        #just check if the URL is valid
-        for(A in inventory_year:2024){
-          data_URL <- paste0("https://www2.census.gov/programs-surveys/popest/datasets/2020-",A,"/state/totals/NST-EST",A,"-ALLDATA.csv")
-          test_url=suppressWarnings(try(utils::download.file(data_URL,tempfile(".csv"),quiet = T),silent = T))
-          if(test_url==0){
-            break
-          }
-        }
-        
-        State_pop_file <- file.path(input_directory,paste0("2020-",A,"_state_pop.csv"))
-        
-        #download the data from the URL
-        Trycatch_downloader(URL = data_URL,method = "save",output_location = State_pop_file,
-                            error_message = paste0("State population data could not be downloaded using FTP link: ",data_URL))
-      }
-    }
-  }else if(Source_State_population_data=="default"){
+  if(Source_State_population_data=="M3T"){
     #UPDATE TO ZENODO
+    Census_state_population <- M3T::Census_state_population_M3T
   }else{
-    State_pop_file <- file.path(input_directory,"User_provided_state_pop.csv")
-    invisible(file.copy(Source_State_population_data,State_pop_file,overwrite=T))
+    #first define the state population dataset filenames - new each decade as
+    #new census' are done
+    if(inventory_year < 2020){
+      State_pop_file <- file.path(input_directory,"2010-2020_state_pop.csv")
+    }else if(inventory_year >= 2020){
+      State_pop_file <- file.path(input_directory,"2020-2024_state_pop.csv")
+    }
+    
+    if(Source_State_population_data=="download"){
+      #Download the state population dataset needed
+      if(!file.exists(State_pop_file)){
+        if(inventory_year < 2020){
+          data_URL <- "https://www2.census.gov/programs-surveys/popest/datasets/2010-2020/state/totals/nst-est2020-alldata.csv"
+          Trycatch_downloader(URL = data_URL,method = "save",output_location = State_pop_file,
+                              error_message = paste0("State population data could not be downloaded using FTP link: ",data_URL))
+        }else if(inventory_year <= 2024){
+          data_URL <- "https://www2.census.gov/programs-surveys/popest/datasets/2020-2024/state/totals/NST-EST2024-ALLDATA.csv"
+          Trycatch_downloader(URL = data_URL,method = "save",output_location = State_pop_file,
+                              error_message = paste0("State population data could not be downloaded using FTP link: ",data_URL))
+        }else{
+          #for every year after the most recent census they output a new file with
+          #the most recent estimates.  Iteratively test from the user input year
+          #going back to 2024 (year code was written) to find the newest one
+          #available.
+          #just check if the URL is valid
+          for(A in inventory_year:2024){
+            data_URL <- paste0("https://www2.census.gov/programs-surveys/popest/datasets/2020-",A,"/state/totals/NST-EST",A,"-ALLDATA.csv")
+            test_url=suppressWarnings(try(utils::download.file(data_URL,tempfile(".csv"),quiet = T),silent = T))
+            if(test_url==0){
+              break
+            }
+          }
+          
+          State_pop_file <- file.path(input_directory,paste0("2020-",A,"_state_pop.csv"))
+          
+          #download the data from the URL
+          Trycatch_downloader(URL = data_URL,method = "save",output_location = State_pop_file,
+                              error_message = paste0("State population data could not be downloaded using FTP link: ",data_URL))
+        }
+      }
+    }else{
+      State_pop_file <- file.path(input_directory,"User_provided_state_pop.csv")
+      invisible(file.copy(Source_State_population_data,State_pop_file,overwrite=T))
+    }
+    
+    Census_state_population <- utils::read.csv(State_pop_file)
   }
+  
   ################################################################################
   #Update the state population data from config using this data
-  Census_state_population <- utils::read.csv(State_pop_file)
   
   State_population <- Census_state_population[match(sort(State_Tigerlines$NAME),Census_state_population$NAME),
                                               paste0("POPESTIMATE",GHGI_data_yr)]
@@ -584,7 +577,7 @@ Wastewater <- function(input_directory,
     }
   }
   
-  if(nrow(Wastewater_reported_State_info)!=0){
+  if(nrow(Wastewater_reported_State_info)!=0 & any(Wastewater_reported_State_info$Year!=inventory_year)){
     cat("Reported septic data for",
         paste0(Wastewater_reported_State_info$State[Wastewater_reported_State_info$Year!=inventory_year],collapse = ", "),"are from the nearest available years,",
         paste0(Wastewater_reported_State_info$Year[Wastewater_reported_State_info$Year!=inventory_year],collapse = ", "),"respectively\n")
@@ -593,119 +586,143 @@ Wastewater <- function(input_directory,
     cat("No reported septic data for the inventory year or +/- 1 year for",Wastewater_State_info$State[update_indx],"- switching these states to scaled method like most states\n")
   }
   ################################################################################
-  #Now load in output from NLCD_fractions_by_state
+  #Now load in output from NLCD_fractions_by_state - processing differs since
+  #M3T is national, download is state by state
   
-  #output from NLCD_fractions_by_state - rasters have been reprojected
-  Suburbia_rasterfile <- list.files(pattern="NLCD_suburban.tif",path=Wastewater_partial_output_directory,full.names = T)
-  nlcd_state_total_areas <- utils::read.table(file.path(Wastewater_partial_output_directory,"NLCD_state_total_areas.csv"),header=T,sep=",")
+  if(Total_national_open_or_low_int_area == "M3T"){
+    Total_national_open_or_low_int_area <- utils::read.csv(file.path(input_directory,"Total_national_septic_area.csv"))
+    Total_national_open_or_low_int_area <- Total_national_open_or_low_int_area[which.min(abs(inventory_year - Total_national_open_or_low_int_area$year)),]
+    NLCD_yr <- Total_national_open_or_low_int_area$year
+    Total_national_open_or_low_int_area <- Total_national_open_or_low_int_area$Total_national_open_or_low_int_area
+    if(NLCD_yr!=inventory_year & Source_wastewater_NLCD != "M3T"){
+      cat("National Land Cover Data used for septic does not include",inventory_year,"using",NLCD_yr,"as the nearest data available\n")
+    }
+  }
   
-  #just in case this is a rerun with more output here than the states being run
-  #now
-  Suburbia_rasterfile <- Suburbia_rasterfile[sapply(state_name_list,
-                                                    FUN=function(x){which(grepl(x,Suburbia_rasterfile))})]
+  if(Source_wastewater_NLCD=="M3T"){
+    nlcd_state_total_areas <- utils::read.csv(file.path(input_directory,"wastewater_state_septic_area.csv"))
+    colnames(nlcd_state_total_areas) <- gsub("X","",colnames(nlcd_state_total_areas))
+    NLCD_yr <- names(nlcd_state_total_areas)[-1][which.min(abs(inventory_year - as.numeric(colnames(nlcd_state_total_areas)[-1])))]
+    if(NLCD_yr!=inventory_year){
+      cat("National Land Cover Data used for septic does not include",inventory_year,"using",NLCD_yr,"as the nearest data available\n")
+    }
+    nlcd_state_total_areas <- nlcd_state_total_areas[,c("state",NLCD_yr)]
+    colnames(nlcd_state_total_areas) <- c("X","open_or_low_int_area")
+    nlcd_state_total_areas <- nlcd_state_total_areas[nlcd_state_total_areas$X %in% state_name_list,]
+    
+    Suburbia <- terra::rast(file.path(input_directory,"combined_wastewater_NLCD.tif"))
+    Suburbia <- Suburbia[[names(Suburbia)==NLCD_yr]]
+  }else{
+    #output from NLCD_fractions_by_state - rasters have been reprojected
+    Suburbia <- terra::rast(file.path(Wastewater_partial_output_directory,"NLCD_suburban.tif"))
+    nlcd_state_total_areas <- utils::read.table(file.path(Wastewater_partial_output_directory,"NLCD_state_total_areas.csv"),header=T,sep=",")
+  }
   
   #quickly ensure that the state data is all in the same order, alphabetical
-  Suburbia_rasterfile <- sort(Suburbia_rasterfile)
   Wastewater_State_info <- Wastewater_State_info[order(Wastewater_State_info$State),]
   nlcd_state_total_areas <- nlcd_state_total_areas[order(nlcd_state_total_areas$X),]
+  state_name_list <- sort(state_name_list)
+  
   ################################################################################
   #Calculate septic emissions using emission factors and the land cover data
   #from NLCD_fractions_by_state.R
   
-  septic_EPA_emiss <- GHGI_wastewater_data$Septic.Emissions[GHGI_wastewater_data$year==GHGI_data_yr]*1e9/(16.043*365*24*60*60)   #kt/y to mol/s
   tot_nlcd_area <- Total_national_open_or_low_int_area  # all states in km2
+  NLCD_Tigerlines <- terra::project(State_Tigerlines,Suburbia)
   
-  # blank output to combine the states
-  septic_flux <- terra::rast(Suburbia_rasterfile[1])
-  septic_flux2 <- terra::rast(Suburbia_rasterfile[1])
-  terra::values(septic_flux2) <- 0
-  terra::values(septic_flux) <- 0
-  
-  septic_flux_bystate <- vector()
-  septic_flux2_bystate <- vector()
-  
-  for(A in 1:length(Suburbia_rasterfile)){
-    #from NLCD_fraction_by_state.  The fractional coverage of NLCD open or low
-    #intensity urban land cover per pixel.
-    Suburbia <- terra::rast(Suburbia_rasterfile[A])
+  #if CONUS or custom with a very large domain - reprojecting domain can be
+  #problematic
+  if(any(terra::ext(domain)/terra::ext(State_Tigerlines) > 1.1)){
+    NLCD_domain <- terra::as.polygons(terra::ext(domain)/terra::ext(State_Tigerlines) * terra::ext(NLCD_Tigerlines))
+  }else{
+    NLCD_domain <- terra::project(domain,NLCD_Tigerlines)
     
-    if(Wastewater_national_septic){
-      #Calculate state-by-state totals by equally distributing GHGI totals
-      #to developed, open and developed low intensity land cover nationally.
-      state_flux <- septic_EPA_emiss*Suburbia/tot_nlcd_area  # in mol/s/km2
-      
-      #save within-domain state total emissions for csv later
-      septic_flux_bystate <- c(septic_flux_bystate,
-                               as.numeric(terra::global(state_flux*terra::cellSize(state_flux,unit="km"),sum,na.rm=T)))
-      
-      # Combine across states
-      septic_flux <- sum(septic_flux,state_flux,na.rm=T)
-    }
-    
-    
-    if(Wastewater_state_septic){
-      # Calculate state-by-state totals using state-specific septic fraction data
-      Tot_area <- nlcd_state_total_areas[A,2] # total area of both classes in km2 from nlcd_state_total_areas.csv
-      pop <- Wastewater_State_info[A,"Population"]
-      
-      #Fraction that's septic as reported or calculating by scaling the 1990
-      #state value by the change in national septic fraction since 1990
-      if(Wastewater_State_info[A,"Method"]=="scaled"){
-        septic_frac <- Wastewater_State_info[A,"Septic_Fraction"]*National_wastewater_info[2,2]/National_wastewater_info[1,2]
-      }else if(Wastewater_State_info[A,"Method"]=="reported"){
-        septic_frac <- Wastewater_State_info[A,"Septic_Fraction"]
-      }
-      
-      state_tot_emiss <- pop*septic_frac*GHGI_wastewater_data$EF[GHGI_wastewater_data$year==GHGI_data_yr]/(16.043*24*60*60)  #in mol/s (EF is in g/capita/day)
-      state_flux <- state_tot_emiss*Suburbia/Tot_area #gridded and distributed equally across the state in mol/s/km2
-      
-      #save within-domain state total emissions for csv later
-      septic_flux2_bystate <- c(septic_flux2_bystate,
-                                as.numeric(terra::global(state_flux*terra::cellSize(state_flux,unit="km"),sum,na.rm=T)))
-      
-      # Combine across states
-      septic_flux2 <- sum(septic_flux2,state_flux,na.rm=T)
-    }
-    cat("Finished processing septic for",Wastewater_State_info[A,1],"at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
+    #prep to project to domain
+    cover <- terra::extract(Suburbia,NLCD_domain,weights=T,cells=T)
   }
+  terra::crs(NLCD_domain) <- terra::crs(NLCD_Tigerlines)
+  
   
   if(Wastewater_national_septic){
+    #Calculate state-by-state totals by equally distributing GHGI totals
+    #to developed, open and developed low intensity land cover nationally.
+    septic_flux <- Suburbia*septic_EPA_emiss/tot_nlcd_area # in mol/s/km2
+    
     # Now finalize units
     septic_flux <- septic_flux*1e9*1E-6  # Convert from mol/km2/s to nmol/m2/s
     septic_flux[is.na(septic_flux)]<-0
     
-    #mask and account for pixels partially within the domain
-    septic_flux <- terra::mask(septic_flux,domain)
-    cover <- terra::extract(septic_flux,domain,weights=T,cells=T)
-    septic_flux[cover[,'cell']] <- septic_flux[cover[,'cell']]*cover[,'weight']
+    #prep to project to domain
+    septic_flux=terra::crop(septic_flux,NLCD_domain,snap="out")
+    septic_flux=terra::mask(septic_flux,NLCD_domain,touches=T,updatevalue=0)
+
+    #add a few pixels worth of buffer (at the domain resolution) filled with 0's
+    #so the average doesn't consider these NA values to ignore in calculations
+    #(drastically impacts avg).  Then finally reproject via average.
+    if(!any(terra::ext(domain)/terra::ext(State_Tigerlines) > 1.1)){
+      septic_flux[cover[,'cell']] <- septic_flux[cover[,'cell']]*cover[,'weight']
+      septic_flux=terra::extend(septic_flux,fill=0,
+                                terra::ext(septic_flux)+(terra::res(NLCD_domain)*5))
+    }
+    septic_flux=terra::project(septic_flux,domain_template,method="average")
+    
+    
+    #this approach will not NA out areas outside polygon domains - do so now.
+    #Pixels that are outside the domain.  It's possible for something to be very
+    #slightly outside the domain and non zero due to the reprojecting and this
+    #will retain any such data.
+    septic_flux[terra::mask(septic_flux,domain,inverse=T)==0] <- NA
   }
   
   if(Wastewater_state_septic){
+    # Calculate state-by-state totals using state-specific septic fraction data
+    Tot_area <- nlcd_state_total_areas$open_or_low_int_area # total area of both classes in km2 from nlcd_state_total_areas.csv
+    pop <- Wastewater_State_info$Population
+    #Fraction that's septic as reported or calculating by scaling the 1990
+    #state value by the change in national septic fraction since 1990
+    Wastewater_State_info$Updated_septic_frac[Wastewater_State_info$Method=="scaled"] <- Wastewater_State_info[Wastewater_State_info$Method=="scaled","Septic_Fraction"]*National_wastewater_info[2,2]/National_wastewater_info[1,2]
+    #use as reported for the year
+    Wastewater_State_info$Updated_septic_frac[Wastewater_State_info$Method=="reported"]  <- Wastewater_State_info[Wastewater_State_info$Method=="reported","Septic_Fraction"]
+    
+    state_tot_emiss <- data.frame("Combined_Septic_EF"=pop*Wastewater_State_info$Updated_septic_frac*GHGI_wastewater_data$EF[GHGI_wastewater_data$year==GHGI_data_yr]/(16.043*24*60*60) / Tot_area, #in mol/s/km2 (GHGI EF is in g/capita/day)
+                                  "State"=Wastewater_State_info$State)
+    
+    #make a raster with separate values for each state to combine
+    state_tot_emiss <- terra::merge(NLCD_Tigerlines,state_tot_emiss,by.x="STUSPS",by.y="State",all.y=T)
+    #disagg before rasterizing to better represent pixels on state borders
+    state_tot_emiss <- terra::rasterize(state_tot_emiss,terra::disagg(Suburbia,5),field="Combined_Septic_EF",touches=T)
+    state_tot_emiss[is.na(state_tot_emiss)] <- 0
+    state_tot_emiss <- terra::aggregate(state_tot_emiss,5,mean,na.rm=T)
+    
+    septic_flux2 <- Suburbia*state_tot_emiss #gridded and distributed appropriately across each state in mol/s/km2
+    
     # Now finalize units
     septic_flux2 <- septic_flux2*1e9*1E-6  # Convert from mol/km2/s to nmol/m2/s
     septic_flux2[is.na(septic_flux2)]<-0
     
-    #mask and account for pixels partially within the domain
-    septic_flux2 <- terra::mask(septic_flux2,domain)
-    cover <- terra::extract(septic_flux2,domain,weights=T,cells=T)
-    septic_flux2[cover[,'cell']] <- septic_flux2[cover[,'cell']]*cover[,'weight']
-  }
-  
-  if(Wastewater_state_septic & Wastewater_national_septic){
-    #pull the state total emissions from both methods and a few additional
-    #details so state totals can be easily compared.  Because of how NLCD
-    #fractions by state works, this includes only the fraction of each state
-    #within the domain.
-    Wastewater_State_info$State_based_septic_emissions_mol_per_s <- septic_flux2_bystate
-    Wastewater_State_info$National_based_septic_emissions_mol_per_s <- septic_flux_bystate
-    Wastewater_State_info$total_septic_area_km2 <- nlcd_state_total_areas[,2]
-    Wastewater_State_info$State_to_national_method_ratio <- Wastewater_State_info$State_based_septic_emissions_mol_per_s/Wastewater_State_info$National_based_septic_emissions_mol_per_s
-    if(verbose){
-      #now save the comparison across the methods
-      utils::write.csv(Wastewater_State_info, file.path(Wastewater_output_directory,"WWTP_septic_method_comparison.csv"),row.names = F)
+    #prep to project to domain
+    septic_flux2=terra::crop(septic_flux2,NLCD_domain,snap="out")
+    septic_flux2=terra::mask(septic_flux2,NLCD_domain,touches=T,updatevalue=0)
+    
+    #add a few pixels worth of buffer (at the domain resolution) filled with 0's
+    #so the average doesn't consider these NA values to ignore in calculations
+    #(drastically impacts avg).  Then finally reproject via average.
+    if(!any(terra::ext(domain)/terra::ext(State_Tigerlines) > 1.1)){
+      septic_flux2[cover[,'cell']] <- septic_flux2[cover[,'cell']]*cover[,'weight']
+      septic_flux2=terra::extend(septic_flux2,fill=0,
+                                 terra::ext(septic_flux2)+(terra::res(NLCD_domain)*5))
     }
+    septic_flux2=terra::project(septic_flux2,domain_template,method="average")
+    
+    
+    #this approach will not NA out areas outside polygon domains - do so now.
+    #Pixels that are outside the domain.  It's possible for something to be very
+    #slightly outside the domain and non zero due to the reprojecting and this
+    #will retain any such data.
+    septic_flux2[terra::mask(septic_flux2,domain,inverse=T)==0] <- NA
   }
-  cat("Finished calculating septic emissions at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
+
+  cat("Finished calculating septic emissions at",format(Sys.time(),"%H:%M"),"\n")
   ################################################################################
   #Download the relevant emissions data using the API
   #(https://www.epa.gov/enviro/envirofacts-data-service-api) and combine the
@@ -714,17 +731,19 @@ Wastewater <- function(input_directory,
   #download the relevant industrial wastewater - sector data
   #(https://www.epa.gov/enviro/greenhouse-gas-model).  
   ghgrp_wastewater_file <- file.path(input_directory,"GHGRP","industrial_wastewater_II.csv")
-  if(Source_GHGRP_wastewater=="download"){
-    data_URL <- "https://data.epa.gov/dmapservice/ghg.ii_subpart_level_information/csv"
-    Trycatch_downloader(URL = data_URL,method = "save",output_location = ghgrp_wastewater_file,
-                        error_message = paste0("Greenhouse Gas Reporting Program data could not be downloaded using API link: ",data_URL))
-  }else if(Source_GHGRP_wastewater=="default"){
+  if(Source_GHGRP_wastewater=="M3T"){
     #UPDATE TO ZENODO
+    ghgrp_data <- M3T::GHGRP_wastewater
   }else{
-    invisible(file.copy(Source_GHGRP_wastewater,ghgrp_wastewater_file,overwrite = T))
+    if(Source_GHGRP_wastewater=="download"){
+      data_URL <- "https://data.epa.gov/dmapservice/ghg.ii_subpart_level_information/csv"
+      Trycatch_downloader(URL = data_URL,method = "save",output_location = ghgrp_wastewater_file,
+                          error_message = paste0("Greenhouse Gas Reporting Program data could not be downloaded using API link: ",data_URL))
+    }else{
+      invisible(file.copy(Source_GHGRP_wastewater,ghgrp_wastewater_file,overwrite = T))
+    }
+    ghgrp_data <- utils::read.csv(ghgrp_wastewater_file)
   }
-  
-  ghgrp_data <- utils::read.csv(ghgrp_wastewater_file)
   ghgrp_data <- make_consistent(ghgrp_data)
   ################################################################################
   #Merge with location-like data
@@ -758,21 +777,7 @@ Wastewater <- function(input_directory,
   #those within the domain have been rasterized.
   ghgrp_flux <- terra::mask(ghgrp_flux,domain)
   
-  if(verbose){
-    if(nrow(ghgrp_crop)>0){
-      # Save point sources as csv files - first just the raw dataframe
-      utils::write.csv(ghgrp_crop, file.path(Wastewater_output_directory,"WWTP_industrial_all.csv"))
-      
-      # Now just the names, coordinates and emissions
-      ghgrp_crop_output <- data.frame(ghgrp_crop$facility_name.x,
-                                      terra::geom(ghgrp_crop)[,"x"],
-                                      terra::geom(ghgrp_crop)[,"y"],
-                                      ghgrp_crop$emiss)
-      names(ghgrp_crop_output) <- c('Site_Name','Longitude','Latitude','Emission_mol_per_s')
-      utils::write.csv(ghgrp_crop_output, file.path(Wastewater_output_directory,"WWTP_industrial.csv"),row.names = F)
-    }
-  }
-  cat("Finished calculating industrial treatment plant emissions at",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes since start\n")
+  cat("Finished calculating industrial treatment plant emissions at",format(Sys.time(),"%H:%M"),"\n")
   ################################################################################
   # Write the rasters
   
@@ -1168,5 +1173,5 @@ Wastewater <- function(input_directory,
       }
     }
   }
-  cat("Finished wastewater sector: Wastewater in",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
+  cat("Finished wastewater sector: Wastewater at",format(Sys.time(),"%H:%M"),"with a total runtime of",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
 }
