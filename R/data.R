@@ -4,7 +4,7 @@
 #'
 #' The estimated state level population published by the U.S. Census Bureau
 #'
-#' @format `Census_state_population` A data frame with 49 rows and 16 columns:
+#' @format `Census_state_population_M3T` A data frame with 49 rows and 16 columns:
 #' \describe{
 #'   \item{Name}{State name}
 #'   \item{POPESTIMATE2010}{Estimated population for the year 2010}
@@ -25,7 +25,7 @@
 #' }
 #' @source
 #'   <https://www.census.gov/data/tables/time-series/demo/popest/2020s-state-total.html>
-'Census_state_population'
+'Census_state_population_M3T'
 
 
 
@@ -79,46 +79,6 @@
 
 
 
-#' The total "Developed, Open" and "Developed, Low Intensity" in the Continental
-#' US (CONUS) land area
-#'
-#' National Land Cover Database (NLCD) calculated land cover data
-#'
-#' Annual NLCD data is processed to calculate the total fraction of land cover
-#' that is the land types considered likely to have septic systems rather than
-#' sewer systems.
-#'
-#' @format `Total_national_open_or_low_int_area` A vector with 14 entries
-#'   named by year, each with numeric values representing the total of this land
-#'   cover for the year across CONUS + AK.
-#' @source <https://doi.org/10.5066/P94UXNTS>
-'Total_national_open_or_low_int_area'
-
-
-
-
-
-
-#' The total "Developed, Open" and "Developed, Low Intensity" land cover by
-#' state in the Continental US
-#'
-#' National Land Cover Database (NLCD) calculated land cover data
-#'
-#' Annual NLCD data is processed to calculate the total fraction of land cover
-#' that is the land types considered likely to have septic systems rather than
-#' sewer systems separately for each state.
-#'
-#' @format `wastewater_state_septic_area` A list with 14 entries named by
-#'   year, each with a vector representing the total of this land cover for each
-#'   state. Rownames are state abbreviations.
-#' @source <https://doi.org/10.5066/P94UXNTS>
-'wastewater_state_septic_area'
-
-
-
-
-
-
 #' Data from EIA Form 176 - the Annual Report of Natural and supplemental Gas
 #' Supply and Disposition
 #'
@@ -129,16 +89,16 @@
 #'
 #' @format `EIA_NG_data` A data frame with 28,553 rows and 10 columns:
 #' \describe{
-#'   \item{EIA_Year}{Year of data}
-#'   \item{EIA_State}{State the utility operates in}
-#'   \item{EIA_Residential_Total_Volume_(Mcf)}{Volume of natural gas delivered to residential customers in thousand cubic feet}
-#'   \item{EIA_Residential_Total_Customers}{Number of residential customers}
-#'   \item{EIA_Commercial_Total_Volume_(Mcf)}{Volume of natural gas delivered to commercial customers in thousand cubic feet}
-#'   \item{EIA_Commercial_Total_Customers}{Number of commercial customers}
-#'   \item{EIA_Industrial_Total_Volume_(Mcf)}{Volume of natural gas delivered to industrial customers in thousand cubic feet}
-#'   \item{EIA_Industrial_Total_Customers}{Number of industrial customers}
-#'   \item{EIA_Electric_Total_Volume_(Mcf)}{Volume of natural gas delivered to electric production customers in thousand cubic feet}
-#'   \item{EIA_Electric_Total_Customers}{Number of electric production customers}
+#'   \item{Year}{Year of data}
+#'   \item{State}{State the utility operates in}
+#'   \item{Residential_Total_Volume_(Mcf)}{Volume of natural gas delivered to residential customers in thousand cubic feet}
+#'   \item{Residential_Total_Customers}{Number of residential customers}
+#'   \item{Commercial_Total_Volume_(Mcf)}{Volume of natural gas delivered to commercial customers in thousand cubic feet}
+#'   \item{Commercial_Total_Customers}{Number of commercial customers}
+#'   \item{Industrial_Total_Volume_(Mcf)}{Volume of natural gas delivered to industrial customers in thousand cubic feet}
+#'   \item{Industrial_Total_Customers}{Number of industrial customers}
+#'   \item{Electric_Total_Volume_(Mcf)}{Volume of natural gas delivered to electric production customers in thousand cubic feet}
+#'   \item{Electric_Total_Customers}{Number of electric production customers}
 #' }
 #' @source
 #' <https://www.eia.gov/naturalgas/ngqs/#?report=RP4&year1=2020&year2=2020&company=Name>
@@ -181,14 +141,14 @@
 #'
 #' The national methane emissions estimated for municipal landfills in the GHGI
 #'
-#' @format `GHGI_landfill_total` A data frame with 12 rows and 2 columns:
+#' @format `GHGI_landfill_total_M3T` A data frame with 12 rows and 2 columns:
 #' \describe{
 #'   \item{Year}{Year of data}
 #'   \item{Emissions}{National total emissions in kilotons/year for municipal solid waste as reported in the GHGI}
 #' }
 #' @source
 #' <https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks-1990-2022>
-'GHGI_landfill_total'
+'GHGI_landfill_total_M3T'
 
 
 
