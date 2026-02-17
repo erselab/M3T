@@ -26,8 +26,6 @@
 #' \itemize{
 #'   \item{\bold{Use_ACES} - logical stating whether the \href{https://doi.org/10.3334/ORNLDAAC/1943}{ACES CO2 inventory} should be used to downscale the stationary combustion and natural gas distribution emissions. Default TRUE.}
 #'   \item{\bold{Use_Vulcan} - logical stating whether the \href{https://doi.org/10.5281/zenodo.15446748}{Vulcan CO2 inventory} should be used to downscale the stationary combustion and natural gas distribution emissions. Default TRUE.}
-#'   \item{\bold{Combine_sectors} - logical stating whether sectors should be summed to create all possible unique inventory combinations across variations. Be aware that with many variations this can create >1,000 inventories. Default TRUE.}
-#'   \item{\bold{Separate_thermo} - logical stating whether combined inventories should also be calculated separately for thermogenic (i.e., natural gas) and non-thermogenic sources. Be aware that this will triple the number of inventories created. Default FALSE.}
 #'   }
 #'
 #' Accessing Datasets
@@ -210,7 +208,7 @@
 #'
 #' Accessing Datasets
 #' \itemize{
-#'   \item{\bold{Source_wastewater_NLCD} - character stating "M3T", "download", or a filepath pointing to the needed file. The \href{https://doi.org/10.5066/P94UXNTS}{National Land Cover Database (NLCD)} is high resolution (30 m) land cover data used to distribute septic emissions. Default "M3T", which is already processed NLCD data, to speed analyses.}
+#'   \item{\bold{Source_wastewater_NLCD} - character stating "M3T" or a filepath pointing to the needed file. \bold{Cannot} be set to "download" as there is no simple way to automatically download these files. The \href{https://doi.org/10.5066/P94UXNTS}{National Land Cover Database (NLCD)} is high resolution (30 m) land cover data used to distribute septic emissions. Default "M3T", which is already processed NLCD data, to speed analyses.}
 #'   \item{\bold{Source_CWNS} - character stating "M3T" or a filepath pointing to the needed file. \bold{Cannot} be set to "download" as there is no simple way to automatically download these files. The 2022 CWNS can be downloaded as a folder of csvs and the filepath should point to this folder. The 2012 CWNS can be downloaded as an access database.  To convert this to a useable excel file:
 #'   \enumerate{
 #'      \item{Open mdb file in Microsoft Access}
@@ -230,7 +228,7 @@
 #' Emission Factors and similar
 #' \itemize{
 #'   \item{\bold{GHGI_wastewater_data} - data.frame with columns "EF", "Septic.Emissions", "Nonseptic.Emissions", and "year". The estimated national total emissions in kt/yr from the Environmental Protection Agency's (EPA) \href{https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks-1990-2022}{Greenhouse Gas Inventory (GHGI)}. Septic is provided and nonseptic is the sum of all other entries in the table titled "Domestic Wastewater CH4 Emissions from Septic and Centralized Systems", though years before 2019 were formatted differently. Default is GHGI data from 2010 - 2022.}
-#'   \item{\bold{Total_national_open_or_low_int_area} - Numeric representing the national total of "developed open space" and "developed low intensity" land cover in km2 from the National Land Cover Database (NLCD). Default to the value in Table 7 of that was published in \href{https://doi.org/10.1016/j.isprsjprs.2020.02.019}{Homer et al., 2020}.}
+#'   \item{\bold{Total_national_open_or_low_int_area} - Numeric representing the national total of "developed open space" and "developed low intensity" land cover in km2 from the National Land Cover Database (NLCD) or "M3T". Default to "M3T", which has pre-calculated values for each year available at the time.}
 #'   \item{\bold{Wastewater_State_info} - data.frame with columns "State", "Septic_Fraction", and "Method" with method being either "scaled" or "reported". These methods are relevant to the state septic variation. The scaled approach scales the septic fraction based on the change in the national septic fraction as described below in the National_wastewater_info. The reported approach uses the value provided. Default is a data frame with data for all states using reported when available from the \href{https://www.census.gov/programs-surveys/ahs/data/interactive/ahstablecreator.html?s_areas=00000&s_year=2021&s_tablename=TABLE1&s_bygroup1=1&s_bygroup2=1&s_filtergroup1=1&s_filtergroup2=1}{U.S. Census American Housing Survey} in the Plumbing, Water, and Sewage Disposal survey, pulling the appropriate year from Wastewater_reported_State_info described below.}
 #'   \item{\bold{Wastewater_reported_State_info} - data.frame with columns "State", "Year", and "Septic_Fraction". Provides the reported data for states and years available to update the wastewater_state_info where needed. Default is all reported Census data available from 2010 to 2023.}
 #'   \item{\bold{National_wastewater_info} - data.frame with columns "Year", and "Septic_Fraction". Provides the reported national data used if the method variation Wastewater_national_septic is true. Default is all reported data from 1990 to 2023.}
@@ -268,9 +266,9 @@
 #'
 #' Accessing Datasets
 #' \itemize{
-#'   \item{\bold{Source_wetland_NLCD} - character stating "M3T", "download", or a filepath pointing to the needed file. The \href{https://doi.org/10.5066/P94UXNTS}{National Land Cover Database (NLCD)} is high resolution (30 m) land cover data used to distribute septic emissions. Default "M3T", which is actually the WetCHARTs data downscaled using the NLCD, to speed analyses.}
+#'   \item{\bold{Source_wetland_NLCD} - character stating "M3T" or a filepath pointing to the needed file. \bold{Cannot} be set to "download" as there is no simple way to automatically download these files. The \href{https://doi.org/10.5066/P94UXNTS}{National Land Cover Database (NLCD)} is high resolution (30 m) land cover data used to distribute septic emissions. Default "M3T", which is actually the WetCHARTs data downscaled using the NLCD, to speed analyses.}
 #'   \item{\bold{Source_Watershed_file} - character stating "M3T", "download", or a filepath pointing to the needed file. A shapefile from \href{http://www.cec.org/north-american-environmental-atlas/watersheds/}{the Commission for Environmental Cooperation's (CEC) North American Environmental Atlas} that outlines the watersheds in North America. Only relevant if using SOCCR2 as it has different emission factors for different watersheds. Default "M3T".}
-#'   \item{\bold{Source_wetcharts} - character stating "M3T" or a filepath pointing to the needed file. \bold{Cannot} be set to "download" as the data has recently moved and cannot be automatically accessed easily yet. Only needed if Source_wetland_NLCD is not "M3T" and Use_Wetcharts is TRUE. Default empty as Source_wetland_NLCD is "M3T" by default.}
+#'   \item{\bold{Source_wetcharts} - character stating a filepath pointing to the needed file. \bold{Cannot} be set to "download" as the data has recently moved and cannot be automatically accessed easily yet or "M3T" as the data is used as is. Only needed if Source_wetland_NLCD is not "M3T" and Use_Wetcharts is TRUE. Default empty as Source_wetland_NLCD is "M3T" by default.}
 #'   \item{\bold{Source_NWI} - character stating "M3T", "download", or a filepath pointing to the needed directory. Should be a directory including state shapefiles outlining different wetland and inland water types by the \href{https://www.fws.gov/program/national-wetlands-inventory}{U.S. Fish and Wildlife Service's National Wetland Inventory (NWI)} in geopackage format (except MN which is a geodatabase). Default is "M3T" which uses 1 km x 1 km processed files for speed.}
 #'   }
 #'
@@ -297,6 +295,28 @@
 #'   \item{\bold{Source_GEPA} - character stating "download", or a filepath pointing to the needed file. \bold{Cannot} be set to "M3T" as there is no version saved within the package - it relies on publicly available versions of the data so there is no need. The \href{https://zenodo.org/records/8367082}{gridded Environmental Protection Agency (GEPA) anthropogenic methane inventory} .nc file. Default "download".}
 #'   }
 #' }
+#'
+#'
+#'
+#'
+#'
+#'
+#'
+#'
+#'
+#'  \bold{Combine output across sectors}
+#' \itemize{
+#'   \item{\bold{Combine_sectors} - logical stating whether sectors should be summed to create total emissions inventories. Default TRUE.}
+#'
+#' Method Variations
+#' \itemize{
+#'   \item{\bold{Separate_thermo} - logical stating whether combined inventories should also be calculated separately for thermogenic (i.e., natural gas) and non-thermogenic sources. Be aware that this will triple the number of inventories created. Default TRUE.}
+#'   \item{\bold{Create_summary_combinations} - logical stating whether or not to create summary inventories of the mean, max, and min across variations for each sector.  Default TRUE.}
+#'   \item{\bold{Create_individual_combinations} - logical stating whether or not to create all possible unique inventory combinations across variations. Be aware that with many variations this can create >1,000 inventories. Default FALSE.}
+#'   }
+#' }
+
+
 
 
 
