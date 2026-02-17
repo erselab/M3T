@@ -95,15 +95,15 @@ PHMSA_natural_gas_distribution <- data.frame(matrix(ncol=0,nrow=nrow(combined_da
 #combine to just the columns and combination of columns needed
 PHMSA_natural_gas_distribution[,c("OPERATOR_NAME","REPORT_YEAR","NUM_SRVCS_TOTAL","AVERAGE_LENGTH","STOP",'MMILES_TOTAL')] <- combined_data[,c("OPERATOR_NAME","REPORT_YEAR","NUM_SRVCS_TOTAL","AVERAGE_LENGTH","STOP",'MMILES_TOTAL')]
 
-PHMSA_natural_gas_distribution$MMILES_bare_steel <- rowSums(combined_data[,c("MMILES_STEEL_UNP_BARE","MMILES_STEEL_CP_BARE","MMILES_CU")])
-PHMSA_natural_gas_distribution$MMILES_iron <- rowSums(combined_data[,c("MMILES_CI","MMILES_DI","MMILES_RCI")])
-PHMSA_natural_gas_distribution$MMILES_coat_steel <- rowSums(combined_data[,c("MMILES_STEEL_UNP_COATED","MMILES_STEEL_CP_COATED","MMILES_OTHER")])
+PHMSA_natural_gas_distribution$MMILES_bare_steel <- rowSums(combined_data[,c("MMILES_STEEL_UNP_BARE","MMILES_STEEL_CP_BARE","MMILES_CU")],na.rm=T)
+PHMSA_natural_gas_distribution$MMILES_iron <- rowSums(combined_data[,c("MMILES_CI","MMILES_DI","MMILES_RCI")],na.rm=T)
+PHMSA_natural_gas_distribution$MMILES_coat_steel <- rowSums(combined_data[,c("MMILES_STEEL_UNP_COATED","MMILES_STEEL_CP_COATED","MMILES_OTHER")],na.rm=T)
 PHMSA_natural_gas_distribution$MMILES_plastic <- combined_data[,"MMILES_PLASTIC"]
 
-PHMSA_natural_gas_distribution$NUM_SRVS_unp_steel <- rowSums(combined_data[,c("NUM_SRVS_STEEL_UNP_COATED","NUM_SRVS_STEEL_UNP_BARE")])
-PHMSA_natural_gas_distribution$NUM_SRVS_cp_steel <- rowSums(combined_data[,c("NUM_SRVS_STEEL_CP_BARE","NUM_SRVS_STEEL_CP_COATED","NUM_SRVS_OTHER")])
+PHMSA_natural_gas_distribution$NUM_SRVS_unp_steel <- rowSums(combined_data[,c("NUM_SRVS_STEEL_UNP_COATED","NUM_SRVS_STEEL_UNP_BARE")],na.rm=T)
+PHMSA_natural_gas_distribution$NUM_SRVS_cp_steel <- rowSums(combined_data[,c("NUM_SRVS_STEEL_CP_BARE","NUM_SRVS_STEEL_CP_COATED","NUM_SRVS_OTHER")],na.rm=T)
 PHMSA_natural_gas_distribution$NUM_SRVS_plastic <- combined_data[,c("NUM_SRVS_PLASTIC")]
-PHMSA_natural_gas_distribution$NUM_SRVS_copper_iron <- rowSums(combined_data[,c("NUM_SRVS_CU","NUM_SRVS_CI","NUM_SRVS_DI","NUM_SRVS_RCI")])
+PHMSA_natural_gas_distribution$NUM_SRVS_copper_iron <- rowSums(combined_data[,c("NUM_SRVS_CU","NUM_SRVS_CI","NUM_SRVS_DI","NUM_SRVS_RCI")],na.rm=T)
 
 ################################################################################
 #save output
