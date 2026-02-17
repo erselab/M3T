@@ -52,10 +52,6 @@ M3T_config$Base_timeout <- 60*20
 
 #Settings applicable to multiple sectors
 {
-  M3T_config$Combine_sectors <- TRUE
-  #Relevant for combining sectors only
-  M3T_config$Separate_thermo=FALSE
-  
   #Method variations
   {
     #used in NG distribution and stationary combustion for downscaling
@@ -297,8 +293,8 @@ M3T_config$Base_timeout <- 60*20
                                                   "year"=               c(2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022))
     
     #National total of developed open space and developed low intensity land
-    #cover from the NLCD
-    M3T_config$Total_national_open_or_low_int_area <- 352032 #km2
+    #cover from the NLCD in km2
+    M3T_config$Total_national_open_or_low_int_area <- "M3T"
     
     #1990 census data on state estimated septic fractions.
     M3T_config$Wastewater_State_info <- data.frame("State"          =c("AL"    ,"AZ"    ,"AR"    ,"CA"      ,"CO"    ,"CT"    ,"DE"    ,"DC"    ,"FL"      ,"GA"    ,"ID"    ,"IL"    ,"IN"    ,"IA"    ,"KS"    ,"KY"    ,"LA"    ,"ME"    ,"MD"    ,"MA"      ,"MI"    ,"MN"    ,"MS"    ,"MO"    ,"MT"    ,"NE"    ,"NV"    ,"NH"    ,"NJ"    ,"NM"    ,"NY"      ,"NC"    ,"ND"    ,"OH"      ,"OK"    ,"OR"    ,"PA"    ,"RI"    ,"SC"    ,"SD"    ,"TN"    ,"TX"      ,"UT"    ,"VT"    ,"VA"    ,"WA"    ,"WV"    ,"WI"    ,"WY"),
@@ -350,7 +346,7 @@ M3T_config$Base_timeout <- 60*20
 {
   M3T_config$Process_wetlands_and_inland_waters <- TRUE
   
-  #Method variations, emission factors, and similar
+  #Method variations
   {
     #Methodology for Wetland and freshwater methane emissions.  State Of the
     #Carbon Cycle Report (SOCCR) emission factors combined with national wetland
@@ -368,6 +364,7 @@ M3T_config$Base_timeout <- 60*20
     M3T_config$Source_wetland_NLCD="M3T"
     M3T_config$Source_Watershed_file="M3T"
     M3T_config$Source_wetcharts="M3T"
+    M3T_config$Source_NWI="M3T"
   }
   
   #Emission factors, and similar
@@ -409,6 +406,27 @@ M3T_config$Base_timeout <- 60*20
   #How to access datasets
   {
     M3T_config$Source_GEPA="download"
+  }
+}
+
+
+
+
+
+
+
+
+
+
+#Combined inventory settings
+{
+  M3T_config$Combine_sectors <- TRUE
+  
+  #Method variations
+  {
+    M3T_config$Separate_thermo=TRUE
+    M3T_config$Create_summary_combinations=TRUE
+    M3T_config$Create_individual_combinations=FALSE
   }
 }
 
