@@ -216,7 +216,6 @@
 #'  upset, serv (services), post_meter, MnR (metering and regulating stations),
 #'  and mains; sector is abbreviated as res (residential) or com (commercial);
 #'  variation is byLDC, bystate, or bydomain; and inventory is ACES or Vulcan.
-#'@inherit CH4_inventory_build author
 #'@references \href{https://doi.org/10.1021/acs.est.0c00437}{Weller et al.}
 #'@references \href{https://doi.org/10.1021/acs.est.8b03217}{Fischer et al.}
 #'@references \href{https://doi.org/10.1029/2020JD032974}{Vulcan}
@@ -348,7 +347,6 @@ NG_distribution <- function(domain,
     if(Source_EIA_NG_file=="M3T"){
       #UPDATE TO ZENODO
       EIA_csv <- M3T::EIA_NG_data
-      EIA_csv <- EIA_csv[EIA_csv$Year==GHGI_data_yr,]
     }else{
       EIA_file <- file.path(input_directory,"EIA","User_supplied_EIA_form_176.csv")
       invisible(file.copy(Source_EIA_NG_file,EIA_file,overwrite = T))
@@ -363,6 +361,8 @@ NG_distribution <- function(domain,
         EIA_csv <- utils::read.csv(EIA_file,skip=which(EIA_csv[,1]=="Year"))
       }
     }
+    #subset to the inventory year
+    EIA_csv <- EIA_csv[EIA_csv$Year==GHGI_data_yr,]
     
     #Correct column names that matter
     colnames(EIA_csv) <- gsub("\\.|\\.BR\\.","_",
@@ -567,7 +567,9 @@ NG_distribution <- function(domain,
     #update user about changes to any LDCs that are/were listed as states within
     #the domain
     if(any(GHGRP_csv$state!=GHGRP_csv$operating_state)){
-      cat(paste("\n",GHGRP_csv$facility_name[GHGRP_csv$state!=GHGRP_csv$operating_state],"    rewritten from",GHGRP_csv$state_name[GHGRP_csv$state!=GHGRP_csv$operating_state],"    to",GHGRP_csv$operating_state_name[GHGRP_csv$state!=GHGRP_csv$operating_state]))
+      update_ordered <- GHGRP_csv[order(GHGRP_csv$facility_name),]
+      cat(paste("\n",update_ordered$facility_name[update_ordered$state!=update_ordered$operating_state],"    rewritten from",update_ordered$state_name[update_ordered$state!=update_ordered$operating_state],"    to",update_ordered$operating_state_name[update_ordered$state!=update_ordered$operating_state]))
+      rm(update_ordered)
     }
     ################################################################################
     #have to calculate before aggregating/merging via sum since it applies an
@@ -871,14 +873,14 @@ NG_distribution <- function(domain,
                   'MnR_ER_total_res',
                   'meter_ER_total_res',
                   'upset_ER_total_res',
-                  'post_meter_ER_total_res',
-                  'post_meter_ER_total_com')
+                  'post_meter_ER_total_res')
   
   com_totals <- c('mains_ER_total_com',
                   'serv_ER_total_com',
                   'MnR_ER_total_com',
                   'meter_ER_total_com',
-                  'upset_ER_total_com')
+                  'upset_ER_total_com',
+                  'post_meter_ER_total_com')
   
   ################################################################################
   #write a function to save
@@ -890,14 +892,26 @@ NG_distribution <- function(domain,
     disaggregation_level <- utils::tail(strsplit(input_name,"_")[[1]],1)
     inventory_name <- strsplit(input_name,"_")[[1]][1]
     
+    #if CONUS or custom with a very large domain - reprojecting domain can be
+    #problematic
+    if(any(terra::ext(domain)/terra::ext(State_Tigerlines) > 1.1)){
+      domain_reproj <- terra::as.polygons(terra::ext(domain_template)/terra::ext(State_Tigerlines) * terra::ext(terra::project(State_Tigerlines,input)))
+      terra::crs(domain_reproj) <- terra::crs(input)
+    }else{
+      domain_reproj <- terra::as.polygons(terra::ext(terra::project(domain_template,terra::crs(input))))
+      terra::crs(domain_reproj) <- terra::crs(input)
+    }
+    
+    
     #project to a grid with the exact right resolution, extent and origin. First
     #put domain in ACES/Vulcan crs, then crop/mask input to it.  Account for
     #pixels partially within the domain.
-    domain_reproj <- terra::project(domain,terra::crs(input))
     input=terra::crop(input,domain_reproj,snap="out")
     input=terra::mask(input,domain_reproj,touches=T,updatevalue=0)
-    cover <- terra::extract(input,domain_reproj,weights=T,cells=T)
-    input[cover[,'cell']] <- input[cover[,'cell']]*cover[,'weight']
+    if(!any(terra::ext(domain)/terra::ext(State_Tigerlines) > 1.1)){
+      cover <- terra::extract(input,domain_reproj,weights=T,cells=T)
+      input[cover[,'cell']] <- input[cover[,'cell']]*cover[,'weight']
+    }
     
     #add a few pixels worth of buffer (at the domain resolution) filled with 0's
     #so the average doesn't consider these NA values to ignore in calculations
@@ -1071,7 +1085,6 @@ NG_distribution <- function(domain,
       names(all_merge_state_poly) <- gsub("STUSPS","PHMSA_State",names(all_merge_state_poly))
     }else{
       all_merge_state_poly <- all_merge_clean
-      all_merge_state <- as.data.frame(all_merge_clean)
     }
     
     
