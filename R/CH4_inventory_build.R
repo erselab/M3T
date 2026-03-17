@@ -61,8 +61,6 @@
 #'                     domain_res=1,
 #'                     domain_crs="epsg:4326",
 #'                     verbose=F)
-#'@author Kris Hajny, \email{kris.hajny@gmail.com}
-#'@author Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
 #'@seealso [M3T_config] Generates the config function with user-editable
 #'  settings used throughout processing.
 
@@ -106,6 +104,9 @@ CH4_inventory_build <- function(run_directory,
   
   sink(file = file.path(input_directory,"Run_settings.txt"),type='output')
   
+  cat("Run Date: ",as.character(Sys.Date()),
+      "\nM3T package version:",as.character(utils::packageVersion("M3T")),"\n\n")
+  
   #loop through all objects in the environment, except functions, and save them to
   #the file.
   for(object in dplyr::setdiff(ls(envir = environment()),utils::ls.str(mode = "function"))){
@@ -130,7 +131,7 @@ CH4_inventory_build <- function(run_directory,
     cat("\n")
   }
   
-  cat(rep("\n",4),"\nConfig settings:\n\n")
+  cat(rep("\n",4),"\nConfig settings:\n")
   #repeat almost exactly for config
   for(object in names(M3T_config)){
     cat(object,"=\n")
@@ -145,7 +146,10 @@ CH4_inventory_build <- function(run_directory,
         print(temp_data,quote = FALSE,width=300)
       }
     }else if(isa(temp_data,"list")){
-      print(temp_data,quote = FALSE,width=300)
+      for(A in 1:length(temp_data)){
+        if(A!=1){cat("\n")}
+        cat("\tsubset",A,":\n\t",temp_data[[A]])
+        }
     }else{
       cat(temp_data)
     }
@@ -578,9 +582,13 @@ CH4_inventory_build <- function(run_directory,
   ################################################################################
   # Now crop/mask the tigerlines to the domain
   
+  #first remove states outside of CONUS (Alaska, Samoa, Puerto Rico, Hawaii,
+  #Mariana Islands, Guam, virgin islands)
+  State_Tigerlines <- State_Tigerlines[!State_Tigerlines$STUSPS %in% c("AK","AS","PR","HI","MP","GU","VI"),]
+  County_Tigerlines <- County_Tigerlines[(County_Tigerlines$STATEFP %in% State_Tigerlines$STATEFP),]
+
   #only bother if at least some states are outside the domain (i.e., domain !=
-  #CONUS).  Only relevant if source_tigerlines = M3T, but common enough to be
-  #worthwhile given the time required to crop county tigerlines
+  #CONUS).  If this given the time required to crop county tigerlines
   if(!all(terra::relate(State_Tigerlines,domain,"within"))){
     #subset to just those relevant for the domain.  For state it's any state that
     #touches the domain at all.  For county, it's only those within the states
@@ -690,7 +698,7 @@ CH4_inventory_build <- function(run_directory,
   #Download, load in, and prepare GHGI data if/as needed.  Download the most
   #recent available as previous years are updated with each new GHGI.
   
-  if((M3T_config$Process_landfills | M3T_config$Process_natural_gas_distribution | M3T_config$Process_natural_gas_transmission | M3T_config$Process_wastewater) &
+  if((M3T_config$Process_landfills | M3T_config$Process_natural_gas_distribution | M3T_config$Process_natural_gas_transmission | M3T_config$Process_stationary_combustion | M3T_config$Process_wastewater) &
      any(c(M3T_config$GHGI_landfill_total,
            M3T_config$GHGI_MnR,M3T_config$GHGI_maintenance,
            M3T_config$GHGI_meters,M3T_config$GHGI_services,
@@ -1065,7 +1073,7 @@ CH4_inventory_build <- function(run_directory,
   ################################################################################
   #do some basic processing to prep NLCD data for the domain if needed
   
-  if(M3T_config$Use_Wetcharts & M3T_config$Source_wetcharts=="M3T"){
+  if(M3T_config$Process_wetlands_and_inland_waters & M3T_config$Use_Wetcharts & M3T_config$Source_wetcharts=="M3T"){
     Wetland_output_directory <- file.path(output_directory,"Wetlands")
     dir.create(Wetland_output_directory,showWarnings = F)
     
@@ -1088,14 +1096,18 @@ CH4_inventory_build <- function(run_directory,
     
     #crop to the domain + buffer first to speed up process
     wetcharts <- terra::crop(wetcharts,terra::ext(domain_trans)*1.1,snap="out")
-    wetcharts <- terra::disagg(wetcharts,
-                               round(terra::res(wetcharts)/terra::res(domain_trans),3),
-                               "near")
+    if(any(terra::res(wetcharts) < terra::res(domain_trans))){
+      wetcharts <- terra::project(wetcharts,domain_template,method="mean")
+    }else if(any(terra::res(wetcharts) > terra::res(domain_trans))){
+      wetcharts <- terra::disagg(wetcharts,
+                                 round(terra::res(wetcharts)/terra::res(domain_trans),3),
+                                 "near")
+      #reproject to exact domain now.  Here using nearest neighbor to prevent
+      #only 1 row/column of higher res pixels on the border of each coarser
+      #pixel from being interpolated.
+      wetcharts <- terra::project(wetcharts,domain_template,method="near")
+    }
     
-    #reproject to exact domain now.  Here using nearest neighbor to prevent
-    #only 1 row/column of higher res pixels on the border of each coarser
-    #pixel from being interpolated.
-    wetcharts <- terra::project(wetcharts,domain_template,method="near")
     wetcharts <- terra::mask(wetcharts,domain)
     
     if(!any(terra::ext(domain)/terra::ext(State_Tigerlines) > 1.1)){
@@ -1211,6 +1223,7 @@ CH4_inventory_build <- function(run_directory,
                           output_directory=output_directory,
                           inventory_year=inventory_year,
                           GHGI_data_yr=GHGI_data_yr,
+                          State_Tigerlines=State_Tigerlines,
                           verbose=verbose,
                           County_Tigerlines=County_Tigerlines,
                           Use_ACES=M3T_config$Use_ACES,
@@ -1338,7 +1351,7 @@ CH4_inventory_build <- function(run_directory,
   invisible(gc())
   if(M3T_config$Combine_sectors){
     Combine_inventories(output_directory=output_directory,
-                        separate_thermo=M3T_config$Separate_thermo,
+                        Separate_thermo=M3T_config$Separate_thermo,
                         Create_summary_combinations=M3T_config$Create_summary_combinations,
                         Create_individual_combinations=M3T_config$Create_individual_combinations,
                         plot_directory=plot_directory,
