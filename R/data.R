@@ -32,6 +32,27 @@
 
 
 
+#' Historical state septic data from the U.S. Census Bureau
+#'
+#' A subset of data from the Census Bureau
+#'
+#' The estimated fraction of the population using septic systems at the state
+#' level for 1990 published by the U.S. Census Bureau
+#'
+#' @format `Wastewater_1990_state_septic` A data frame with 52 rows and 2
+#'   columns:
+#' \describe{
+#'   \item{State}{State name}
+#'   \item{Septic_Fraction}{Fraction of the population using septic systems}
+#' }
+#' @source <https://www.census.gov/data/tables/time-series/dec/coh-sewage.html>
+'Wastewater_1990_state_septic'
+
+
+
+
+
+
 #' 2012 Clean Watershed Needs Survey (CWNS) data on waste water treatment plants
 #'
 #' A subset of data from the 2012 CWNS
