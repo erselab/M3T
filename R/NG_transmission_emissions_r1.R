@@ -93,7 +93,6 @@
 #'  location, and assigned emissions for compressors within the domain that were
 #'  pulled from the GHGRP  The _all files include all variables that were in the
 #'  corresponding input file for the same compressors.
-#'@inherit CH4_inventory_build author
 #'@inherit Municipal_solid_waste seealso
 #'@keywords internal
 
@@ -327,6 +326,7 @@ Transmission <- function(input_directory,
   ghgrp_compressors <- terra::vect(ghgrp_compressors,geom=c("longitude","latitude"))
   terra::crs(ghgrp_compressors) <- "epsg:4326"
   compressors_ghgrp_crop <- terra::crop(terra::project(ghgrp_compressors,terra::crs(domain)),domain)
+  compressors_ghgrp_crop$ghg_quantity <- compressors_ghgrp_crop$ghg_quantity*1e6/(16.043*365*24*60*60) #MT CH4/yr to mol/s
   
   #Use the GHGRP matching built into the updated HIFLD data to ID data in both
   #datasets or just GHGRP
@@ -338,7 +338,7 @@ Transmission <- function(input_directory,
   if(nrow(compressors_ghgrp_crop)>0){
     #replace the HIFLD default with GHGRP values for those with a match, then
     #add in those without a match
-    compressors_crop_HIFLD$emiss[indx] <- GHGRP_in_HIFLD$ghg_quantity*1e6/(16.043*365*24*60*60) #MT CH4/yr to mol/s
+    compressors_crop_HIFLD$emiss[indx] <- GHGRP_in_HIFLD$ghg_quantity
     names(GHGRP_missing_from_HIFLD) <- gsub("ghg_quantity","emiss",names(GHGRP_missing_from_HIFLD))
     compressors_crop_HIFLD <- rbind(compressors_crop_HIFLD,GHGRP_missing_from_HIFLD[,"emiss"])
   }
