@@ -50,7 +50,7 @@
 #'
 #'@inheritParams Municipal_solid_waste
 #'
-#'@param separate_thermo Logical.  Pulled from \code{\link{M3T_config}}.
+#'@param Separate_thermo Logical.  Pulled from \code{\link{M3T_config}}.
 #'@param verbose Logical indicating whether to save visuals. This is a single
 #'  plot of the average gridded methane emissions across all variations on a log
 #'  scale
@@ -61,17 +61,16 @@
 #'  titled "Combined_inventory_key.csv" is also saved that details what
 #'  variations were used for each sector for each inventory.
 #'
-#'@inherit CH4_inventory_build author
 #'@inherit Municipal_solid_waste seealso
 #'@keywords internal
 
 #@examples
 #library(terra)
 #Combine_inventories <- function(output_directory="~/../Desktop/out/",
-#                                separate_thermo=T)
+#                                Separate_thermo=T)
 
 Combine_inventories <- function(output_directory,
-                                separate_thermo,
+                                Separate_thermo,
                                 Create_summary_combinations,
                                 Create_individual_combinations,
                                 plot_directory,
@@ -171,7 +170,7 @@ Combine_inventories <- function(output_directory,
   ################################################################################
   #prepare lists for the thermogenic and nonthermogenic if that option was set
   
-  if(separate_thermo){
+  if(Separate_thermo){
     nonthermo_options <- unlist(sapply(all_filename_options[!all_filename_options %in% "NG_dist_options_filenames"],local_get))
     thermo_options <- NG_dist_options_filenames
     
@@ -295,7 +294,7 @@ Combine_inventories <- function(output_directory,
   ################################################################################
   #repeat for thermogenic and non-thermogenic if the option was set
   
-  if(separate_thermo){
+  if(Separate_thermo){
     #save these in their own folders
     thermo_output_directory <- file.path(Combined_output_directory,"thermogenic")
     nonthermo_output_directory <- file.path(Combined_output_directory,"non_thermogenic")
@@ -343,7 +342,9 @@ Combine_inventories <- function(output_directory,
       if(length(non_thermo_set_indx)!=0){
         for(A in 1:3){non_thermo_summary_combinations_rast[[A]]=sum(c(non_thermo_summary_combinations_rast[[A]],sum(set_rast[[non_thermo_set_indx]],na.rm=T)),na.rm=T)}
       }
-      
+      names(thermo_summary_combinations_rast) <- c("min","mean","max")
+      names(non_thermo_summary_combinations_rast) <- c("min","mean","max")
+
       writeCDF_no_newline(thermo_summary_combinations_rast,
                           file.path(Summary_combination_output_directory,"Summary_combination_thermogenic_inventories.nc"),
                           force_v4=TRUE,
@@ -419,7 +420,7 @@ Combine_inventories <- function(output_directory,
              domain=domain,County_Tigerlines=County_Tigerlines,
              zlim_min=-4,
              State_CB=State_CB)
-    if(separate_thermo){
+    if(Separate_thermo){
       Summed_thermogenic_sources <- thermo_summary_combinations_rast$mean
       log_plot(Summed_thermogenic_sources,
                "Final Inventory thermogenic sources -\nAveraged across all variations\nSaturated low end",
