@@ -106,7 +106,6 @@
 #'@param Source_DMR Character.  Pulled from \code{\link{M3T_config}}.
 #'@param Source_State_population_data Character.  Pulled from \code{\link{M3T_config}}.
 #'@param National_wastewater_info Data.frame.  Pulled from \code{\link{M3T_config}}.
-#'@param Wastewater_State_info Data.frame.  Pulled from \code{\link{M3T_config}}.
 #'@param Wastewater_reported_State_info Data.frame.  Pulled from \code{\link{M3T_config}}.
 #'@param GHGI_wastewater_data Data.frame.  Pulled from \code{\link{M3T_config}}.
 #'@param Total_national_open_or_low_int_area Numeric.  Pulled from \code{\link{M3T_config}}.
@@ -134,7 +133,6 @@
 #'  that were pulled from the corresponding input file.  The _all files include
 #'  all variables that were in the corresponding input file for the same
 #'  facilities.
-#'@inherit CH4_inventory_build author
 #'@references \href{https://doi.org/10.1016/j.isprsjprs.2020.02.019}{Homer et
 #'  al.}
 #'@references \href{https://doi.org/10.1021/acs.est.2c05373}{Moore et al.}
@@ -272,7 +270,6 @@ Wastewater <- function(input_directory,
                        Source_State_population_data,
                        inventory_year,
                        National_wastewater_info,
-                       Wastewater_State_info,
                        Wastewater_reported_State_info,
                        GHGI_wastewater_data,
                        GHGI_data_yr,
@@ -463,16 +460,34 @@ Wastewater <- function(input_directory,
   
   if(Wastewater_Municipal_Method_Moore_EF){
     if(Wastewater_use_CWNS){
-      #multiply flow by mol/s/MGD
-      #convert the average ton per day CH4 / million gallons per day wastewater to mol/s / million gallons per day wastewater
-      CWNS_Municipal_flow$emiss <- CWNS_Municipal_flow$EXIST_MUNICIPAL*0.050840504 * 1E6 / (16.043 * 24 * 60 * 60)
+      #convert from million gallons/day to m3/s
+      CWNS_Municipal_flow$EXIST_MUNICIPAL <- CWNS_Municipal_flow$EXIST_MUNICIPAL*3785.41178/(24*60*60)  
+      #Apply the log-log linear relationship from Figure 2A of Moore et al.
+      CWNS_Municipal_flow$emiss <- 1.2*log10(CWNS_Municipal_flow$EXIST_MUNICIPAL)+1
+      #convert from log10(g/s) to mol/s
+      CWNS_Municipal_flow$emiss <- (10^(CWNS_Municipal_flow$emiss))/(12.011+1.008*4)
       rasterize_plus(CWNS_Municipal_flow,"WWTP_CWNS_Moore_municipal")
     }
     if(Wastewater_use_DMR){
-      #average ton per day CH4 / million gallons per day wastewater to nmol/year / million gallons per day wastewater
-      DMR_Municipal_flow$emiss <- DMR_Municipal_flow$Average_Daily_Flow__MGD_*0.050840504 * 1E6 / (16.043 * 24 * 60 * 60)
+      #convert from million gallons/day to m3/s
+      DMR_Municipal_flow$Average_Daily_Flow__MGD_ <- DMR_Municipal_flow$Average_Daily_Flow__MGD_*3785.41178/(24*60*60)
+      #Apply the log-log linear relationship from Figure 2A of Moore et al.
+      DMR_Municipal_flow$emiss <- 1.2*log10(DMR_Municipal_flow$Average_Daily_Flow__MGD_)+1
+      #convert from log10(g/s) to mol/s
+      DMR_Municipal_flow$emiss <- (10^(DMR_Municipal_flow$emiss))/(12.011+1.008*4)
       rasterize_plus(DMR_Municipal_flow,"WWTP_DMR_Moore_municipal")
     }
+    # if(Wastewater_use_CWNS){
+    #   #multiply flow by 0.0508 mol/s/MGD emission factor
+    #   #convert the average ton per day CH4 / million gallons per day wastewater to mol/s / million gallons per day wastewater
+    #   CWNS_Municipal_flow$emiss <- CWNS_Municipal_flow$EXIST_MUNICIPAL*0.050840504 * 1E6 / (16.043 * 24 * 60 * 60)
+    #   rasterize_plus(CWNS_Municipal_flow,"WWTP_CWNS_Moore_municipal")
+    # }
+    # if(Wastewater_use_DMR){
+    #   #average ton per day CH4 / million gallons per day wastewater to mol/s / million gallons per day wastewater
+    #   DMR_Municipal_flow$emiss <- DMR_Municipal_flow$Average_Daily_Flow__MGD_*0.050840504 * 1E6 / (16.043 * 24 * 60 * 60)
+    #   rasterize_plus(DMR_Municipal_flow,"WWTP_DMR_Moore_municipal")
+    # }
   }
   
   cat("Finished calculating municipal treatment plant emissions at",format(Sys.time(),"%H:%M"),"\n")
@@ -539,14 +554,19 @@ Wastewater <- function(input_directory,
   ################################################################################
   #Update the state population data from config using this data
   
-  State_population <- Census_state_population[match(sort(State_Tigerlines$NAME),Census_state_population$NAME),
-                                              paste0("POPESTIMATE",GHGI_data_yr)]
+  #ensure organized as per state_name_list (STUSPS)
+  State_population <- merge(Census_state_population,State_Tigerlines,by="NAME",all.x=T)
+  State_population <- State_population[order(State_population$STUSPS),paste0("POPESTIMATE",GHGI_data_yr)]
   
+  Wastewater_State_info <- M3T::Wastewater_1990_state_septic
+  Wastewater_State_info <- Wastewater_State_info[order(Wastewater_State_info$State),]
+
   #filter the reported state info to only those within 1 year (it's biannual),
-  #within the domain, and set to reported
+  #within the domain
   Wastewater_reported_State_info <- Wastewater_reported_State_info[(Wastewater_reported_State_info$Year %in% (inventory_year-1):(inventory_year+1)) & 
-                                                                     (Wastewater_reported_State_info$State %in% State_Tigerlines$STUSPS) &
-                                                                     (Wastewater_reported_State_info$State %in% Wastewater_State_info$State[Wastewater_State_info$Method=="reported"]),]
+                                                                     (Wastewater_reported_State_info$State %in% State_Tigerlines$STUSPS),]
+  
+  Wastewater_State_info$Method <- "scaled"
   
   if(nrow(Wastewater_reported_State_info)!=0){
     #average across years if both years around the inventory year are available
@@ -554,14 +574,11 @@ Wastewater <- function(input_directory,
     colnames(Wastewater_reported_State_info)[1] <- "State"
     #update using the reported info
     Wastewater_State_info$Septic_Fraction[match(Wastewater_reported_State_info$State,Wastewater_State_info$State)] <- Wastewater_reported_State_info$Septic_Fraction
+    Wastewater_State_info$Method[match(Wastewater_reported_State_info$State,Wastewater_State_info$State)] <- "reported"
   }
-  reported_states <- Wastewater_State_info$Method=="reported"
-  update_indx <- !(Wastewater_State_info$State %in% Wastewater_reported_State_info$State) & Wastewater_State_info$Method=="reported"
-  Wastewater_State_info$Method[update_indx] <- "scaled"
-  
+
   #filter the final info to the domain and incorporate the population
-  update_indx <- update_indx[Wastewater_State_info$State %in% State_Tigerlines$STUSPS]
-  Wastewater_State_info <- Wastewater_State_info[Wastewater_State_info$State %in% State_Tigerlines$STUSPS,]
+  Wastewater_State_info <- Wastewater_State_info[State_Tigerlines$STUSPS %in% Wastewater_State_info$State,]
   Wastewater_State_info$Population <- State_population
   
   #Same for the national data
@@ -581,9 +598,6 @@ Wastewater <- function(input_directory,
     cat("Reported septic data for",
         paste0(Wastewater_reported_State_info$State[Wastewater_reported_State_info$Year!=inventory_year],collapse = ", "),"are from the nearest available years,",
         paste0(Wastewater_reported_State_info$Year[Wastewater_reported_State_info$Year!=inventory_year],collapse = ", "),"respectively\n")
-  }
-  if(any(update_indx)){
-    cat("No reported septic data for the inventory year or +/- 1 year for",Wastewater_State_info$State[update_indx],"- switching these states to scaled method like most states\n")
   }
   ################################################################################
   #Now load in output from NLCD_fractions_by_state - processing differs since
@@ -636,10 +650,8 @@ Wastewater <- function(input_directory,
     NLCD_domain <- terra::as.polygons(terra::ext(domain)/terra::ext(State_Tigerlines) * terra::ext(NLCD_Tigerlines))
   }else{
     NLCD_domain <- terra::project(domain,NLCD_Tigerlines)
-    
-    #prep to project to domain
-    cover <- terra::extract(Suburbia,NLCD_domain,weights=T,cells=T)
   }
+  NLCD_res <- terra::res(terra::project(domain_template,NLCD_Tigerlines))
   terra::crs(NLCD_domain) <- terra::crs(NLCD_Tigerlines)
   
   
@@ -660,9 +672,11 @@ Wastewater <- function(input_directory,
     #so the average doesn't consider these NA values to ignore in calculations
     #(drastically impacts avg).  Then finally reproject via average.
     if(!any(terra::ext(domain)/terra::ext(State_Tigerlines) > 1.1)){
+      #prep to project to domain
+      cover <- terra::extract(septic_flux,NLCD_domain,weights=T,cells=T)
       septic_flux[cover[,'cell']] <- septic_flux[cover[,'cell']]*cover[,'weight']
       septic_flux=terra::extend(septic_flux,fill=0,
-                                terra::ext(septic_flux)+(terra::res(NLCD_domain)*5))
+                                terra::ext(septic_flux)+(NLCD_res*5))
     }
     septic_flux=terra::project(septic_flux,domain_template,method="average")
     
@@ -689,8 +703,14 @@ Wastewater <- function(input_directory,
     
     #make a raster with separate values for each state to combine
     state_tot_emiss <- terra::merge(NLCD_Tigerlines,state_tot_emiss,by.x="STUSPS",by.y="State",all.y=T)
-    #disagg before rasterizing to better represent pixels on state borders
-    state_tot_emiss <- terra::rasterize(state_tot_emiss,terra::disagg(Suburbia,5),field="Combined_Septic_EF",touches=T)
+    #disagg from 1000 to 200 before rasterizing to better represent pixels on
+    #state borders. Create as equivalent new raster instead to avoid compute
+    #time (values are irrelevant for this task)
+    state_tot_emiss <- terra::rasterize(state_tot_emiss,
+                                        terra::rast(resolution=200,
+                                                    ext=terra::ext(Suburbia),
+                                                    crs="+proj=aea +lat_0=23 +lon_0=-96 +lat_1=29.5 +lat_2=45.5 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"),
+                                        field="Combined_Septic_EF",touches=T)
     state_tot_emiss[is.na(state_tot_emiss)] <- 0
     state_tot_emiss <- terra::aggregate(state_tot_emiss,5,mean,na.rm=T)
     
@@ -708,9 +728,11 @@ Wastewater <- function(input_directory,
     #so the average doesn't consider these NA values to ignore in calculations
     #(drastically impacts avg).  Then finally reproject via average.
     if(!any(terra::ext(domain)/terra::ext(State_Tigerlines) > 1.1)){
+      #prep to project to domain
+      cover <- terra::extract(septic_flux2,NLCD_domain,weights=T,cells=T)
       septic_flux2[cover[,'cell']] <- septic_flux2[cover[,'cell']]*cover[,'weight']
       septic_flux2=terra::extend(septic_flux2,fill=0,
-                                 terra::ext(septic_flux2)+(terra::res(NLCD_domain)*5))
+                                terra::ext(septic_flux2)+(NLCD_res*5))
     }
     septic_flux2=terra::project(septic_flux2,domain_template,method="average")
     
