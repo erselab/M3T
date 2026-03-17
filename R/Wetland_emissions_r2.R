@@ -47,7 +47,6 @@
 #'  plots with consistent axes are saved for the 2 SOCCR emissions and
 #'  freshwater emissions.  They are saved as "SOCCR1.png", "SOCCR2.png", and
 #'  "Freshwater.png".
-#'@inherit CH4_inventory_build author
 #'@references \href{https://doi.org/10.4319/lo.2012.57.2.0597}{McDonald et al.}
 #'@references \href{https://doi.org/10.1038/s41561-021-00715-2}{Rosentreter et
 #'  al.}
@@ -228,12 +227,11 @@ SOCCR_Wetlands <- function(input_directory,
     #problematic
     if(any(terra::ext(domain)/terra::ext(State_Tigerlines) > 1.1)){
       domain_trans <- terra::as.polygons(terra::ext(domain_template)/terra::ext(State_Tigerlines) * terra::ext(terra::project(State_Tigerlines,NWI_data)))
-      terra::crs(domain_trans) <- terra::crs(NWI_data)
-      domain_res <- terra::res(terra::project(domain_template,terra::crs(NWI_data)))
     }else{
-      domain_trans <- terra::project(domain_template,terra::crs(NWI_data))
-      domain_res <- terra::res(domain_trans)
+      domain_trans <- terra::as.polygons(terra::ext(terra::project(domain_template,terra::crs(NWI_data))))
     }
+    domain_res <- terra::res(terra::project(domain_template,terra::crs(NWI_data)))
+    terra::crs(domain_trans) <- terra::crs(NWI_data)
     
     
     
@@ -268,7 +266,11 @@ SOCCR_Wetlands <- function(input_directory,
       }
       if(Use_SOCCR2){
         #disagg before rasterizing to better represent pixels on watershed borders
-        temp <- terra::rasterize(watershed,terra::disagg(subset_data,5),field=SOCCR_wetland_types[1],touches=T)
+        temp <- terra::rasterize(watershed,
+                                 terra::rast(resolution=terra::res(subset_data)/5,
+                                             extent=terra::ext(subset_data),
+                                             crs=terra::crs(subset_data)),
+                                 field=SOCCR_wetland_types[1],touches=T)
         temp <- terra::aggregate(temp,5,mean,na.rm=T)
         SOCCR2_flux <- temp*subset_data
       }
@@ -296,7 +298,11 @@ SOCCR_Wetlands <- function(input_directory,
         }
         if(Use_SOCCR2){
           #disagg before rasterizing to better represent pixels on watershed borders
-          temp <- terra::rasterize(watershed,terra::disagg(subset_data,5),field=SOCCR_wetland_types[i],touches=T)
+          temp <- terra::rasterize(watershed,
+                                   terra::rast(resolution=terra::res(subset_data)/5,
+                                               extent=terra::ext(subset_data),
+                                               crs=terra::crs(subset_data)),
+                                   field=SOCCR_wetland_types[i],touches=T)
           temp <- terra::aggregate(temp,5,mean,na.rm=T)
           SOCCR2_flux <- sum(c(SOCCR2_flux,temp*subset_data),na.rm=T)
         }
@@ -375,7 +381,11 @@ SOCCR_Wetlands <- function(input_directory,
       }
       if(Use_SOCCR2){
         #disagg before rasterizing to better represent pixels on watershed borders
-        temp <- terra::rasterize(watershed,terra::disagg(subset_data,5),field=SOCCR_wetland_types[1],touches=T)
+        temp <- terra::rasterize(watershed,
+                                 terra::rast(resolution=terra::res(subset_data)/5,
+                                             extent=terra::ext(subset_data),
+                                             crs=terra::crs(subset_data)),
+                                 field=SOCCR_wetland_types[1],touches=T)
         temp <- terra::aggregate(temp,5,mean,na.rm=T)
         SOCCR2_flux <- temp*subset_data
       }
@@ -393,7 +403,11 @@ SOCCR_Wetlands <- function(input_directory,
         }
         if(Use_SOCCR2){
           #disagg before rasterizing to better represent pixels on watershed borders
-          temp <- terra::rasterize(watershed,terra::disagg(subset_data,5),field=SOCCR_wetland_types[i],touches=T)
+          temp <- terra::rasterize(watershed,
+                                   terra::rast(resolution=terra::res(subset_data)/5,
+                                               extent=terra::ext(subset_data),
+                                               crs=terra::crs(subset_data)),
+                                   field=SOCCR_wetland_types[i],touches=T)
           temp <- terra::aggregate(temp,5,mean,na.rm=T)
           SOCCR2_flux <- sum(c(SOCCR2_flux,temp*subset_data),na.rm=T)
         }
