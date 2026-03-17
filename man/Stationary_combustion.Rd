@@ -12,6 +12,7 @@ Stationary_combustion(
   output_directory,
   inventory_year,
   GHGI_data_yr,
+  State_Tigerlines,
   verbose,
   County_Tigerlines,
   Use_ACES,
@@ -216,10 +217,5 @@ throughout processing.
 
 \code{\link[=disaggregation]{disaggregation()}} Disaggregates data from the county level to pixels using a
 sectoral CO2 inventory.
-}
-\author{
-Kris Hajny, \email{kris.hajny@gmail.com}
-
-Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
 }
 \keyword{internal}

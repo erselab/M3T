@@ -24,7 +24,6 @@ Wastewater(
   Source_State_population_data,
   inventory_year,
   National_wastewater_info,
-  Wastewater_State_info,
   Wastewater_reported_State_info,
   GHGI_wastewater_data,
   GHGI_data_yr,
@@ -80,8 +79,6 @@ years and states as prepared in \code{\link{CH4_inventory_build}} using the
 closest available will be used if unavailable with a user update.}
 
 \item{National_wastewater_info}{Data.frame.  Pulled from \code{\link{M3T_config}}.}
-
-\item{Wastewater_State_info}{Data.frame.  Pulled from \code{\link{M3T_config}}.}
 
 \item{Wastewater_reported_State_info}{Data.frame.  Pulled from \code{\link{M3T_config}}.}
 
@@ -246,10 +243,5 @@ cover in each pixel.
 
 \link{M3T_config} Generates the config function with user-editable settings used
 throughout processing.
-}
-\author{
-Kris Hajny, \email{kris.hajny@gmail.com}
-
-Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
 }
 \keyword{internal}

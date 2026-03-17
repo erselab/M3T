@@ -336,9 +336,4 @@ throughout processing.
 
 \code{\link[=disaggregation]{disaggregation()}} Disaggregates data to pixels using a sectoral CO2 inventory.
 }
-\author{
-Kris Hajny, \email{kris.hajny@gmail.com}
-
-Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
-}
 \keyword{internal}

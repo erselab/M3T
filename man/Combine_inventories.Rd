@@ -6,7 +6,7 @@
 \usage{
 Combine_inventories(
   output_directory,
-  separate_thermo,
+  Separate_thermo,
   Create_summary_combinations,
   Create_individual_combinations,
   plot_directory,
@@ -21,7 +21,7 @@ Combine_inventories(
 \item{output_directory}{Character providing the full filepath to save
 processed data as created in \code{\link{CH4_inventory_build}}}
 
-\item{separate_thermo}{Logical.  Pulled from \code{\link{M3T_config}}.}
+\item{Separate_thermo}{Logical.  Pulled from \code{\link{M3T_config}}.}
 
 \item{plot_directory}{Character. \strong{Optional}. Provides the full filepath
 to save figures. Only relevant if \code{verbose} = TRUE.}
@@ -110,10 +110,5 @@ provided in config.
 
 \link{M3T_config} Generates the config function with user-editable settings used
 throughout processing.
-}
-\author{
-Kris Hajny, \email{kris.hajny@gmail.com}
-
-Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
 }
 \keyword{internal}

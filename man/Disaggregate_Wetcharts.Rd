@@ -119,9 +119,4 @@ throughout processing.
 \code{\link[=SOCCR_Wetlands]{SOCCR_Wetlands()}} Calculates methane emissions for the wetland sector using
 the state of the carbon cycle report instead.
 }
-\author{
-Kris Hajny, \email{kris.hajny@gmail.com}
-
-Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
-}
 \keyword{internal}

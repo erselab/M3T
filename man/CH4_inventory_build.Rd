@@ -92,8 +92,3 @@ CH4_inventory_build(run_directory=tempdir(),
 \link{M3T_config} Generates the config function with user-editable
 settings used throughout processing.
 }
-\author{
-Kris Hajny, \email{kris.hajny@gmail.com}
-
-Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
-}

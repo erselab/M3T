@@ -28,9 +28,4 @@ uses a repeat and trycatch loop in case there is poor internet
 connectivity.  It will attempt the download up to 5 times before failing.
 Includes user updates throughout as well.
 }
-\author{
-Kris Hajny, \email{kris.hajny@gmail.com}
-
-Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
-}
 \keyword{internal}

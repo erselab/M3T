@@ -74,9 +74,4 @@ throughout processing.
 
 \code{\link[=Wastewater]{Wastewater()}} Calculates methane emissions for the wastewater sector.
 }
-\author{
-Kris Hajny, \email{kris.hajny@gmail.com}
-
-Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
-}
 \keyword{internal}

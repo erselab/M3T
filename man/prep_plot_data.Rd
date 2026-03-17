@@ -27,9 +27,4 @@ those for point sources, are more useful on a log scale.
 \seealso{
 \code{\link[=log_plot]{log_plot()}} plots the data in simple log-scale visuals.
 }
-\author{
-Kris Hajny, \email{kris.hajny@gmail.com}
-
-Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
-}
 \keyword{internal}

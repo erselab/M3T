@@ -23,9 +23,4 @@ This function will change "ghg_gas_name" to "ghg_name" and
 tables.  It will also force the "ghg_name" and "facility_name" data to be
 lower case and remove any data for a ghg besides methane.
 }
-\author{
-Kris Hajny, \email{kris.hajny@gmail.com}
-
-Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
-}
 \keyword{internal}

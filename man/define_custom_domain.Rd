@@ -32,9 +32,4 @@ polygon is useful.
 \code{\link[=CH4_inventory_build]{CH4_inventory_build()}} Calculates methane inventory using settings
 provided in config.
 }
-\author{
-Kris Hajny, \email{kris.hajny@gmail.com}
-
-Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
-}
 \keyword{internal}

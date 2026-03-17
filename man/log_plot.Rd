@@ -72,8 +72,3 @@ similar sectors/subsectors.
 
 \code{\link[=not_log_plot]{not_log_plot()}} plots the data in simple linear-scale visuals.
 }
-\author{
-Kris Hajny, \email{kris.hajny@gmail.com}
-
-Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
-}

@@ -127,9 +127,4 @@ sector using wetcharts instead.
 \code{\link[=NWI_Wetland_fraction]{NWI_Wetland_fraction()}} Calculates the fraction of wetland land cover by
 wetland type in each pixel.
 }
-\author{
-Kris Hajny, \email{kris.hajny@gmail.com}
-
-Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
-}
 \keyword{internal}

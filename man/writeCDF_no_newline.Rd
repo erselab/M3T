@@ -14,9 +14,4 @@ writeCDF_no_newline(input_raster, ...)
 outputting a new line after running.  Improves flow of periodic user
 updates within the package.
 }
-\author{
-Kris Hajny, \email{kris.hajny@gmail.com}
-
-Joe Pitt, \email{joseph.pitt@bristol.ac.uk}
-}
 \keyword{internal}
