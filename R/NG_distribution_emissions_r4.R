@@ -665,9 +665,48 @@ NG_distribution <- function(domain,
     above_grade_MnR$stations_per_mile <- above_grade_MnR$x/main_miles_ghgrp$x
     below_grade_MnR$stations_per_mile <- below_grade_MnR$x/main_miles_ghgrp$x
     
+    ############################################################################
+    #handle states with no GHGRP data using the average of neighboring states
+
+    #ID states with no data
+    state_indx <- match(all_merge_clean$PHMSA_State,above_grade_MnR$State)
+    missing_states <- all_merge_clean$PHMSA_State[is.na(state_indx)]
+    Neighboring_states <- M3T::Neighboring_states
+    
+    B=1
+    repeat{
+      for(A in 1:length(missing_states)){
+        #calculate avg stations/mile across neighboring states
+        sub_in <- data.frame("State" = missing_states[A],
+                             "x" = NA,
+                             "stations_per_mile" = mean(above_grade_MnR[state_indx,"stations_per_mile"][Neighboring_states[missing_states[A],]],na.rm=T))
+        above_grade_MnR <- rbind(above_grade_MnR,sub_in)
+        
+        sub_in$stations_per_mile <- mean(below_grade_MnR[state_indx,"stations_per_mile"][Neighboring_states[missing_states[A],]],na.rm=T)
+        below_grade_MnR <- rbind(below_grade_MnR,sub_in)
+      }
+      
+      #if all neighbors = 0, remove that row
+      above_grade_MnR <- above_grade_MnR[!is.na(above_grade_MnR$stations_per_mile),]
+      below_grade_MnR <- below_grade_MnR[!is.na(below_grade_MnR$stations_per_mile),]
+      
+      #recalculate matches as indices are now different
+      state_indx <- match(all_merge_clean$PHMSA_State,above_grade_MnR$State)
+      missing_states <- all_merge_clean$PHMSA_State[is.na(state_indx)]
+      
+      #if any were all na, run the loop again as neighbors may have been
+      #assigned through this process.  
+      if(!any(is.na(state_indx))){
+        break
+      }
+      #just in case, stop just to avoid an infinite loop
+      if(B>10){
+        stop()
+      }
+    }
+
     # allocate average stations per mile in each state to all facilities if not
     # calculating by LDC
-    state_indx <- match(all_merge_clean$PHMSA_State,above_grade_MnR$State)
     all_merge_clean$GHGRP_MnR_above <- all_merge_clean$PHMSA_MMILES_TOTAL*above_grade_MnR$stations_per_mile[state_indx]
     all_merge_clean$GHGRP_MnR_below <- all_merge_clean$PHMSA_MMILES_TOTAL*below_grade_MnR$stations_per_mile[state_indx]
     
