@@ -32,21 +32,18 @@
 
 
 
-#' Historical state septic data from the U.S. Census Bureau
+#' States that neighbor each state
 #'
-#' A subset of data from the Census Bureau
+#' A logical matrix of which states are neighbors within CONUS
 #'
-#' The estimated fraction of the population using septic systems at the state
-#' level for 1990 published by the U.S. Census Bureau
+#' Processed data from the Census tigerlines
 #'
-#' @format `Wastewater_1990_state_septic` A data frame with 52 rows and 2
-#'   columns:
-#' \describe{
-#'   \item{State}{State name}
-#'   \item{Septic_Fraction}{Fraction of the population using septic systems}
-#' }
-#' @source <https://www.census.gov/data/tables/time-series/dec/coh-sewage.html>
-'Wastewater_1990_state_septic'
+#' @format `Neighboring_states` A data frame with 49 rows and 49 columns.  Each
+#'   row and column is a state abbreviation, a true means the states neighbor
+#'   one another (e.g., WA neighbors only ID and OR).
+#' @source
+#' <https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html>
+'Neighboring_states'
 
 
 
@@ -469,3 +466,23 @@
 #' <https://www.phmsa.dot.gov/data-and-statistics/pipeline/gas-distribution-gas-gathering-gas-transmission-hazardous-liquids>
 "PHMSA_natural_gas_distribution"
 
+
+
+
+
+
+#' Historical state septic data from the U.S. Census Bureau
+#'
+#' A subset of data from the Census Bureau
+#'
+#' The estimated fraction of the population using septic systems at the state
+#' level for 1990 published by the U.S. Census Bureau
+#'
+#' @format `Wastewater_1990_state_septic` A data frame with 52 rows and 2
+#'   columns:
+#' \describe{
+#'   \item{State}{State name}
+#'   \item{Septic_Fraction}{Fraction of the population using septic systems}
+#' }
+#' @source <https://www.census.gov/data/tables/time-series/dec/coh-sewage.html>
+'Wastewater_1990_state_septic'
