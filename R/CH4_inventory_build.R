@@ -245,10 +245,8 @@ CH4_inventory_build <- function(run_directory,
   
   if(M3T_config$Use_Vulcan & (M3T_config$Process_stationary_combustion | M3T_config$Process_natural_gas_distribution)){
     #year of Vulcan v4.0 data.
-    vulcan_year <- which.min(abs(2010:2015 - inventory_year))
-    # vulcan_year <- (2010:2021)[which.min(abs(2010:2021 - inventory_year))]
-    # if(inventory_year!=vulcan_year){
-    if(inventory_year!=(2010:2015)[vulcan_year]){
+    vulcan_year <- (2010:2021)[which.min(abs(2010:2021 - inventory_year))]
+    if(inventory_year!=vulcan_year){
       cat("Vulcan does not include",inventory_year,"using",(2010:2015)[vulcan_year],"as the nearest data available\n")
     }
     
@@ -264,15 +262,10 @@ CH4_inventory_build <- function(run_directory,
                             vulcan_directory,overwrite=T,recursive=T))
       }
     }
-    # vu_res <- terra::rast(file.path(vulcan_directory,paste0("v4.res.co2.usa.1km.lcc.mn.",vulcan_year,".tif")))
-    # vu_com <- terra::rast(file.path(vulcan_directory,paste0("v4.com.co2.usa.1km.lcc.mn.",vulcan_year,".tif")))
-    # vu_ind <- terra::rast(file.path(vulcan_directory,paste0("v4.ind.co2.usa.1km.lcc.mn.",vulcan_year,".tif")))
-    # vu_elec <- terra::rast(file.path(vulcan_directory,paste0("v4.elc.co2.usa.1km.lcc.mn.",vulcan_year,".tif")))
-    
-    vu_res <- terra::rast(file.path(vulcan_directory,paste0("Vulcan_v3_US_annual_1km_residential_mn.nc4")),lyr=vulcan_year)
-    vu_com <- terra::rast(file.path(vulcan_directory,paste0("Vulcan_v3_US_annual_1km_commercial_filt.nc")),lyr=vulcan_year)
-    vu_ind <- terra::rast(file.path(vulcan_directory,paste0("Vulcan_v3_US_annual_1km_industrial_mn.nc4")),lyr=vulcan_year)
-    vu_elec <- terra::rast(file.path(vulcan_directory,paste0("Vulcan_v3_US_annual_1km_elec_prod_mn.nc4")),lyr=vulcan_year)
+    vu_res <- terra::rast(file.path(vulcan_directory,paste0("v4.res.co2.usa.1km.lcc.mn.",vulcan_year,".tif")))
+    vu_com <- terra::rast(file.path(vulcan_directory,paste0("v4.com.co2.usa.1km.lcc.mn.",vulcan_year,".tif")))
+    vu_ind <- terra::rast(file.path(vulcan_directory,paste0("v4.ind.co2.usa.1km.lcc.mn.",vulcan_year,".tif")))
+    vu_elec <- terra::rast(file.path(vulcan_directory,paste0("v4.elc.co2.usa.1km.lcc.mn.",vulcan_year,".tif")))
   }
   ################################################################################
   #some early error checking, mostly looking at config.  Are the options
