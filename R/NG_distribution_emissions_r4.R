@@ -560,9 +560,86 @@ NG_distribution <- function(domain,
     
     GHGRP_csv[!is.na(name_match),"operating_state"]=datasets::state.abb[stats::na.omit(name_match)]
     GHGRP_csv[!is.na(name_match),"operating_state_name"]=datasets::state.name[stats::na.omit(name_match)]
+
+    ############################################################################
+    #M&R stations - can't use GHGRP data without matching facilities, so
+    #estimate based on avg stations per mile for reporters in each state. Then
+    #split by pressure and function assuming the same split as at the national
+    #level (from the GHGI national inventory report).
+    
+    #aggregate each to a state total
+    main_miles_ghgrp <- stats::aggregate(GHGRP_csv$Miles_of_Mains,
+                                         list(State=GHGRP_csv$operating_state),
+                                         sum,
+                                         na.rm=TRUE)
+    above_grade_MnR <- stats::aggregate((GHGRP_csv$`N_of_above_grade_T_D_transfer_stations` +
+                                           GHGRP_csv$`N_of_above_grade_non_T_D_MR_stations`),
+                                        list(State=GHGRP_csv$operating_state),
+                                        sum,
+                                        na.rm=TRUE)
+    below_grade_MnR <- stats::aggregate((GHGRP_csv$`N_of_below_grade_non_T_D_MR_stations` +
+                                           GHGRP_csv$`N_of_below_grade_T_D_transfer_stations`),
+                                        list(State=GHGRP_csv$operating_state),
+                                        sum,
+                                        na.rm=TRUE)
+    
+    # Calculate average stations per mile in each state
+    above_grade_MnR$stations_per_mile <- above_grade_MnR$x/main_miles_ghgrp$x
+    below_grade_MnR$stations_per_mile <- below_grade_MnR$x/main_miles_ghgrp$x
+    
+    ############################################################################
+    #handle states with no GHGRP data using the average of neighboring states
+    
+    full_state_list <- c('AL','AR','AZ','CA','CA','CT','DC','DE','FL','GA','IA','ID','IL','IN',
+                         'KS','KY','LA','MA','MD','ME','MI','MN','MO','MS','MT','NC','ND','NE',
+                         'NH','NJ','NM','NV','NY','OH','OK','OR','PA','RI','SC','SD','TN','TX',
+                         'UT','VA','VT','WA','WI','WV','WY')
+    #ID states with no data
+    state_indx <- match(full_state_list,above_grade_MnR$State)
+    missing_states <- full_state_list[is.na(state_indx)]
+    Neighboring_states <- M3T::Neighboring_states
+    
+    B=1
+    repeat{
+      for(A in 1:length(missing_states)){
+        #calculate avg stations/mile across neighboring states
+        sub_in <- data.frame("State" = missing_states[A],
+                             "x" = NA,
+                             "stations_per_mile" = mean(above_grade_MnR[state_indx,"stations_per_mile"][Neighboring_states[missing_states[A],]],na.rm=T))
+        above_grade_MnR <- rbind(above_grade_MnR,sub_in)
+        
+        sub_in$stations_per_mile <- mean(below_grade_MnR[state_indx,"stations_per_mile"][Neighboring_states[missing_states[A],]],na.rm=T)
+        below_grade_MnR <- rbind(below_grade_MnR,sub_in)
+      }
+      
+      #if all neighbors = 0, remove that row
+      above_grade_MnR <- above_grade_MnR[!is.na(above_grade_MnR$stations_per_mile),]
+      below_grade_MnR <- below_grade_MnR[!is.na(below_grade_MnR$stations_per_mile),]
+      
+      #recalculate matches as indices are now different
+      state_indx <- match(full_state_list,above_grade_MnR$State)
+      missing_states <- full_state_list[is.na(state_indx)]
+      
+      #if any were all na, run the loop again as neighbors may have been
+      #assigned through this process.  
+      if(!any(is.na(state_indx))){
+        break
+      }
+      #just in case, stop just to avoid an infinite loop
+      if(B>10){
+        stop()
+      }
+    }
+    above_grade_MnR <- above_grade_MnR[state_indx,]
+    below_grade_MnR <- below_grade_MnR[state_indx,]
+
+    ################################################################################
+    #finalize GHGRP data
     
     #filter to the states in the domain
     GHGRP_csv <- GHGRP_csv[GHGRP_csv$operating_state %in% state_name_list,]
+    above_grade_MnR <- above_grade_MnR[above_grade_MnR$State %in% state_name_list,]
+    below_grade_MnR <- below_grade_MnR[below_grade_MnR$State %in% state_name_list,]
     
     #update user about changes to any LDCs that are/were listed as states within
     #the domain
@@ -639,76 +716,11 @@ NG_distribution <- function(domain,
     
     #just so the state variable is consistent with the byLDC version
     names(all_merge_clean) <- gsub("STUSPS","PHMSA_State",names(all_merge_clean))
-    ############################################################################
-    #M&R stations - can't use GHGRP data without matching facilities, so
-    #estimate based on avg stations per mile for reporters in each state. Then
-    #split by pressure and function assuming the same split as at the national
-    #level (from the GHGI national inventory report).
     
-    #aggregate each to a state total
-    main_miles_ghgrp <- stats::aggregate(GHGRP_csv$Miles_of_Mains,
-                                         list(State=GHGRP_csv$operating_state),
-                                         sum,
-                                         na.rm=TRUE)
-    above_grade_MnR <- stats::aggregate((GHGRP_csv$`N_of_above_grade_T_D_transfer_stations` +
-                                           GHGRP_csv$`N_of_above_grade_non_T_D_MR_stations`),
-                                        list(State=GHGRP_csv$operating_state),
-                                        sum,
-                                        na.rm=TRUE)
-    below_grade_MnR <- stats::aggregate((GHGRP_csv$`N_of_below_grade_non_T_D_MR_stations` +
-                                           GHGRP_csv$`N_of_below_grade_T_D_transfer_stations`),
-                                        list(State=GHGRP_csv$operating_state),
-                                        sum,
-                                        na.rm=TRUE)
-    
-    # Calculate average stations per mile in each state
-    above_grade_MnR$stations_per_mile <- above_grade_MnR$x/main_miles_ghgrp$x
-    below_grade_MnR$stations_per_mile <- below_grade_MnR$x/main_miles_ghgrp$x
-    
-    ############################################################################
-    #handle states with no GHGRP data using the average of neighboring states
-
-    #ID states with no data
-    state_indx <- match(all_merge_clean$PHMSA_State,above_grade_MnR$State)
-    missing_states <- all_merge_clean$PHMSA_State[is.na(state_indx)]
-    Neighboring_states <- M3T::Neighboring_states
-    
-    B=1
-    repeat{
-      for(A in 1:length(missing_states)){
-        #calculate avg stations/mile across neighboring states
-        sub_in <- data.frame("State" = missing_states[A],
-                             "x" = NA,
-                             "stations_per_mile" = mean(above_grade_MnR[state_indx,"stations_per_mile"][Neighboring_states[missing_states[A],]],na.rm=T))
-        above_grade_MnR <- rbind(above_grade_MnR,sub_in)
-        
-        sub_in$stations_per_mile <- mean(below_grade_MnR[state_indx,"stations_per_mile"][Neighboring_states[missing_states[A],]],na.rm=T)
-        below_grade_MnR <- rbind(below_grade_MnR,sub_in)
-      }
-      
-      #if all neighbors = 0, remove that row
-      above_grade_MnR <- above_grade_MnR[!is.na(above_grade_MnR$stations_per_mile),]
-      below_grade_MnR <- below_grade_MnR[!is.na(below_grade_MnR$stations_per_mile),]
-      
-      #recalculate matches as indices are now different
-      state_indx <- match(all_merge_clean$PHMSA_State,above_grade_MnR$State)
-      missing_states <- all_merge_clean$PHMSA_State[is.na(state_indx)]
-      
-      #if any were all na, run the loop again as neighbors may have been
-      #assigned through this process.  
-      if(!any(is.na(state_indx))){
-        break
-      }
-      #just in case, stop just to avoid an infinite loop
-      if(B>10){
-        stop()
-      }
-    }
-
     # allocate average stations per mile in each state to all facilities if not
     # calculating by LDC
-    all_merge_clean$GHGRP_MnR_above <- all_merge_clean$PHMSA_MMILES_TOTAL*above_grade_MnR$stations_per_mile[state_indx]
-    all_merge_clean$GHGRP_MnR_below <- all_merge_clean$PHMSA_MMILES_TOTAL*below_grade_MnR$stations_per_mile[state_indx]
+    all_merge_clean$GHGRP_MnR_above <- all_merge_clean$PHMSA_MMILES_TOTAL*above_grade_MnR$stations_per_mile
+    all_merge_clean$GHGRP_MnR_below <- all_merge_clean$PHMSA_MMILES_TOTAL*below_grade_MnR$stations_per_mile
     
     cat("\nFinished downloading and merging all input data at",format(Sys.time(),"%H:%M"),"\n")
   }else{
