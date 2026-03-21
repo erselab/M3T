@@ -462,8 +462,9 @@ Wastewater <- function(input_directory,
     if(Wastewater_use_CWNS){
       #convert from million gallons/day to m3/s
       CWNS_Municipal_flow$EXIST_MUNICIPAL <- CWNS_Municipal_flow$EXIST_MUNICIPAL*3785.41178/(24*60*60)  
-      #Apply the log-log linear relationship from Figure 2A of Moore et al.
-      CWNS_Municipal_flow$emiss <- 1.2*log10(CWNS_Municipal_flow$EXIST_MUNICIPAL)+1
+      #Apply the log-log linear relationship from Figure 2A of Moore et al.,
+      #updated with the data in the 2025 nature publication
+      CWNS_Municipal_flow$emiss <- 1.279367*log10(CWNS_Municipal_flow$EXIST_MUNICIPAL)+0.9257305
       #convert from log10(g/s) to mol/s
       CWNS_Municipal_flow$emiss <- (10^(CWNS_Municipal_flow$emiss))/(12.011+1.008*4)
       rasterize_plus(CWNS_Municipal_flow,"WWTP_CWNS_Moore_municipal")
@@ -472,22 +473,11 @@ Wastewater <- function(input_directory,
       #convert from million gallons/day to m3/s
       DMR_Municipal_flow$Average_Daily_Flow__MGD_ <- DMR_Municipal_flow$Average_Daily_Flow__MGD_*3785.41178/(24*60*60)
       #Apply the log-log linear relationship from Figure 2A of Moore et al.
-      DMR_Municipal_flow$emiss <- 1.2*log10(DMR_Municipal_flow$Average_Daily_Flow__MGD_)+1
+      DMR_Municipal_flow$emiss <- 1.279367*log10(DMR_Municipal_flow$Average_Daily_Flow__MGD_)+0.9257305
       #convert from log10(g/s) to mol/s
       DMR_Municipal_flow$emiss <- (10^(DMR_Municipal_flow$emiss))/(12.011+1.008*4)
       rasterize_plus(DMR_Municipal_flow,"WWTP_DMR_Moore_municipal")
     }
-    # if(Wastewater_use_CWNS){
-    #   #multiply flow by 0.0508 mol/s/MGD emission factor
-    #   #convert the average ton per day CH4 / million gallons per day wastewater to mol/s / million gallons per day wastewater
-    #   CWNS_Municipal_flow$emiss <- CWNS_Municipal_flow$EXIST_MUNICIPAL*0.050840504 * 1E6 / (16.043 * 24 * 60 * 60)
-    #   rasterize_plus(CWNS_Municipal_flow,"WWTP_CWNS_Moore_municipal")
-    # }
-    # if(Wastewater_use_DMR){
-    #   #average ton per day CH4 / million gallons per day wastewater to mol/s / million gallons per day wastewater
-    #   DMR_Municipal_flow$emiss <- DMR_Municipal_flow$Average_Daily_Flow__MGD_*0.050840504 * 1E6 / (16.043 * 24 * 60 * 60)
-    #   rasterize_plus(DMR_Municipal_flow,"WWTP_DMR_Moore_municipal")
-    # }
   }
   
   cat("Finished calculating municipal treatment plant emissions at",format(Sys.time(),"%H:%M"),"\n")
@@ -560,14 +550,13 @@ Wastewater <- function(input_directory,
   
   Wastewater_State_info <- M3T::Wastewater_1990_state_septic
   Wastewater_State_info <- Wastewater_State_info[order(Wastewater_State_info$State),]
-
+  Wastewater_State_info$Method <- "scaled"
+  
   #filter the reported state info to only those within 1 year (it's biannual),
   #within the domain
   Wastewater_reported_State_info <- Wastewater_reported_State_info[(Wastewater_reported_State_info$Year %in% (inventory_year-1):(inventory_year+1)) & 
                                                                      (Wastewater_reported_State_info$State %in% State_Tigerlines$STUSPS),]
-  
-  Wastewater_State_info$Method <- "scaled"
-  
+
   if(nrow(Wastewater_reported_State_info)!=0){
     #average across years if both years around the inventory year are available
     Wastewater_reported_State_info <- suppressWarnings(stats::aggregate(Wastewater_reported_State_info,by=list(Wastewater_reported_State_info$State),mean)[,-2])
@@ -578,7 +567,7 @@ Wastewater <- function(input_directory,
   }
 
   #filter the final info to the domain and incorporate the population
-  Wastewater_State_info <- Wastewater_State_info[State_Tigerlines$STUSPS %in% Wastewater_State_info$State,]
+  Wastewater_State_info <- Wastewater_State_info[Wastewater_State_info$State %in% State_Tigerlines$STUSPS,]
   Wastewater_State_info$Population <- State_population
   
   #Same for the national data
