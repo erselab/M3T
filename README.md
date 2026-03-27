@@ -5,6 +5,7 @@
 
 <!-- badges: start -->
 
+[![R-CMD-check](https://github.com/Kristian-hajny/methane_inventory/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/Kristian-hajny/methane_inventory/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
 This is an R package designed to help create an urban-focused gridded
