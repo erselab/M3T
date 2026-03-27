@@ -38,7 +38,7 @@
 #'  each pixel contained within the state/county.  This allows for better
 #'  accounting for pixels that are on the borders of states/counties.
 #'@param out_envir Environment.  Where to assign output data.  Should be the
-#'  environment of `stationary_combustion` or `NG_distribution` as the output
+#'  environment of `stationary_combustion` or `Natural_Gas_Distribution` as the output
 #'  will be used and exported there.
 #'@returns Nothing is returned.  The disaggregated methane data is assigned to
 #'  the specified out_envir.  This will be a SpatRaster list with one for each
@@ -48,7 +48,7 @@
 #'@author Israel Lopez-Coto, \email{test@@test.edu}
 #'@references \href{https://doi.org/10.1029/2020JD032974}{Vulcan}
 #'@references \href{https://doi.org/10.1002/2017JD027359}{ACES}
-#'@seealso [NG_distribution()] Calculates methane emissions for the natural gas
+#'@seealso [Natural_Gas_Distribution()] Calculates methane emissions for the natural gas
 #'  distribution sector.
 #'
 #'  [Stationary_combustion()] Calculates methane emissions for the stationary
@@ -56,7 +56,7 @@
 #'@keywords internal
 
 
-disaggregation <- function(input_inventory,totals,agg_level,NEI_input,cover_all,out_envir){
+Inventory_based_disaggregation  <- function(input_inventory,totals,agg_level,NEI_input,cover_all,out_envir){
   #pull the input name (aces_res/com or vu_res/com) for naming later.  Note -
   #this must be done before input_inventory is edited
   #(https://stackoverflow.com/a/23563587)

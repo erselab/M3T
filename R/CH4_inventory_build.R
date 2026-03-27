@@ -1147,7 +1147,7 @@ CH4_inventory_build <- function(run_directory,
   }
   invisible(gc())
   if(M3T_config$Process_natural_gas_distribution){
-    NG_distribution(domain=domain,
+    Natural_Gas_Distribution(domain=domain,
                     domain_template=domain_template,
                     state_name_list=state_name_list,
                     input_directory=input_directory,
@@ -1183,7 +1183,7 @@ CH4_inventory_build <- function(run_directory,
   }
   invisible(gc())
   if(M3T_config$Process_natural_gas_transmission){
-    Transmission(input_directory=input_directory,
+    Natural_Gas_Transmission(input_directory=input_directory,
                  GHGI_transmission_compressors=M3T_config$GHGI_transmission_compressors,
                  GHGI_Pipeline=M3T_config$GHGI_Pipeline,
                  Source_HIFLD_compressor_file=M3T_config$Source_HIFLD_compressor_file,
@@ -1240,7 +1240,7 @@ CH4_inventory_build <- function(run_directory,
     #wetcharts and the processed version is pulled in M3T
     if(M3T_config$Source_wastewater_NLCD!="M3T"){
       #UPDATE TO ZENODO
-      NLCD_open_and_low_int(input_directory=input_directory,
+      NLCD_fractions_by_state(input_directory=input_directory,
                             Source_wastewater_NLCD=M3T_config$Source_wastewater_NLCD,
                             domain=domain,
                             domain_template=domain_template,
@@ -1337,7 +1337,7 @@ CH4_inventory_build <- function(run_directory,
   }
   invisible(gc())
   if(M3T_config$Combine_sectors){
-    Combine_inventories(output_directory=output_directory,
+    Combine_across_sectors(output_directory=output_directory,
                         Separate_thermo=M3T_config$Separate_thermo,
                         Create_summary_combinations=M3T_config$Create_summary_combinations,
                         Create_individual_combinations=M3T_config$Create_individual_combinations,
@@ -1349,4 +1349,3 @@ CH4_inventory_build <- function(run_directory,
                         State_CB=State_CB)
   }
 }
-

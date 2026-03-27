@@ -1,6 +1,6 @@
 #'@title Create gridded methane emissions maps that include all sectors
 #'
-#'@description `Combine_inventories` writes a netcdf for every unique
+#'@description `Combine_across_sectors` writes a netcdf for every unique
 #'  combination of sectoral emissions estimates.  Optionally writes additional
 #'  netcdf with the thermogenic and nonthermogenic sectors separately.
 #'
@@ -69,7 +69,7 @@
 #Combine_inventories <- function(output_directory="~/../Desktop/out/",
 #                                Separate_thermo=T)
 
-Combine_inventories <- function(output_directory,
+Combine_across_sectors <- function(output_directory,
                                 Separate_thermo,
                                 Create_summary_combinations,
                                 Create_individual_combinations,
@@ -81,7 +81,7 @@ Combine_inventories <- function(output_directory,
                                 verbose){
   
   starttime <- Sys.time()
-  cat("Starting the process of combining emissions across all sectors: Combine_inventories\n")
+  cat("Starting the process of combining emissions across all sectors: Combine_across_sectors\n")
   
   Combined_output_directory <- file.path(output_directory,"Combined_files")
   dir.create(Combined_output_directory,showWarnings = F)
@@ -437,7 +437,5 @@ Combine_inventories <- function(output_directory,
                State_CB=State_CB)
     }
   }
-  cat("\nFinished the process of combining emissions across all sectors: Combine_inventories at",format(Sys.time(),"%H:%M"),"with a total runtime of",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
+  cat("\nFinished the process of combining emissions across all sectors: Combine_across_sectors at",format(Sys.time(),"%H:%M"),"with a total runtime of",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
 }
-
-

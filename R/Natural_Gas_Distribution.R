@@ -1,6 +1,6 @@
 #'@title Create gridded natural gas distribution methane emissions maps
 #'
-#'@description `NG_distribution` writes up to 63 netcdf files of gridded methane
+#'@description `Natural_Gas_Distribution` writes up to 63 netcdf files of gridded methane
 #'  emissions from natural gas distribution sources, as well as optional visuals
 #'
 #'@details This function calculates and grids methane emissions from natural gas
@@ -226,10 +226,10 @@
 #'[M3T_config] Generates the config function with user-editable settings used
 #'throughout processing.
 #'
-#'[disaggregation()] Disaggregates data to pixels using a sectoral CO2 inventory.
+#'[Inventory_based_disaggregation()] Disaggregates data to pixels using a sectoral CO2 inventory.
 #'@keywords internal
 
-NG_distribution <- function(domain,
+Natural_Gas_Distribution <- function(domain,
                             domain_template,
                             state_name_list,
                             input_directory,
@@ -265,7 +265,7 @@ NG_distribution <- function(domain,
   
   
   starttime <- Sys.time()
-  cat("Starting natural gas distribution sector: NG_distribution_emissions\n")
+  cat("Starting natural gas distribution sector: Natural_Gas_Distribution\n")
   
   NG_dist_output_directory <- file.path(output_directory,"NG_distribution")
   dir.create(NG_dist_output_directory,showWarnings = F)
@@ -959,7 +959,7 @@ NG_distribution <- function(domain,
                         overwrite=TRUE)
   }
   ################################################################################
-  #these are assigned in the below sections from the disaggregation function,
+  #these are assigned in the below sections from the Inventory_based_disaggregation function,
   #but R doesn't see them being created explicitly, so do so here just to make
   #usethis::check() happy for package building.
   aces_res_ch4_byLDC <- vu_res_ch4_byLDC <- 
@@ -1026,8 +1026,8 @@ NG_distribution <- function(domain,
         cover_all <- cover_all[all_merge_LCC$HIFLD_SVCTERID]
       }
       
-      disaggregation(aces_res,res_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
-      disaggregation(aces_com,com_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
+      Inventory_based_disaggregation(aces_res,res_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
+      Inventory_based_disaggregation(aces_com,com_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
     }
     if(Use_Vulcan){
       all_merge_LCC <- terra::mask(all_merge_clean,terra::project(domain,all_merge_clean))
@@ -1045,8 +1045,8 @@ NG_distribution <- function(domain,
         cover_all <- cover_all[all_merge_LCC$HIFLD_SVCTERID]
       }
       
-      disaggregation(vu_res,res_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
-      disaggregation(vu_com,com_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
+      Inventory_based_disaggregation(vu_res,res_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
+      Inventory_based_disaggregation(vu_com,com_totals,agg_level="LDC",NEI_input = all_merge_LCC,cover_all,out_envir=environment())
     }
     cat("\rFinished disaggregating emissions to pixels from the LDC scale at",format(Sys.time(),"%H:%M"),"\n")
   }
@@ -1090,8 +1090,8 @@ NG_distribution <- function(domain,
         cover_all <- cover_all[all_merge_LCC_state$STATEFP]
       }
       
-      disaggregation(aces_res,res_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all,out_envir=environment())
-      disaggregation(aces_com,com_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all,out_envir=environment())
+      Inventory_based_disaggregation(aces_res,res_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all,out_envir=environment())
+      Inventory_based_disaggregation(aces_com,com_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all,out_envir=environment())
     }
     if(Use_Vulcan){
       all_merge_LCC_state <- terra::project(all_merge_state_poly,vu_res)
@@ -1105,8 +1105,8 @@ NG_distribution <- function(domain,
         cover_all <- cover_all[all_merge_LCC_state$STATEFP]
       }
       
-      disaggregation(vu_res,res_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all,out_envir=environment())
-      disaggregation(vu_com,com_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all,out_envir=environment())
+      Inventory_based_disaggregation(vu_res,res_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all,out_envir=environment())
+      Inventory_based_disaggregation(vu_com,com_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all,out_envir=environment())
     }
     gc()
     cat("\rFinished disaggregating emissions to pixels from the state scale at",format(Sys.time(),"%H:%M"),"\n")
@@ -1126,15 +1126,15 @@ NG_distribution <- function(domain,
       all_merge_LCC_domain <- terra::project(all_merge_domain_poly,aces_res)
       cover_all <- list(terra::extract(aces_res,all_merge_LCC_domain,weights=T,cells=T))
       
-      disaggregation(aces_res,res_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
-      disaggregation(aces_com,com_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
+      Inventory_based_disaggregation(aces_res,res_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
+      Inventory_based_disaggregation(aces_com,com_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
     }
     if(Use_Vulcan){
       all_merge_LCC_domain <- terra::project(all_merge_domain_poly,vu_res)
       cover_all <- list(terra::extract(vu_res,all_merge_LCC_domain,weights=T,cells=T))
       
-      disaggregation(vu_res,res_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
-      disaggregation(vu_com,com_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
+      Inventory_based_disaggregation(vu_res,res_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
+      Inventory_based_disaggregation(vu_com,com_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all,out_envir=environment())
     }
     gc()
     cat("\rFinished disaggregating emissions to pixels from the domain scale at",format(Sys.time(),"%H:%M"),"\n")
@@ -1467,5 +1467,5 @@ NG_distribution <- function(domain,
     
   }
   
-  cat("\nFinished natural gas distribution sector: NG_distribution_emissions at",format(Sys.time(),"%H:%M"),"with a total runtime of",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
+  cat("\nFinished natural gas distribution sector: Natural_Gas_Distribution at",format(Sys.time(),"%H:%M"),"with a total runtime of",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
 }

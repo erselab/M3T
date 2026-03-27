@@ -1,6 +1,6 @@
 #'@title Process the National Land Cover Database for `Wastewater` function
 #'
-#'@description `NLCD_open_and_low_int` writes 1 netcdf file per state within the
+#'@description `NLCD_fractions_by_state` writes 1 netcdf file per state within the
 #'  domain as well as a csv.  These netcdf files have the 30 m National Land
 #'  Cover Database Developed, Open Space and Developed, Low Intensity land cover
 #'  types for each state.  The csv provides the total area covered by these two
@@ -39,7 +39,7 @@
 #'[Wastewater()] Calculates methane emissions for the wastewater sector.
 #'@keywords internal
 
-NLCD_open_and_low_int <- function(input_directory,
+NLCD_fractions_by_state <- function(input_directory,
                                   Source_wastewater_NLCD,
                                   domain,
                                   domain_template,
@@ -49,7 +49,7 @@ NLCD_open_and_low_int <- function(input_directory,
   
   
   starttime <- Sys.time()
-  cat("Starting wastewater sector: NLCD_open_and_low_int\n")
+  cat("Starting wastewater sector: NLCD_fractions_by_state\n")
   
   Wastewater_partial_output_directory <- file.path(output_directory,"Wastewater","processed_NLCD_data")
   dir.create(Wastewater_partial_output_directory,showWarnings = F,recursive = T)
@@ -150,5 +150,5 @@ NLCD_open_and_low_int <- function(input_directory,
                      overwrite=T)
   
   
-  cat("Finished wastewater sector: NLCD_open_and_low_int at",format(Sys.time(),"%H:%M"),"with a total runtime of",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
+  cat("Finished wastewater sector: NLCD_fractions_by_state at",format(Sys.time(),"%H:%M"),"with a total runtime of",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
 }

@@ -64,7 +64,7 @@
 #'  See references \href{https://doi.org/10.1029/2020JD032974}{Vulcan} and
 #'  \href{https://doi.org/10.1002/2017JD027359}{ACES}
 #'@inheritParams Municipal_solid_waste
-#'@inheritParams NG_distribution
+#'@inheritParams Natural_Gas_Distribution
 #'
 #'@param aces_ind SpatRaster of industrial CO2 emissions from the ACES inventory
 #'  as loaded in \code{\link{CH4_inventory_build}} based on \code{Use_ACES} and
@@ -107,7 +107,7 @@
 #'[M3T_config] Generates the config function with user-editable settings used
 #'throughout processing.
 #'
-#'[disaggregation()] Disaggregates data from the county level to pixels using a
+#'[Inventory_based_disaggregation()] Disaggregates data from the county level to pixels using a
 #'sectoral CO2 inventory.
 #'@keywords internal
 
@@ -587,7 +587,7 @@ Stationary_combustion <- function(input_directory,
                    'elec_wood_ER')
   
   ################################################################################
-  #these are assigned in the below sections from the disaggregation function,
+  #these are assigned in the below sections from the Inventory_based_disaggregation function,
   #but R doesn't see them being created explicitly, so do so here just to make
   #usethis::check() happy for package building.
   aces_res_ch4_bystate <- aces_res_ch4_bydomain <- vu_res_ch4_bystate <- vu_res_ch4_bydomain <- 
@@ -616,14 +616,14 @@ Stationary_combustion <- function(input_directory,
         cover_all_aces <- cover_all_aces[paste0(all_merge_LCC_state$STATEFP,all_merge_LCC_state$COUNTYFP)]
       }
       
-      #run the disaggregation function (separate) to go from county totals to
+      #run the Inventory_based_disaggregation function (separate) to go from county totals to
       #pixel values using ACES
-      disaggregation(aces_res,res_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all_aces,out_envir=environment())
-      disaggregation(aces_com,com_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_aces,out_envir=environment())
-      disaggregation(aces_ind,ind_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_aces,out_envir=environment())
-      disaggregation(aces_elec,elec_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_aces,out_envir=environment())
+      Inventory_based_disaggregation(aces_res,res_totals,agg_level="state",NEI_input = all_merge_LCC_state,cover_all_aces,out_envir=environment())
+      Inventory_based_disaggregation(aces_com,com_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_aces,out_envir=environment())
+      Inventory_based_disaggregation(aces_ind,ind_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_aces,out_envir=environment())
+      Inventory_based_disaggregation(aces_elec,elec_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_aces,out_envir=environment())
       
-      #clear up memory from disaggregation as it can be quite significant for a
+      #clear up memory from Inventory_based_disaggregation as it can be quite significant for a
       #large domain
       invisible(gc())
     }
@@ -638,10 +638,10 @@ Stationary_combustion <- function(input_directory,
           lapply(function(x){terra::extract(vu_res,x,weights=T,cells=T)})
         cover_all_vulcan <- cover_all_vulcan[paste0(all_merge_LCC_state$STATEFP,all_merge_LCC_state$COUNTYFP)]
       }
-      disaggregation(vu_res,res_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_vulcan,out_envir=environment())
-      disaggregation(vu_com,com_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_vulcan,out_envir=environment())
-      disaggregation(vu_ind,ind_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_vulcan,out_envir=environment())
-      disaggregation(vu_elec,elec_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_vulcan,out_envir=environment())
+      Inventory_based_disaggregation(vu_res,res_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_vulcan,out_envir=environment())
+      Inventory_based_disaggregation(vu_com,com_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_vulcan,out_envir=environment())
+      Inventory_based_disaggregation(vu_ind,ind_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_vulcan,out_envir=environment())
+      Inventory_based_disaggregation(vu_elec,elec_totals,agg_level="state",NEI_input=all_merge_LCC_state,cover_all_vulcan,out_envir=environment())
       invisible(gc())
     }
     rm(all_merge_LCC_state)
@@ -670,10 +670,10 @@ Stationary_combustion <- function(input_directory,
           cover_all_aces <- cover_all_aces[paste0(all_merge_LCC_domain$STATEFP,all_merge_LCC_domain$COUNTYFP)]
         }
       }
-      disaggregation(aces_res,res_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_aces,out_envir=environment())
-      disaggregation(aces_com,com_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_aces,out_envir=environment())
-      disaggregation(aces_ind,ind_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_aces,out_envir=environment())
-      disaggregation(aces_elec,elec_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_aces,out_envir=environment())
+      Inventory_based_disaggregation(aces_res,res_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_aces,out_envir=environment())
+      Inventory_based_disaggregation(aces_com,com_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_aces,out_envir=environment())
+      Inventory_based_disaggregation(aces_ind,ind_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_aces,out_envir=environment())
+      Inventory_based_disaggregation(aces_elec,elec_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_aces,out_envir=environment())
       invisible(gc())
     }
     if(Use_Vulcan){
@@ -689,10 +689,10 @@ Stationary_combustion <- function(input_directory,
           cover_all_vulcan <- cover_all_vulcan[paste0(all_merge_LCC_domain$STATEFP,all_merge_LCC_domain$COUNTYFP)]
         }
       }
-      disaggregation(vu_res,res_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_vulcan,out_envir=environment())
-      disaggregation(vu_com,com_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_vulcan,out_envir=environment())
-      disaggregation(vu_ind,ind_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_vulcan,out_envir=environment())
-      disaggregation(vu_elec,elec_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_vulcan,out_envir=environment())
+      Inventory_based_disaggregation(vu_res,res_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_vulcan,out_envir=environment())
+      Inventory_based_disaggregation(vu_com,com_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_vulcan,out_envir=environment())
+      Inventory_based_disaggregation(vu_ind,ind_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_vulcan,out_envir=environment())
+      Inventory_based_disaggregation(vu_elec,elec_totals,agg_level="domain",NEI_input=all_merge_LCC_domain,cover_all_vulcan,out_envir=environment())
       invisible(gc())
     }
     rm(all_merge_LCC_domain)

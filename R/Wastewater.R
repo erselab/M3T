@@ -139,7 +139,7 @@
 #'@seealso [CH4_inventory_build()] Calculates methane inventory using settings
 #'provided in config.
 #'
-#'[NLCD_open_and_low_int()] Calculates the fraction of low intensity urban land
+#'[NLCD_fractions_by_state()] Calculates the fraction of low intensity urban land
 #'cover in each pixel.
 #'
 #'[M3T_config] Generates the config function with user-editable settings used

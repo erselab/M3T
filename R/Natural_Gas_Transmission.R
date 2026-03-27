@@ -1,6 +1,6 @@
 #'@title Create gridded natural gas transmission methane emissions maps
 #'
-#'@description `Transmission` writes 2 netcdf files of gridded methane emissions
+#'@description `Natural_Gas_Transmission` writes 2 netcdf files of gridded methane emissions
 #'  from natural gas transmission, as well as optional visuals and 2 optional
 #'  csv files.
 #'
@@ -96,7 +96,7 @@
 #'@inherit Municipal_solid_waste seealso
 #'@keywords internal
 
-Transmission <- function(input_directory,
+Natural_Gas_Transmission <- function(input_directory,
                          GHGI_transmission_compressors,
                          GHGI_Pipeline,
                          Source_HIFLD_compressor_file,
@@ -116,7 +116,7 @@ Transmission <- function(input_directory,
                          State_CB){
   
   starttime <- Sys.time()
-  cat("Starting natural gas transmission sector: Transmission\n")
+  cat("Starting natural gas transmission sector: Natural_Gas_Transmission\n")
   
   Transmission_output_directory <- file.path(output_directory,"NG_transmission")
   dir.create(Transmission_output_directory,showWarnings = F)
@@ -379,5 +379,5 @@ Transmission <- function(input_directory,
              domain=domain,County_Tigerlines=County_Tigerlines,
              State_CB=State_CB)
   }
-  cat("Finished natural gas transmission sector: Transmission at",format(Sys.time(),"%H:%M"),"with a total runtime of",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
+  cat("Finished natural gas transmission sector: Natural_Gas_Transmission at",format(Sys.time(),"%H:%M"),"with a total runtime of",round(difftime(Sys.time(),starttime,units = "min"),2),"minutes\n\n")
 }
