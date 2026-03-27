@@ -53,17 +53,23 @@ devtools::install_github("Kristian-hajny/M3T", dependencies = TRUE)
 
 ## Setup
 
-Only 3 functions should be necessary for users 1. `M3T_get_config()` -
-Retrieve one or more settings saved in the config environment. Strongly
-recommend seeing help(M3T_config) before editing. 2.
-`M3T_set_config()` - Change one or more settings saved in the config
-environment. Strongly recommend seeing help(M3T_config) before editing.
-3. `CH4_inventory_build()` - Uses config and runs all sectors. Inputs
-include the folder for output, desired year, domain, resolution, and
-mapping (e.g., lat/long or a m grid). The domain can be “CONUS” for the
-entire continental US, “custom” to draw one manually, state names/FIPS
-codes (e.g., c(“NY”,“NJ”) for New York and New Jersey), urban names/FIPS
-codes (e.g., “Long Neck, DE”), or the filepath to a polygon file.
+Only 3 functions should be necessary for users
+
+1.  `M3T_get_config()` - Retrieve one or more settings saved in the
+    config environment. Strongly recommend seeing help(M3T_config)
+    before editing.
+
+2.  `M3T_set_config()` - Change one or more settings saved in the config
+    environment. Strongly recommend seeing help(M3T_config) before
+    editing.
+
+3.  `CH4_inventory_build()` - Uses config and runs all sectors. Inputs
+    include the folder for output, desired year, domain, resolution, and
+    mapping (e.g., lat/long or a m grid). The domain can be “CONUS” for
+    the entire continental US, “custom” to draw one manually, state
+    names/FIPS codes (e.g., c(“NY”,“NJ”) for New York and New Jersey),
+    urban names/FIPS codes (e.g., “Long Neck, DE”), or the filepath to a
+    polygon file.
 
 ## Config Settings
 
@@ -86,66 +92,116 @@ codes (e.g., “Long Neck, DE”), or the filepath to a polygon file.
       [ACES](https://doi.org/10.3334/ORNLDAAC/1943) and
       [Vulcan](https://doi.org/10.5281/zenodo.15446748) as well.
 
-Sectors and methods 1. Landfills - landfill_ghgrp_reported - TRUE/FALSE
-option to use the reported methane emissions which can be either of the
-below methods and will vary across landfills. - landfill_ghgrp_modeled -
-TRUE/FALSE option to use the reported methane emissions calculated using
-a first order decay model. - landfill_ghgrp_collection_efficiency -
-TRUE/FALSE option to use the reported methane emissions back-calculated
-using data from landfill gas collection systems. 2. Natural Gas
-Distribution - NG_distribution_by_LDC - TRUE/FALSE option to calculate
-emissions using local distribution company (LDC) level data. Requires
-manually aligning and updating datasets as they don’t have consistent
-identifiers across them and some are dated. Companion Zenodo has code to
-support this. - NG_distribution_by_state - TRUE/FALSE option to
-calculate emissions at the state level. - NG_distribution_by_domain -
-TRUE/FALSE option to calculate emissions at the domain level. Not
-recommended if the domain is more than a few states. 3. Natural Gas
-Transmission - No variations 4. Stationary Combustion -
-stationary_combustion_by_state - TRUE/FALSE option to calculate
-emissions at the state level. - stationary_combustion_by_domain -
-TRUE/FALSE option to calculate emissions at the domain level. Not
-recommended if the domain is more than a few states. 5. Wastewater -
-Wastewater_use_CWNS and Wastewater_use_DMR - TRUE/FALSE options to use
-the Clean Watershed Needs Survey (CWNS) and/or Discharge Monitoring
-Report (DMR) data on wastewater treatment plants. CWNS is infrequent
-while DMR data is regularly updated, though the two differ even for the
-same year. - Wastewater_Municipal_Method_Moore_EF and
-Wastewater_Municipal_Method_GHGI - TRUE/FALSE options to use the Moore
-et al. relationship between flow and emissions based on a large
-measurement campaign or distribute the EPA Greenhouse Gas Inventory
-(GHGI) total using flow as a proxy. - See publications [Moore et
-al. 2023](https://doi.org/10.1021/acs.est.2c05373) and [Moore et
-al. 2025](https://doi.org/10.1038/s44221-025-00490-z) discussing
-emissions measurements from municipal wastewater treatment plants. -
-Wastewater_national_septic and Wastewater_state_septic - TRUE/FALSE
-options to calculate septic emissions using state and national estimates
-of septic fraction along with landcover data or downscale the national
-GHGI estimate using landcover data. 6. Wetlands and Inland Waters -
-Use_SOCCR1 and Use_SOCCR2 - TRUE/FALSE options to use state of the
-carbon cycle (SOCCR) emission factors and national wetland inventory
-(NWI) data to calculate emissions. - The [State Of the Carbon Cycle
-Report version
-1](https://www.carboncyclescience.us/state-carbon-cycle-report-soccr)
-and [State of the Carbon Cycle Report version
-2](https://carbon2018.globalchange.gov/) are publicly available -
-Use_Wetcharts - TRUE/FALSE option to use the WetCHARTs modeled wetland
-emissions disaggregated from 0.5 degrees to 0.1 degrees using land
-cover. - The dataset is publicly available for
-[WetCHARTs](https://doi.org/10.3334/ORNLDAAC/2346) -
-Wetcharts_model_subset - List of model numbers within wetcharts to use.
-Default is the average across all models. 7. Gridded EPA (GEPA) - No
-variations - See the publication [Maasakkers et
-al.](https://doi.org/10.1021/acs.est.3c05138). The
-[GEPA](https://doi.org/10.5281/zenodo.8367082) dataset is publicly
-available. 8. Combining across sectors - Separate_thermo - TRUE/FALSE
-option to separate thermogenic (fossil fuel source) and non-thermogenic
-(e.g., landfills, agriculture, etc.) sectors into separate combined
-output - Create_summary_combinations - TRUE/FALSE option to create only
-the min, mean, and max per pixel across all sectors -
-Create_individual_combinations - TRUE/FALSE option to combines output
-from across all sectors and all variations to create every unique
-combination
+Sectors and methods
+
+1.  Landfills
+
+    - landfill_ghgrp_reported - TRUE/FALSE option to use the reported
+      methane emissions which can be either of the below methods and
+      will vary across landfills.
+
+    - landfill_ghgrp_modeled - TRUE/FALSE option to use the reported
+      methane emissions calculated using a first order decay model.
+
+    - landfill_ghgrp_collection_efficiency - TRUE/FALSE option to use
+      the reported methane emissions back-calculated using data from
+      landfill gas collection systems.
+
+2.  Natural Gas Distribution
+
+    - NG_distribution_by_LDC - TRUE/FALSE option to calculate emissions
+      using local distribution company (LDC) level data. Requires
+      manually aligning and updating datasets as they don’t have
+      consistent identifiers across them and some are dated. Companion
+      Zenodo has code to support this.
+
+    - NG_distribution_by_state - TRUE/FALSE option to calculate
+      emissions at the state level.
+
+    - NG_distribution_by_domain - TRUE/FALSE option to calculate
+      emissions at the domain level. Not recommended if the domain is
+      more than a few states.
+
+3.  Natural Gas Transmission
+
+    - No variations
+
+4.  Stationary Combustion
+
+    - stationary_combustion_by_state - TRUE/FALSE option to calculate
+      emissions at the state level.
+
+    - stationary_combustion_by_domain - TRUE/FALSE option to calculate
+      emissions at the domain level. Not recommended if the domain is
+      more than a few states.
+
+5.  Wastewater
+
+    - Wastewater_use_CWNS and Wastewater_use_DMR - TRUE/FALSE options to
+      use the Clean Watershed Needs Survey (CWNS) and/or Discharge
+      Monitoring Report (DMR) data on wastewater treatment plants. CWNS
+      is infrequent while DMR data is regularly updated, though the two
+      differ even for the same year.
+
+    - Wastewater_Municipal_Method_Moore_EF and
+      Wastewater_Municipal_Method_GHGI - TRUE/FALSE options to use the
+      Moore et al. relationship between flow and emissions based on a
+      large measurement campaign or distribute the EPA Greenhouse Gas
+      Inventory (GHGI) total using flow as a proxy.
+
+      - See publications [Moore et al.
+        2023](https://doi.org/10.1021/acs.est.2c05373) and [Moore et
+        al. 2025](https://doi.org/10.1038/s44221-025-00490-z) discussing
+        emissions measurements from municipal wastewater treatment
+        plants.
+
+    - Wastewater_national_septic and Wastewater_state_septic -
+      TRUE/FALSE options to calculate septic emissions using state and
+      national estimates of septic fraction along with landcover data or
+      downscale the national GHGI estimate using landcover data.
+
+6.  Wetlands and Inland Waters
+
+    - Use_SOCCR1 and Use_SOCCR2 - TRUE/FALSE options to use state of the
+      carbon cycle (SOCCR) emission factors and national wetland
+      inventory (NWI) data to calculate emissions.
+
+      - The [State Of the Carbon Cycle Report version
+        1](https://www.carboncyclescience.us/state-carbon-cycle-report-soccr)
+        and [State of the Carbon Cycle Report version
+        2](https://carbon2018.globalchange.gov/) are publicly available
+
+    - Use_Wetcharts - TRUE/FALSE option to use the WetCHARTs modeled
+      wetland emissions disaggregated from 0.5 degrees to 0.1 degrees
+      using land cover.
+
+      - The dataset is publicly available for
+        [WetCHARTs](https://doi.org/10.3334/ORNLDAAC/2346)
+
+    - Wetcharts_model_subset - List of model numbers within wetcharts to
+      use. Default is the average across all models.
+
+7.  Gridded EPA (GEPA)
+
+    - No variations
+
+    - See the publication [Maasakkers et
+      al.](https://doi.org/10.1021/acs.est.3c05138) The
+      [GEPA](https://doi.org/10.5281/zenodo.8367082) dataset is publicly
+      available.
+
+8.  Combining across sectors
+
+    - Separate_thermo - TRUE/FALSE option to separate thermogenic
+      (fossil fuel source) and non-thermogenic (e.g., landfills,
+      agriculture, etc.) sectors into separate combined output
+
+    - Create_summary_combinations - TRUE/FALSE option to create only the
+      min, mean, and max per pixel across all sectors
+
+    - Create_individual_combinations - TRUE/FALSE option to combines
+      output from across all sectors and all variations to create every
+      unique combination
 
 ## Output
 
@@ -157,9 +213,11 @@ folder. Subsectors and partial output is saved here while sector totals
 folder. The sector total values are named to clarify the variations that
 the subsectors came from. The below lists the subsector output for each
 sector, including all possible variations. Minor variations in the
-filenames to differentiate subsectors are in **bold**. If you are
-interested in methodology, we recommend you to the paper mentioned in
-the background section or the help files.
+filenames to differentiate subsectors are in **bold**. Point 8 describes
+the final inventory files.
+
+If you are interested in detailed methodology, we recommend you to the
+paper mentioned in the background section or the help files.
 
 1.  Landfills
     - MSW_GHGRP\_**method**.nc
