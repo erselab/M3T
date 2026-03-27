@@ -143,17 +143,17 @@ Prepare_GEPA <- function(inventory_year,
   #remap to domain
   
   Domain_reproj <- function(input){
-    if(any(domain_res<terra::res(GEPA))){
+    if(any(domain_res - terra::res(GEPA) <= 1E-5)){
       #crop to the domain + buffer first to speed up process
       input <- terra::crop(input,terra::ext(domain_trans)*1.1,snap="out")
-      input <- terra::disagg(input,round(terra::res(input)/domain_res,3),"near")
+      input <- suppressWarnings(terra::disagg(input,round(terra::res(input)/domain_res,3),"near"))
       
       #reproject to exact domain now.  Here using nearest neighbor to prevent only
       #1 row/column of higher res pixels on the border of each input pixel from
       #being interpolated.
       input <- terra::project(input,domain_template,method="near")
       input <- terra::mask(input,domain)
-    }else if(any(domain_res>terra::res(GEPA))){
+    }else if(any(domain_res - terra::res(GEPA) > 1E-5)){
       input <- terra::crop(input,terra::project(domain,input),snap="out")
       input <- terra::mask(input,terra::project(domain,input),touches=T,updatevalue=0)
       cover <- terra::extract(input,terra::project(domain,input),weights=T,exact=T,cells=T)
