@@ -440,7 +440,7 @@ Wastewater <- function(input_directory,
   #Update the state population data from config using this data
   
   #ensure organized as per state_name_list (STUSPS)
-  State_population <- merge(Census_state_population,State_Tigerlines,by="NAME",all.x=T)
+  State_population <- merge(Census_state_population,State_Tigerlines,by="NAME")
   State_population <- State_population[order(State_population$STUSPS),paste0("POPESTIMATE",GHGI_data_yr)]
   
   Wastewater_State_info <- M3T::Wastewater_1990_state_septic
