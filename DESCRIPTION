@@ -6,7 +6,6 @@ Authors@R: c(
 	person(given = "Joseph", family = "Pitt", email = "joseph.pitt@bristol.ac.uk", role = "ctb", comment=c(ORCID = "0000-0002-8660-5136")),
 	person("The Research Foundation for The State University of New York", role="cph"))
 Description: The Modular Methane Mapping Tool (M3T) uses a user defined mix of a variety of literature based methods to estimate gridded methane emissions for several sectors relevant for urban areas.  Available only for the Continental United States with user specified resolution (minimum of 0.01 deg or 1 km2), year (> 2011), and domain.
-URL: GITHUB/vignette, publication
 BugReports: https://github.com/Kristian-hajny/M3T/issues
 Encoding: UTF-8
 Imports:
@@ -20,7 +19,7 @@ Imports:
     utils
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
-License: CC BY 4.0
+License: CC BY-NC 4.0
 Depends: 
     R (>= 3.5)
 LazyData: true
