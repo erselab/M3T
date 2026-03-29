@@ -122,7 +122,7 @@ SOCCR_Wetlands <- function(input_directory,
     #and remove extra data
     watershed <- watershed["NAW1_EN"]
     watershed <- terra::aggregate(watershed,by="NAW1_EN")
-    watershed <- terra::crop(watershed,terra::project(domain_template,terra::crs(watershed))*1.1)
+    watershed <- terra::crop(watershed,terra::project(domain_template,terra::crs(watershed)))
     expanded_watershed <- terra::buffer(watershed,2E4)
     watershed <- terra::aggregate(expanded_watershed-watershed+watershed,"NAW1_EN")
     watershed <- terra::project(watershed,terra::crs(domain))
@@ -443,7 +443,7 @@ SOCCR_Wetlands <- function(input_directory,
                           force_v4=TRUE,
                           varname='methane_emissions',
                           unit='nmol/m2/s',
-                          longname='Methane emissions from wetlands and optionally freshwater',
+                          longname='Methane emissions from wetlands and freshwater',
                           missval=-9999,
                           overwrite=TRUE)
     }
@@ -454,7 +454,7 @@ SOCCR_Wetlands <- function(input_directory,
                         force_v4=TRUE,
                         varname='methane_emissions',
                         unit='nmol/m2/s',
-                        longname='Methane emissions from wetlands and optionally freshwater',
+                        longname='Methane emissions from wetlands and freshwater',
                         missval=-9999,
                         overwrite=TRUE)
   }
@@ -464,7 +464,7 @@ SOCCR_Wetlands <- function(input_directory,
                         force_v4=TRUE,
                         varname='methane_emissions',
                         unit='nmol/m2/s',
-                        longname='Methane emissions from wetlands and optionally freshwater',
+                        longname='Methane emissions from wetlands and freshwater',
                         missval=-9999,
                         overwrite=TRUE)
   }
