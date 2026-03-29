@@ -157,7 +157,6 @@
 #'  \bold{Stationary combustion}
 #' \itemize{
 #'   \item{\bold{Process_stationary_combustion} - logical stating if this sector should be run. Default TRUE.}
-#'   \item{\bold{EIA_API_key} - API key to access the State Energy Data System (SEDS) data API at the \href{https://www.eia.gov/opendata/}{Energy Information Administration (EIA)}. One can register for a key using their email on the right hand side of the page.}
 #'
 #' Method Variations
 #' \itemize{
