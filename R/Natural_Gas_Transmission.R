@@ -1,16 +1,17 @@
 #'@title Create gridded natural gas transmission methane emissions maps
 #'
-#'@description `Natural_Gas_Transmission` writes 2 netcdf files of gridded methane emissions
-#'  from natural gas transmission, as well as optional visuals and 2 optional
-#'  csv files.
+#'@description \code{Natural_Gas_Transmission} is an internal function that we
+#'  strongly recommend users do not use directly, instead using
+#'  \code{\link{CH4_inventory_build}} and \code{\link{M3T_config}} which call
+#'  this function. \code{Natural_Gas_Transmission} writes 2 netcdf files of
+#'  gridded methane emissions from natural gas transmission, as well as optional
+#'  visuals.
 #'
 #'@details This function calculates and grids methane emissions from natural gas
 #'  transmission systems. It uses the Homeland Infrastructure Foundation-Level
 #'  Data (HIFLD), Environmental Protection Agency's (EPA) Greenhouse Gas
 #'  Inventory (GHGI), EPA Greenhouse Gas Reporting Program (GHGRP) and Energy
-#'  Information Administration (EIA) Energy Atlas data.  
-#'  
-#'  The necessary GHGRP, GHGI, and EIA data will be automatically downloaded.
+#'  Information Administration (EIA) Energy Atlas data.
 #'
 #'  For pipelines the GHGI data includes the emissions and activity data for
 #'  pipeline leaks, meter and regulating stations, and venting.  An emission
@@ -23,16 +24,14 @@
 #'  turbines, generators, pneumatic devices, and venting.  For generators they
 #'  are split into engine and turbine emissions so the ratio between
 #'  transmission/storage emissions for engines and turbines are applied to the
-#'  generator values to get the transmission component of generator emissions.
-#'  An national average emission rate in mols of methane per station per second
-#'  can then be calculated.  This emission rate is then assigned to all HIFLD
+#'  generator values to get the transmission component of generator emissions. A
+#'  national average emission rate in mols of methane per station per second can
+#'  then be calculated.  This emission rate is then assigned to all HIFLD
 #'  compressors.  GHGRP data is then used to overwrite this default emission
 #'  rate.  Note most compressor stations do not report their emissions to the
-#'  GHGRP, so only a subset will be overwritten using GHGRP data.  The GHGRP
-#'  compressor emissions are scaled so that the average emissions within the
-#'  domain are equal to the national average calculated from the GHGI.  As there
-#'  is not a common identifier between the GHGRP and HIFLD datasets, the nearest
-#'  facility is considered the matching facility.
+#'  GHGRP, so only a subset will be overwritten using GHGRP data.  As there is
+#'  not a common identifier between the GHGRP and HIFLD datasets, the data has
+#'  been manually aligned.
 #'
 #'  The GHGRP includes only facilities that emit at least 25,000 metric tons of
 #'  carbon dioxide equivalent while the GHGI is intended to capture all national
@@ -56,28 +55,20 @@
 #'  file has multiple sheets, each of which has a separate layout.  The GHGRP is
 #'  available at \url{https://ghgdata.epa.gov/ghgp/main.do}, and the EIA data is
 #'  available at
-#'  \url{https://atlas.eia.gov/datasets/eia::natural-gas-interstate-and-intrastate-pipelines/about}.
-#'  
-#'@inheritParams Municipal_solid_waste 
+#'  \url{https://hub.arcgis.com/datasets/fedmaps::natural-gas-interstate-and-intrastate-pipelines/about}.
+#'
+#'@inheritParams Municipal_solid_waste
 #'@param state_name_list Character vector listing all states within the desired
 #'  domain
 #'@param GHGI_transmission_compressors Character or data.frame.  Pulled from
-#'  config file. Either GHGI to indicate the GHGI file should be used to pull
-#'  emissions and activity data or a data frame providing the needed values.
+#'  \code{\link{M3T_config}}.
 #'@param GHGI_Pipeline Character or data.frame.  Pulled from
-#'  config file. Either GHGI to indicate the GHGI file should be used to pull
-#'  emissions and activity data or a data frame providing the needed values.
-#'@param Source_HIFLD_compressor_file Character providing the full filepath to the
-#'  HIFLD compressor data.  As this file is now deprecated and no replacement
-#'  has been created, it currently must be provided as part of the package.
-#'@param GHGRP_facility_data Data.frame with the GHGRP location data for all
-#'  years and states.  See
-#'  https://www.epa.gov/enviro/envirofacts-data-service-api
+#'  \code{\link{M3T_config}}.
+#'@param Source_HIFLD_compressor_file Character.  Pulled from
+#'  \code{\link{M3T_config}}.
 #'@param verbose Logical indicating whether to save additional output.  This
-#'  includes plots of the gridded methane emissions for each
-#'  fuel-sector-inventory-variation combination as well as 2 summed plots for
-#'  each inventory-variation combination - one for wood and one for all other
-#'  sectors.
+#'  includes separate plots of the gridded methane emissions for pipelines and
+#'  compressors.
 #'@param County_Tigerlines SpatVector.  United States Census Bureau county
 #'  shapefile downloaded in Main.
 #'@param plot_directory Character providing the full filepath to save figures.
@@ -87,33 +78,27 @@
 #'  are titled "NG_trans_compressors.nc" and "NG_trans_pipes.nc" where
 #'  NG=natural gas and trans=transmission.   The first file is for transmission
 #'  compressor emissions and the second is for transmission pipeline emissions.
-#'
-#'  2 csv files are also optionally saved.  These are "NG_trans_compressors.csv"
-#'  and "NG_trans_compressors_all.csv".  The simpler csv includes only the name,
-#'  location, and assigned emissions for compressors within the domain that were
-#'  pulled from the GHGRP  The _all files include all variables that were in the
-#'  corresponding input file for the same compressors.
 #'@inherit Municipal_solid_waste seealso
 #'@keywords internal
 
 Natural_Gas_Transmission <- function(input_directory,
-                         GHGI_transmission_compressors,
-                         GHGI_Pipeline,
-                         Source_HIFLD_compressor_file,
-                         Source_EIA_transmission_file,
-                         domain,
-                         domain_template,
-                         GHGRP_facility_data,
-                         GHGRP_subpartW_emissions,
-                         GHGRP_combustion_emissions,
-                         state_name_list,
-                         output_directory,
-                         inventory_year,
-                         GHGI_data_yr,
-                         verbose,
-                         plot_directory,
-                         County_Tigerlines,
-                         State_CB){
+                                     GHGI_transmission_compressors,
+                                     GHGI_Pipeline,
+                                     Source_HIFLD_compressor_file,
+                                     Source_EIA_transmission_file,
+                                     domain,
+                                     domain_template,
+                                     GHGRP_facility_data,
+                                     GHGRP_subpartW_emissions,
+                                     GHGRP_combustion_emissions,
+                                     state_name_list,
+                                     output_directory,
+                                     inventory_year,
+                                     GHGI_data_yr,
+                                     verbose,
+                                     plot_directory,
+                                     County_Tigerlines,
+                                     State_CB){
   
   starttime <- Sys.time()
   cat("Starting natural gas transmission sector: Natural_Gas_Transmission\n")
@@ -127,17 +112,19 @@ Natural_Gas_Transmission <- function(input_directory,
   pipes_EIA_file <- file.path(input_directory,"EIA","EIA_transmission_pipeline_map.geojson")
   
   #if source = "M3T", the file already exists
-  if(Source_EIA_transmission_file=="download"){
-    #download via API, load directly in then save.  Saving with downloader
-    #directly instead caused a memory issue so only a small amount of data was
-    #downloaded.
-    
-    # data_URL <- "https://services7.arcgis.com/FGr1D95XCGALKXqM/arcgis/rest/services/NaturalGas_InterIntrastate_Pipelines_US_EIA/FeatureServer/0/query?where=1%3D1&outFields=*&outSR=4326&f=geojson"
-    data_URL <- "https://services2.arcgis.com/FiaPA4ga0iQKduv3/arcgis/rest/services/Natural_Gas_Interstate_and_Intrastate_Pipelines_1/FeatureServer/0/query?outFields=*&where=1%3D1&f=geojson"
-    pipes_EIA <- Trycatch_downloader(data_URL,method="vect",error_message=paste0("Unable to download EIA pipeline data at: ",data_URL))
-    terra::writeVector(pipes_EIA,pipes_EIA_file,overwrite=T)
-  }else{
-    invisible(file.copy(Source_EIA_transmission_file,pipes_EIA_file,overwrite = T))
+  if(Source_EIA_transmission_file!="M3T"){
+    if(Source_EIA_transmission_file=="download"){
+      #download via API, load directly in then save.  Saving with downloader
+      #directly instead caused a memory issue so only a small amount of data was
+      #downloaded.
+      
+      # data_URL <- "https://services7.arcgis.com/FGr1D95XCGALKXqM/arcgis/rest/services/NaturalGas_InterIntrastate_Pipelines_US_EIA/FeatureServer/0/query?where=1%3D1&outFields=*&outSR=4326&f=geojson"
+      data_URL <- "https://services2.arcgis.com/FiaPA4ga0iQKduv3/arcgis/rest/services/Natural_Gas_Interstate_and_Intrastate_Pipelines_1/FeatureServer/0/query?outFields=*&where=1%3D1&f=geojson"
+      pipes_EIA <- Trycatch_downloader(data_URL,method="vect",error_message=paste0("Unable to download EIA pipeline data at: ",data_URL))
+      terra::writeVector(pipes_EIA,pipes_EIA_file,overwrite=T)
+    }else{
+      invisible(file.copy(Source_EIA_transmission_file,pipes_EIA_file,overwrite = T))
+    }
   }
   pipes_EIA <- terra::vect(pipes_EIA_file)
   
@@ -155,7 +142,6 @@ Natural_Gas_Transmission <- function(input_directory,
     compressors_HIFLD <- readxl::read_excel(HIFLD_compressor_file)
   }
   compressors_HIFLD <- terra::vect(compressors_HIFLD,geom=c("LONGITUDE", "LATITUDE"),crs="epsg:4326")
-  # compressors_HIFLD=vect("https://services1.arcgis.com/Hp6G80Pky0om7QvQ/arcgis/rest/services/Natural_Gas_Compressor_Stations/FeatureServer/0/query?where=1%3D1&outFields=*&outSR=4326&f=json")
   
   ################################################################################
   #though it's later cropped to the domain, crop out facilities in Canada
@@ -176,11 +162,11 @@ Natural_Gas_Transmission <- function(input_directory,
   #now instead of later.
   GHGRP_subpartW_emissions <- GHGRP_subpartW_emissions[GHGRP_subpartW_emissions$reporting_year==GHGRP_year,]
   processing_CH4 <- stats::aggregate(GHGRP_subpartW_emissions$total_reported_ch4_emissions,
-                              by=list(GHGRP_subpartW_emissions$facility_id,
-                                      GHGRP_subpartW_emissions$reporting_year,
-                                      GHGRP_subpartW_emissions$facility_name,
-                                      GHGRP_subpartW_emissions$industry_segment),
-                              sum,na.rm=T)
+                                     by=list(GHGRP_subpartW_emissions$facility_id,
+                                             GHGRP_subpartW_emissions$reporting_year,
+                                             GHGRP_subpartW_emissions$facility_name,
+                                             GHGRP_subpartW_emissions$industry_segment),
+                                     sum,na.rm=T)
   colnames(processing_CH4) <- c("facility_id","reporting_year","facility_name","industry_segment","ghg_quantity")
   processing_CH4 <- processing_CH4[,c(1:3,5,4)]
   
