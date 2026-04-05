@@ -1,8 +1,11 @@
 #'@title Create gridded stationary combustion methane emissions maps
 #'
-#'@description `Stationary_combustion` writes up to 56 netcdf files of gridded
-#'  methane emissions from stationary combustion sources, as well as optional
-#'  visuals
+#'@description \code{Stationary_combustion} is an internal function that we
+#'  strongly recommend users do not use directly, instead using
+#'  \code{\link{CH4_inventory_build}} and \code{\link{M3T_config}} which call
+#'  this function. \code{Stationary_combustion} writes up to 64 netcdf files of
+#'  gridded methane emissions from stationary combustion sources, as well as
+#'  optional visuals
 #'
 #'@details This function calculates and grids methane emissions from stationary
 #'  combustion. It uses the Energy Information Administration's (EIA) State
@@ -12,8 +15,9 @@
 #'  inventories.  First, the ratio of SEDS national consumption by fuel-sector
 #'  combination to the equivalent GHGI data is applied to SEDS state data so
 #'  that they are approximately consistent with the GHGI.  The state total
-#'  consumption is then converted to emissions using emission factors.  There
-#'  are two variations at this step.
+#'  consumption is then converted to emissions using the Integovernmental Panel
+#'  on Climate Change (IPCC) emission factors.  There are two variations at this
+#'  step.
 #'
 #'  bystate: The state level emissions are then distributed to the county level
 #'  using NEI CO concentrations to calculate weighting values for each county
@@ -41,13 +45,13 @@
 #'  (residential, commercial, industrial, electric, transportation).  The NEI
 #'  data being used provides CO emissions at the county level.  The GHGI is
 #'  available starting in 1990 and is generally about 2 years behind present
-#'  day.  SEDS data is available starting in 1960 and generally is about
-#'  2 years behind present day, though there are periodic updates between
-#'  October and June.  NEI data is available beginning in at least 1990,
-#'  is released every three years, and generally takes three years to complete
-#'  (i.e., 2023 NEI is released in 2026).  All data is annual.  The SEDS data is
-#'  at the state scale, NEI data is at the county scale, and GHGI data is at the
-#'  national scale.
+#'  day.  SEDS data is available starting in 1960 and generally is about 2 years
+#'  behind present day, though there are periodic updates between October and
+#'  June.  NEI data is available beginning in at least 1990, is released every
+#'  three years, and generally takes three years to complete (i.e., 2023 NEI is
+#'  released in 2026).  All data is annual.  The SEDS data is at the state
+#'  scale, NEI data is at the county scale, and GHGI data is at the national
+#'  scale.
 #'
 #'  The GHGI is available at
 #'  \url{https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks}
@@ -55,8 +59,10 @@
 #'  \url{https://www.mrlc.gov/downloads/sciweb1/shared/mrlc/data-bundles/NLCD_2011_Land_Cover_AK_20200724.zip}
 #'  The NEI is available at
 #'  \url{https://www.epa.gov/air-emissions-inventories/national-emissions-inventory-nei}
-#'  ACES is available at \url{https://doi.org/10.3334/ORNLDAAC/1943} and Vulcan
-#'  is available at \url{https://doi.org/10.3334/ORNLDAAC/1741}.
+#'  IPCC emission factors are published at
+#'  \url{https://www.ipcc-nggip.iges.or.jp/public/2006gl/vol2.html} ACES is
+#'  available at \url{https://doi.org/10.3334/ORNLDAAC/1943} and Vulcan is
+#'  available at \url{https://doi.org/10.5281/zenodo.15446748}.
 #'
 #'  Each fuel-sector-inventory-variation combination is saved separately.
 #'
@@ -88,8 +94,6 @@
 #'  \code{\link{M3T_config}}.
 #'@param stationary_combustion_by_domain Logical.  Pulled from
 #'  \code{\link{M3T_config}}.
-#'@param stationary_combustion_GHGI_data Data frame.  Pulled from
-#'  \code{\link{M3T_config}}.
 #'@param stationary_combustion_emission_factors Data frame.  Pulled from
 #'  \code{\link{M3T_config}}.
 #'@param EIA_API_key Character.  Pulled from \code{\link{M3T_config}}.
@@ -100,6 +104,11 @@
 #'  (industrial); fuel is abbreviated as wood, petr (petroleum), gas (natural
 #'  gas), and coal; variation is bystate or bydomain; and inventory is ACES or
 #'  Vulcan.
+#'
+#'  Then the 4 possible combinations for fossil fuel and wood separately (for a
+#'  total of 8) are saved similarly as
+#'  "Stationary_combustion_sector_type_total_inventory_variation.nc" where type
+#'  is either fossil_fuel or wood.
 #'@seealso [CH4_inventory_build()] Calculates methane inventory using settings
 #'  provided in config.
 #'
@@ -130,9 +139,9 @@ Stationary_combustion <- function(input_directory,
                                   vu_com,
                                   vu_ind,
                                   vu_elec,
+                                  stationary_combustion_GHGI_data,
                                   stationary_combustion_by_state,
                                   stationary_combustion_by_domain,
-                                  stationary_combustion_GHGI_data,
                                   stationary_combustion_emission_factors,
                                   Source_EIA_SEDS_data,
                                   Source_NEI_data,
@@ -205,47 +214,6 @@ Stationary_combustion <- function(input_directory,
   }
   EIA_raw_data <- EIA_raw_data[EIA_raw_data$period==SEDS_yr,]
   
-  # ################################################################################
-  # #download SEDS data via API
-  # 
-  # SEDS_state_name_list <- c(state_name_list,"US")
-  # SEDS_filename <- file.path(input_directory,"EIA","SEDS.csv")
-  # 
-  # if(Source_EIA_SEDS_data=="M3T"){
-  #   #UPDATE TO ZENODO
-  #   EIA_raw_data <- M3T::EIA_SEDS
-  #   EIA_raw_data <- EIA_raw_data[EIA_raw_data$period==SEDS_yr,]
-  # }else{
-  #   if(Source_EIA_SEDS_data=="download"){
-  #     #see https://www.eia.gov/opendata/browser/seds.  Filtered to only sectors,
-  #     #states, and years of interest here.  All in billion BTU/yr units (last
-  #     #digit B instead of P - short tons)
-  #     
-  #     SEDS_URL <- paste0("https://api.eia.gov/v2/seds/data/?frequency=annual&data[0]=value&facets[seriesId][]=CLCCB",
-  #                        "&facets[seriesId][]=CLEIB&facets[seriesId][]=CLICB&facets[seriesId][]=NGCCB&facets[seriesId][]=NGEIB&facets[seriesId][]=NGICB&facets[seriesId][]=PACCB&facets[seriesId][]=PAEIB&facets[seriesId][]=PAICB&facets[seriesId][]=PARCB&facets[seriesId][]=WDRCB&facets[seriesId][]=WWCCB&facets[seriesId][]=WWEIB&facets[seriesId][]=WWICB",
-  #                        paste0("&facets[stateId][]=",SEDS_state_name_list,collapse = ""),
-  #                        "&start=",SEDS_yr-1,"&end=",SEDS_yr+1,
-  #                        "&sort[0][column]=seriesId&sort[0][direction]=asc&offset=0&api_key=",EIA_API_key)
-  #     
-  #     #download directly into R and keep only the data table
-  #     EIA_raw_data <- Trycatch_downloader(SEDS_URL,output_location=NULL,method="JSON",
-  #                                         error_message=paste0("\nEIA State Energy Data System data could not be downloaded using API link: ",SEDS_URL,"\n\nmake sure you have an active EIA API key in the config!"))
-  #     EIA_raw_data <- EIA_raw_data$response$data
-  #     
-  #     #frustratingly, the API seems inconsistent. Sometimes 2022 - 2022 grabs
-  #     #only 2022.  Other times doing that gives you no data, and you have to set
-  #     #to 2021 - 2022 or 2022 - 2023 to get the data you want.  This is just to
-  #     #handle these cases.  Download desired year +/-1, then filter to just the
-  #     #year of interest.
-  #     EIA_raw_data <- EIA_raw_data[EIA_raw_data$period==SEDS_yr,]
-  #     
-  #     utils::write.csv(file = SEDS_filename,x = EIA_raw_data,row.names = F)
-  #   }else{
-  #     invisible(file.copy(Source_EIA_SEDS_data,SEDS_filename,overwrite = T))
-  #   }
-  #   EIA_raw_data <- utils::read.csv(SEDS_filename,header=T)
-  # }
-  # 
   ################################################################################
   #prepare SEDS data
   
