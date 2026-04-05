@@ -1,8 +1,13 @@
 #'@title Create gridded methane emissions maps that include all sectors
 #'
-#'@description `Combine_across_sectors` writes a netcdf for every unique
-#'  combination of sectoral emissions estimates.  Optionally writes additional
-#'  netcdf with the thermogenic and nonthermogenic sectors separately.
+#'@description \code{Combine_across_sectors} is an internal function that we
+#'  strongly recommend users do not use directly, instead using
+#'  \code{\link{CH4_inventory_build}} and \code{\link{M3T_config}} which call
+#'  this function. \code{Combine_across_sectors} writes a netcdf for
+#'  combinations of sectoral emissions estimates.  Can be set to write only the
+#'  min, mean, and max across variations and/or every possible combination.  Can
+#'  also be set to write equivalent netcdfs with the thermogenic and
+#'  nonthermogenic sectors separately.
 #'
 #'@details This function considers every possible output across all sectors and
 #'  filters to keep those that have been saved to the output folder.  From there
@@ -10,13 +15,13 @@
 #'  options have been enabled, this can be over 1,000 combinations, so caution
 #'  is warranted, though processing is generally fast and file sizes small -
 #'  this will depend strongly on the domain size. Additionally, if the config
-#'  option is set, three inventories will be created for each unique combination
-#'  instead:
+#'  option is set, thermogenic and non-thermogenic variations will also be
+#'  saved:
 #' \itemize{
 #'   \item One that is the total across all sectors
 #'   \item One that is the total across only thermogenic sources
 #'   \itemize{
-#'     \item stationary combustion of wood
+#'     \item stationary combustion of fossil fuels
 #'     \item natural gas distribution
 #'     \item natural gas transmission
 #'     \item Gridded EPA mobile combustion
@@ -37,7 +42,7 @@
 #'   \item One that is the total across only non-thermogenic sources
 #'   \itemize{
 #'     \item landfills
-#'     \item stationary combustion of fossil fuels
+#'     \item stationary combustion of wood
 #'     \item wastewater
 #'     \item wetlands
 #'     \item Gridded EPA composting
@@ -55,19 +60,15 @@
 #'  plot of the average gridded methane emissions across all variations on a log
 #'  scale
 #'@returns Nothing is returned from the function, but the main outputs are many
-#'  netcdf files of the methane emissions across all sectors.  Given the large
-#'  number of possible files and variations, they are titled
-#'  "Combined_inventory_combination_#.nc" with # increasing numerically.  A csv
-#'  titled "Combined_inventory_key.csv" is also saved that details what
-#'  variations were used for each sector for each inventory.
+#'  netcdf files of the methane emissions across all sectors.  If all
+#'  combinations are run, given the large number of possible files and
+#'  variations, they are titled "Combined_inventory_combination_#.nc" with #
+#'  increasing numerically.  A csv titled "Combined_inventory_key.csv" is also
+#'  saved that details what variations were used for each sector for each
+#'  inventory.
 #'
 #'@inherit Municipal_solid_waste seealso
 #'@keywords internal
-
-#@examples
-#library(terra)
-#Combine_inventories <- function(output_directory="~/../Desktop/out/",
-#                                Separate_thermo=T)
 
 Combine_across_sectors <- function(output_directory,
                                 Separate_thermo,
@@ -96,7 +97,7 @@ Combine_across_sectors <- function(output_directory,
   
   set_output <- c("GEPA_ind_landfill.nc","GEPA_non_thermo.nc","GEPA_thermo.nc",
                   "NG_transmission_sector_total.nc")
-  Landfill_options <- c("GHGRP_reported","GHGRP_modeled","GHGRP_collection_efficiency")
+  Landfill_options <- c("GHGRP_reported","GHGRP_generation_first","GHGRP_collection_first")
   Wetland_options <- c("SOCCR1","SOCCR2","Wetcharts_NLCD")
   
   #expand.grid to combine multiple variations in 1 sector - just simpler 
