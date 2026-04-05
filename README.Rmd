@@ -12,6 +12,7 @@ editor_options:
 <!-- badges: start -->
 
 [![R-CMD-check](https://github.com/Kristian-hajny/methane_inventory/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/Kristian-hajny/methane_inventory/actions/workflows/R-CMD-check.yaml)
+
 <!-- badges: end -->
 
 This is an R package designed to help create an urban-focused gridded
@@ -27,8 +28,8 @@ When running the main function you set the directory to save data, the
 year, resolution, mapping system (e.g., lat/long or a m grid), and area
 you want an inventory for. Years should be between 2011 and 2023 (as of
 this writing) as the GHGRP data utilized for some sectors only exists
-for this timeframe and the resolution should not finer than 0.01 degrees
-or 1 square kilometer.
+for this timeframe and the resolution should not be finer than 0.01
+degrees x 0.01 degrees or 1 kilometer x 1 kilometer.
 
 ## Background
 
@@ -45,6 +46,10 @@ at Earth System Science Data (submitted).
 Other particularly relevant articles for the various sectors are
 mentioned below when describing the functions in this package and within
 help files.
+
+As the methods can be varied, a text file with the settings used is
+saved to the input folder named "Run_settings.txt". This file should
+always be included with any research based on this package.
 
 ## Installation
 
