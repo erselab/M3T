@@ -79,7 +79,8 @@ CH4_inventory_build <- function(run_directory,
                                 domain,
                                 domain_res=NULL,
                                 domain_crs="epsg:4326",
-                                verbose=FALSE){
+                                verbose=FALSE,
+                                Zenodo_folder="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Manuscript/All inventory data/Prepared inventory data/M3T_Zenodo_data/Processed/"){
   ################################################################################
   #quick internet check given much of the package requires it if any M3T_config
   #values are M3T or download
@@ -199,8 +200,8 @@ CH4_inventory_build <- function(run_directory,
   
   if(any(M3T_get_config()=="M3T")){
     #UPDATE TO ZENODO
-    
-    invisible(file.copy(list.files("G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Manuscript/All inventory data/Prepared inventory data/M3T_Zenodo_data/Processed/",full.names = T),
+
+    invisible(file.copy(list.files(Zenodo_folder,full.names = T),
                         input_directory,recursive=T,overwrite=T))
     
   }
