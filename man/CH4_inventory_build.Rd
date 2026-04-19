@@ -63,7 +63,7 @@ inventories for the continental US. Many crs can be seen at
 \item{verbose}{Logical indicating whether to save sector and subsector
 visuals.}
 
-\item{Zenodo_folder}{Character.  TTemporary variable to provide a filepath to
+\item{Zenodo_folder}{Character.  Temporary variable to provide a filepath to
 the data that will later be uploaded and automatically pulled from a zenodo.}
 }
 \value{
@@ -87,12 +87,58 @@ the needed data.
 }
 \examples{
 \dontshow{if (interactive() && curl::has_internet()) withAutoprint(\{ # examplesIf}
- CH4_inventory_build(run_directory=tempdir(), inventory_year=2019,
- domain="RI", domain_res=1, domain_crs="epsg:4326", verbose=F)
+#Strongly recommend writing a run script to set all config 
+#options as desired and run CH4_inventory_build().  Config settings are only 
+#saved for the current R session.
 
- CH4_inventory_build(run_directory=tempdir(), inventory_year=2019, domain =
- as.data.frame(cbind(c(-75,-72),c(39,42))), domain_res=1,
- domain_crs="epsg:4326", verbose=F)
+#see help for the config settings including detailed descriptions of each
+?M3T_config.  
+
+
+#output all current config settings
+M3T_get_config()
+
+#output the config settings for 1 option in particular, in this case, the
+#residential post meter emission factor in mol/s
+M3T_get_config("natural_gas_res_post_meter_emission_factor")
+
+#change the config setting for 1 option, in this case, change the residential
+#post meter emission factor to ~double the default
+M3T_set_config(natural_gas_res_post_meter_emission_factor = 4e-10)
+
+#run M3T for Rhode Island and Connecticut at 1 degree resolution for 2019 in 
+#a temporary folder with current config settings and Zenodo_data in a folder 
+#with that name on the desktop.
+CH4_inventory_build(run_directory=tempdir(),
+                   inventory_year=2019,
+                   domain=c("CT","RI"),
+                   domain_res=1,
+                   domain_crs="epsg:4326",
+                   verbose=F,
+                   Zenodo_folder="~/../Desktop/Zenodo_data/")
+
+#run M3T for a defined box in the northeastern US at 1 degree resolution for
+#2019 in a temporary folder with current config settings and Zenodo_data in 
+#a folder with that name on the desktop.
+CH4_inventory_build(run_directory=tempdir(), 
+                   inventory_year=2019, 
+                   domain = as.data.frame(cbind(c(-75,-72),c(39,42))), 
+                   domain_res=1,
+                   domain_crs="epsg:4326", 
+                   verbose=F,
+                   Zenodo_folder="~/../Desktop/Zenodo_data/")
+
+#run M3T for the entire continental US at 1 degree resolution for
+#2019 in a temporary folder with current config settings and Zenodo_data in 
+#a folder with that name on the desktop.  Larger domains will take much longer 
+#to run.
+CH4_inventory_build(run_directory=tempdir(), 
+                   inventory_year=2019, 
+                   domain = "CONUS", 
+                   domain_res=1,
+                   domain_crs="epsg:4326", 
+                   verbose=F,
+                   Zenodo_folder="~/../Desktop/Zenodo_data/")
 \dontshow{\}) # examplesIf}
 }
 \seealso{

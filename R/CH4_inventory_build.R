@@ -48,7 +48,7 @@
 #'  \href{https://spatialreference.org/}{spatialreference.org}.
 #'@param run_directory Character providing the full filepath to load/save input
 #'  and output data.  Subfolders will be created.
-#'@param Zenodo_folder Character.  TTemporary variable to provide a filepath to
+#'@param Zenodo_folder Character.  Temporary variable to provide a filepath to
 #'  the data that will later be uploaded and automatically pulled from a zenodo.
 #'@param inventory_year Numeric indicating the desired year of data to use.  The
 #'  closest available will be used if unavailable with a user update.
@@ -59,12 +59,59 @@
 #'  various sectors.
 #'@export
 #'@examplesIf interactive() && curl::has_internet()
-#'  CH4_inventory_build(run_directory=tempdir(), inventory_year=2019,
-#'  domain="RI", domain_res=1, domain_crs="epsg:4326", verbose=F)
+#'#Strongly recommend writing a run script to set all config 
+#'#options as desired and run CH4_inventory_build().  Config settings are only 
+#'#saved for the current R session.
 #'
-#'  CH4_inventory_build(run_directory=tempdir(), inventory_year=2019, domain =
-#'  as.data.frame(cbind(c(-75,-72),c(39,42))), domain_res=1,
-#'  domain_crs="epsg:4326", verbose=F)
+#'#see help for the config settings including detailed descriptions of each
+#'?M3T_config.  
+#'
+#'
+#'#output all current config settings
+#'M3T_get_config()
+#'
+#'#output the config settings for 1 option in particular, in this case, the
+#'#residential post meter emission factor in mol/s
+#'M3T_get_config("natural_gas_res_post_meter_emission_factor")
+#'
+#'#change the config setting for 1 option, in this case, change the residential
+#'#post meter emission factor to ~double the default
+#'M3T_set_config(natural_gas_res_post_meter_emission_factor = 4e-10)
+#'
+#'#run M3T for Rhode Island and Connecticut at 1 degree resolution for 2019 in 
+#'#a temporary folder with current config settings and Zenodo_data in a folder 
+#'#with that name on the desktop.
+#'CH4_inventory_build(run_directory=tempdir(),
+#'                    inventory_year=2019,
+#'                    domain=c("CT","RI"),
+#'                    domain_res=1,
+#'                    domain_crs="epsg:4326",
+#'                    verbose=F,
+#'                    Zenodo_folder="~/../Desktop/Zenodo_data/")
+#'
+#'#run M3T for a defined box in the northeastern US at 1 degree resolution for
+#'#2019 in a temporary folder with current config settings and Zenodo_data in 
+#'#a folder with that name on the desktop.
+#'CH4_inventory_build(run_directory=tempdir(), 
+#'                    inventory_year=2019, 
+#'                    domain = as.data.frame(cbind(c(-75,-72),c(39,42))), 
+#'                    domain_res=1,
+#'                    domain_crs="epsg:4326", 
+#'                    verbose=F,
+#'                    Zenodo_folder="~/../Desktop/Zenodo_data/")
+#'
+#'#run M3T for the entire continental US at 1 degree resolution for
+#'#2019 in a temporary folder with current config settings and Zenodo_data in 
+#'#a folder with that name on the desktop.  Larger domains will take much longer 
+#'#to run.
+#'CH4_inventory_build(run_directory=tempdir(), 
+#'                    inventory_year=2019, 
+#'                    domain = "CONUS", 
+#'                    domain_res=1,
+#'                    domain_crs="epsg:4326", 
+#'                    verbose=F,
+#'                    Zenodo_folder="~/../Desktop/Zenodo_data/")
+#'
 #'@seealso [M3T_config] Generates the config function with user-editable
 #'  settings used throughout processing.
 
@@ -739,7 +786,7 @@ CH4_inventory_build <- function(run_directory,
   #Download, load in, and prepare GHGI data if/as needed.  Download the most
   #recent available as previous years are updated with each new GHGI.
   
-  if((M3T_config$Process_landfills | M3T_config$Process_natural_gas_distribution | M3T_config$Process_natural_gas_transmission | M3T_config$Process_stationary_combustion | M3T_config$Process_wastewater) &
+  if((M3T_config$Process_landfills | M3T_config$Process_natural_gas_distribution | M3T_config$Process_natural_gas_transmission | M3T_config$Process_wastewater) &
      any(c(M3T_config$GHGI_landfill_total,
            M3T_config$GHGI_MnR,M3T_config$GHGI_maintenance,
            M3T_config$GHGI_meters,M3T_config$GHGI_services,
@@ -803,22 +850,7 @@ CH4_inventory_build <- function(run_directory,
           data_URL <- paste0("https://www.epa.gov/ghgemissions/inventory-us-greenhouse-gas-emissions-and-sinks-1990-",GHGI_file_yr)
           test_url <- suppressWarnings(try(utils::download.file(data_URL,tempfile(".zip"),quiet = T),silent = T))
           
-          #SEDS too - if processing stationary combustion.  See
-          #https://www.eia.gov/opendata/browser/seds. URL is described in that
-          #sector's code.
-          if(M3T_config$Process_stationary_combustion){
-            SEDS_data_URL <- paste0("https://api.eia.gov/v2/seds/data/?frequency=annual&data[0]=value&facets[seriesId][]=CLCCB",
-                                    "&facets[seriesId][]=CLEIB&facets[seriesId][]=CLICB&facets[seriesId][]=NGCCB&facets[seriesId][]=NGEIB&facets[seriesId][]=NGICB&facets[seriesId][]=PACCB&facets[seriesId][]=PAEIB&facets[seriesId][]=PAICB&facets[seriesId][]=PARCB&facets[seriesId][]=WDRCB&facets[seriesId][]=WWCCB&facets[seriesId][]=WWEIB&facets[seriesId][]=WWICB",
-                                    "&facets[stateId][]=AL",
-                                    "&start=",GHGI_file_yr-1,"&end=",GHGI_file_yr+1,
-                                    "&sort[0][column]=seriesId&sort[0][direction]=asc&offset=0&api_key=",M3T_config$EIA_API_key)
-            SEDS_test_url <- jsonlite::fromJSON(SEDS_data_URL)
-          }else{
-            SEDS_test_url <- list()
-            SEDS_test_url$response$data$period=GHGI_file_yr
-          }
-          
-          if(test_url==0 & (GHGI_file_yr %in% unique(GHGRP_subpartW_emissions$reporting_year)) & (GHGI_file_yr %in% SEDS_test_url$response$data$period)){
+          if(test_url==0 & (GHGI_file_yr %in% unique(GHGRP_subpartW_emissions$reporting_year))){
             break
           }
         }
@@ -1281,7 +1313,6 @@ CH4_inventory_build <- function(run_directory,
                           stationary_combustion_emission_factors=M3T_config$stationary_combustion_emission_factors,
                           Source_EIA_SEDS_data=M3T_config$Source_EIA_SEDS_data,
                           Source_NEI_data=M3T_config$Source_NEI_data,
-                          EIA_API_key=M3T_config$EIA_API_key,
                           plot_directory=plot_directory,
                           State_CB=State_CB)
   }
