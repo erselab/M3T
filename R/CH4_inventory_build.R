@@ -236,7 +236,13 @@ CH4_inventory_build <- function(run_directory,
   on.exit(options("timeout"=M3T_timeout), add = TRUE)
   on.exit(terra::terraOptions(datatype=M3T_terra$datatype,
                               progress=M3T_terra$progress), add = TRUE)
+  ################################################################################
+  #set config to reset to what it was before running the function on exit, some
+  #variables are rewritten as you go
   
+  Initial_config <- as.environment(M3T_get_config())
+  on.exit(rlang::env_unbind(M3T_config,rlang::env_names(Initial_config)), add = TRUE)
+  on.exit(rlang::env_coalesce(M3T_config,Initial_config), add = TRUE)
   ################################################################################
   #Download necessary data from Zenodo
   
@@ -786,11 +792,7 @@ CH4_inventory_build <- function(run_directory,
   #Download, load in, and prepare GHGI data if/as needed.  Download the most
   #recent available as previous years are updated with each new GHGI.
   
-  if((M3T_config$Process_landfills | M3T_config$Process_natural_gas_distribution | M3T_config$Process_natural_gas_transmission | M3T_config$Process_wastewater) &
-     any(c(M3T_config$GHGI_landfill_total,
-           M3T_config$GHGI_MnR,M3T_config$GHGI_maintenance,
-           M3T_config$GHGI_meters,M3T_config$GHGI_services,
-           M3T_config$GHGI_Pipeline,M3T_config$GHGI_transmission_compressors)=="GHGI")){
+  if((M3T_config$Process_landfills | M3T_config$Process_natural_gas_distribution | M3T_config$Process_natural_gas_transmission | M3T_config$Process_wastewater)){
     
     if(M3T_config$Source_GHGI=="M3T"){
       #UPDATE TO ZENODO
@@ -1382,6 +1384,7 @@ CH4_inventory_build <- function(run_directory,
     if(M3T_config$Source_NWI!="M3T"){
       NWI_Wetland_fraction(input_directory=input_directory,
                            output_directory=output_directory,
+                           Source_NWI=M3T_config$Source_NWI,
                            domain=domain,
                            domain_template=domain_template,
                            state_name_list=state_name_list)
