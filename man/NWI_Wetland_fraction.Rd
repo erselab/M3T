@@ -8,6 +8,7 @@ data}
 NWI_Wetland_fraction(
   input_directory,
   output_directory,
+  Source_NWI,
   domain,
   domain_template,
   state_name_list
@@ -20,6 +21,8 @@ the input \code{run_directory}.}
 
 \item{output_directory}{Character providing the full filepath to save
 processed data as created in \code{\link{CH4_inventory_build}}}
+
+\item{Source_NWI}{Logical.  Pulled from \code{\link{M3T_config}}.}
 
 \item{domain}{SpatVector polygon outlining the desired output area as created
 in \code{\link{CH4_inventory_build}}.}
