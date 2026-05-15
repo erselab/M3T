@@ -31,6 +31,10 @@ this writing) as the GHGRP data utilized for some sectors only exists
 for this timeframe and the resolution should not be finer than 0.01
 degrees x 0.01 degrees or 1 kilometer x 1 kilometer.
 
+M3T has a [Companion Zenodo](https://doi.org/10.5281/zenodo.17328718)
+that is accessed when running which also includes some supporting code
+and the code used to generate the datasets stored.
+
 ## Background
 
 This tool is developed using a wide variety of published research,
@@ -83,6 +87,54 @@ Only 3 functions should be necessary for users
     urban names/FIPS codes (e.g., "Long Neck, DE"), or the filepath to a
     polygon file.
 
+## Examples
+
+These examples are also presented in the help documentation for the
+CH4_inventory_build() function.
+
+1.  Run M3T for Rhode Island and Connecticut at 1 degree resolution for
+    2019 in a temporary folder with current config settings. The
+    Zenodo_data folder on the desktop contains the files in the
+    Companion Zenodo.
+
+``` R
+CH4_inventory_build(run_directory=tempdir(),
+                    inventory_year=2019,
+                    domain=c("CT","RI"),
+                    domain_res=1,
+                    domain_crs="epsg:4326",
+                    verbose=F,
+                    Zenodo_folder="~/../Desktop/Zenodo_data/")
+```
+
+2.  Run M3T for a defined box in the northeastern US at 1 degree
+    resolution for 2016 in a temporary folder with current config
+    settings. Uses a specific version of the Companion Zenodo and will
+    include visuals for each sector.
+
+``` R
+CH4_inventory_build(run_directory=tempdir(),
+                    inventory_year=2016,
+                    domain = as.data.frame(cbind(c(-75,-72),c(39,42))),
+                    domain_res=1,
+                    domain_crs="epsg:4326",
+                    verbose=T,
+                    Zenodo_record="17328718")
+```
+
+3.  Run M3T for the entire continental US at 1 degree resolution for
+    2019 in a temporary folder with current config settings. Larger
+    domains will take much longer to run.
+
+``` R
+CH4_inventory_build(run_directory=tempdir(),
+                    inventory_year=2019,
+                    domain = "CONUS",
+                    domain_res=1,
+                    domain_crs="epsg:4326",
+                    verbose=F)
+```
+
 ## Config Settings
 
 1.  Process_X
@@ -111,13 +163,14 @@ Sectors and methods
 
     -   landfill_ghgrp_reported - TRUE/FALSE option to use the reported
         methane emissions which can be either of the below methods and
-        will vary across landfills.
+        will vary across landfills and over time.
 
-    -   landfill_ghgrp_modeled - TRUE/FALSE option to use the reported
-        methane emissions calculated using a first order decay model.
+    -   landfill_ghgrp_generation_first - TRUE/FALSE option to use the
+        reported methane emissions calculated using a first order decay
+        model.
 
-    -   landfill_ghgrp_collection_efficiency - TRUE/FALSE option to use
-        the reported methane emissions back-calculated using data from
+    -   landfill_ghgrp_collection_first - TRUE/FALSE option to use the
+        reported methane emissions back-calculated using data from
         landfill gas collection systems.
 
 2.  Natural Gas Distribution
@@ -156,7 +209,7 @@ Sectors and methods
         CWNS is infrequent while DMR data is regularly updated, though
         the two differ even for the same year.
 
-    -   Wastewater_Municipal_Method_Moore_EF and
+    -   Wastewater_Municipal_Method_Moore and
         Wastewater_Municipal_Method_GHGI - TRUE/FALSE options to use the
         Moore et al. relationship between flow and emissions based on a
         large measurement campaign or distribute the EPA Greenhouse Gas
@@ -228,10 +281,12 @@ folder. The sector total values are named to clarify the variations that
 the subsectors came from. The below lists the subsector output for each
 sector, including all possible variations. Minor variations in the
 filenames to differentiate subsectors are in **bold**. Point 8 describes
-the final inventory files.
+the final combined inventory files.
 
-If you are interested in detailed methodology, we recommend you to the
-paper mentioned in the background section or the help files.
+Point source sectors also produce csv with the activity and emissions
+data before gridding. If you are interested in detailed methodology, we
+recommend you to the paper mentioned in the background section or the
+help files for each sector.
 
 1.  Landfills
     -   MSW_GHGRP\_**method**.nc
@@ -241,16 +296,22 @@ paper mentioned in the background section or the help files.
             -   **Reported**
                 -   Uses values as reported to the GHGRP. Facilities can
                     choose either method below as their reported value.
-            -   **Modeled**
+            -   **Generation_first**
                 -   Uses GHGRP method HH-6 emissions which are based on
                     a first order decay model
-            -   **Collection_efficiency**
+            -   **Collection_first**
                 -   Uses GHGRP method HH-8 emissions which are based on
                     an assumed landfill gas capture efficiency and the
-                    known quantity of gas captured
+                    measured quantity of gas captured
     -   MSW_LMOP.nc
         -   Municipal Solid Waste (MSW) emissions assigned to Landfill
             Methane Outreach Program (LMOP) facilities
+    -   GHGRP_MSW_Landfills.csv
+        -   GHGRP facility data used for the run (i.e., after filtering
+            to the domain and year) including the calculated emissions
+    -   LMOP_MSW_Landfills.csv
+        -   LMOP facility data used for the run (i.e., after filtering
+            to the domain and year) including the calculated emissions
 2.  Natural Gas Distribution
     -   NG_dist\_**type_sector_variation_inventory**.nc
         -   **type**
@@ -341,7 +402,7 @@ paper mentioned in the background section or the help files.
                 -   Disaggregates the GreenHouse Gas Inventory (GHGI)
                     national total emissions to each facility assuming
                     they're proportional to flow handled
-            -   **Moore_EF**
+            -   **Moore**
                 -   Calculates emissions using the Moore et al. log-log
                     Linear (ML) relationship between flow handled and
                     emissions determined using measurements
@@ -352,10 +413,18 @@ paper mentioned in the background section or the help files.
                 -   calculated using state-specific septic data
             -   **national**
                 -   calculated using the fraction of open / low density
-                    urban land cover relative to the national total
+                    urban land cover relative to the national total in
+                    combination with
+    -   GHGRP_industrial_watewater_treatment.csv
+        -   GHGRP facility data used for the run (i.e., after filtering
+            to the domain and year) including the emissions
+    -   Municipal_watewater_treatment.csv
+        -   Facility data including flow used for the run (i.e., CWNS
+            and/or DMR data after filtering to the domain and year)
+            including the calculated emissions
 6.  Wetlands and Inland Waters
-    -   Wetcharts_NLCD_landcover</b>\_downscaled_subset\_<b>N</b>.nc
-        -   Wetland emissions from WetCHARTs downscaled from 0.5 degress
+    -   Wetcharts_NLCD_downscaled_subset\_**N**.nc
+        -   Wetland emissions from WetCHARTs downscaled from 0.5 degrees
             to 0.1 degrees using landcover
         -   **N**
             -   Sequential. You can select different subsets of
@@ -387,7 +456,8 @@ paper mentioned in the background section or the help files.
             ferroalloy industry)
 8.  Combining sectors
     -   a separate folder will be created with each unique combination
-        of sectors saved numerically. A csv will also be saved which
-        provides a clear legend detailing which variations are in each
-        inventory file. Summary combinations will be saved in a separate
-        folder, as will thermogenic/non-thermogenic combinations.
+        of sectors saved numerically if that is set in the config. A csv
+        will also be saved which provides a clear legend detailing which
+        variations are in each inventory file. Summary combinations will
+        be saved in a separate folder, as will
+        thermogenic/non-thermogenic combinations if set in the config.
