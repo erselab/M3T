@@ -7,4 +7,5 @@ dependencies:
   - r-base
   - r-essentials
   - r-terra
+  - r-rlang
   - r-ncdf4
