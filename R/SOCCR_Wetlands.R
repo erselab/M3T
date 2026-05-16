@@ -40,6 +40,7 @@
 #'@param Use_Wetcharts Logical.  Pulled from \code{\link{M3T_config}}.
 #'@param Wetland_EFs Data.frame.  Pulled from \code{\link{M3T_config}}.
 #'@param Source_Watershed_file Character.  Pulled from \code{\link{M3T_config}}.
+#'@param Source_NWI Logical.  Pulled from \code{\link{M3T_config}}.
 #'
 #'@returns Nothing is returned from the function, but the main outputs are up to
 #'  6 netcdcf files of the methane emissions from wetlands with 1 file for
@@ -83,6 +84,7 @@ SOCCR_Wetlands <- function(input_directory,
                            County_Tigerlines,
                            State_CB,
                            Source_Watershed_file,
+                           Source_NWI,
                            Use_Wetcharts,
                            Wetcharts_model_subset){
   
@@ -112,7 +114,6 @@ SOCCR_Wetlands <- function(input_directory,
                         error_message=paste0("\nFailed to download watershed shapefile at URL",data_URL))
     utils::unzip(temp_out,,exdir = input_directory)
   }else if(Source_Watershed_file=="M3T"){
-    #UPDATE TO ZENODO
     Watershed_file <- file.path(input_directory,"Watersheds.gpkg")
   }else{
     invisible(file.copy(Source_Watershed_file,Watershed_file,overwrite = T))
