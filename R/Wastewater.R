@@ -104,7 +104,7 @@
 #'  industrial wastewater treatment facilities
 #'@param Wastewater_use_CWNS Logical.  Pulled from \code{\link{M3T_config}}.
 #'@param Wastewater_use_DMR Logical.  Pulled from \code{\link{M3T_config}}.
-#'@param Wastewater_Municipal_Method_Moore_EF Logical.  Pulled from
+#'@param Wastewater_Municipal_Method_Moore Logical.  Pulled from
 #'  \code{\link{M3T_config}}.
 #'@param Wastewater_Municipal_Method_GHGI Logical.  Pulled from
 #'  \code{\link{M3T_config}}.
@@ -154,7 +154,7 @@ Wastewater <- function(input_directory,
                        output_directory,
                        Wastewater_use_CWNS,
                        Wastewater_use_DMR,
-                       Wastewater_Municipal_Method_Moore_EF,
+                       Wastewater_Municipal_Method_Moore,
                        Wastewater_Municipal_Method_GHGI,
                        Wastewater_national_septic,
                        Wastewater_state_septic,
@@ -190,7 +190,6 @@ Wastewater <- function(input_directory,
   #load Clean Watershed Needs Survey
   
   if(Source_CWNS=="M3T"){
-    #UPDATE TO ZENODO
     CWNS_yr <- which.min(abs(inventory_year - c(2012,2022)))
     if(CWNS_yr==1){
       CWNS <- M3T::CWNS_2012
@@ -236,7 +235,6 @@ Wastewater <- function(input_directory,
   DMR_file <- file.path(input_directory,paste0("DMR_",2010:2024,".csv")[DMR_yr])
   DMR_yr <- (2010:2024)[DMR_yr]
   if(Source_DMR=="M3T"){
-    #UPDATE TO ZENODO
     DMR <- utils::read.csv(file.path(input_directory,"DMR_data.csv"))
     DMR <- DMR[DMR$year==DMR_yr,]
   }else{
@@ -316,6 +314,7 @@ Wastewater <- function(input_directory,
     #project and crop to the domain, remove NAs
     input_crop <- terra::project(input,terra::crs(domain))
     input_crop <- terra::crop(input_crop,domain)
+    input_crop <- terra::mask(input_crop,domain)
     input_crop_filt <- subset(input_crop,!is.na(input_crop$emiss))
     
     #if there's at least 1 facility, rasterize it (mol/s)
@@ -329,13 +328,11 @@ Wastewater <- function(input_directory,
     rast_flux <- rast*1e9/(terra::cellSize(rast,unit="m"))  
     rast_flux[is.na(rast_flux)]<-0
     
-    #mask now - just to NA data outside non-square domains.  No need to
-    #partially weight pixels by fractional coverage, cropped as points so only
-    #those within the domain have been rasterized.
-    rast_flux <- terra::mask(rast_flux,domain)
-    
     #save the raster to the active R environment
     assign(x = outputname,rast_flux,envir = parent.env(environment()))
+    
+    #also return the cropped data - for csv saving
+    return(input_crop_filt)
   }
   
   ################################################################################
@@ -345,27 +342,29 @@ Wastewater <- function(input_directory,
   if(Wastewater_Municipal_Method_GHGI){
     if(Wastewater_use_CWNS){
       CWNS_Municipal_flow$emiss <- central_EPA_emiss*CWNS_Municipal_flow$EXIST_MUNICIPAL/CWNS_tot_flow   # in mol/s
-      rasterize_plus(CWNS_Municipal_flow,"WWTP_CWNS_GHGI_municipal")
+      CWNS_GHGI_csv_data <- rasterize_plus(CWNS_Municipal_flow,"WWTP_CWNS_GHGI_municipal")
     }
     if(Wastewater_use_DMR){
       DMR_Municipal_flow$emiss <- central_EPA_emiss*DMR_Municipal_flow$Average_Daily_Flow__MGD_/DMR_tot_flow   # in mol/s
-      rasterize_plus(DMR_Municipal_flow,"WWTP_DMR_GHGI_municipal")
+      DMR_GHGI_csv_data <- rasterize_plus(DMR_Municipal_flow,"WWTP_DMR_GHGI_municipal")
     }
   }
   ################################################################################
   #Instead calculate Municipal Wastewater Treatment Plant emissions using the
   #moore et al. EF
   
-  if(Wastewater_Municipal_Method_Moore_EF){
+  if(Wastewater_Municipal_Method_Moore){
     if(Wastewater_use_CWNS){
       #convert from million gallons/day to m3/s
-      CWNS_Municipal_flow$EXIST_MUNICIPAL <- CWNS_Municipal_flow$EXIST_MUNICIPAL*3785.41178/(24*60*60)  
+      CWNS_Municipal_flow$EXIST_MUNICIPAL <- CWNS_Municipal_flow$EXIST_MUNICIPAL*3785.41178/(24*60*60)
       #Apply the log-log linear relationship from Figure 2A of Moore et al.,
       #updated with the data in the 2025 nature publication
       CWNS_Municipal_flow$emiss <- 1.279367*log10(CWNS_Municipal_flow$EXIST_MUNICIPAL)+0.9257305
       #convert from log10(g/s) to mol/s
       CWNS_Municipal_flow$emiss <- (10^(CWNS_Municipal_flow$emiss))/(12.011+1.008*4)
-      rasterize_plus(CWNS_Municipal_flow,"WWTP_CWNS_Moore_municipal")
+      #convert back
+      CWNS_Municipal_flow$EXIST_MUNICIPAL <- CWNS_Municipal_flow$EXIST_MUNICIPAL/3785.41178*(24*60*60)
+      CWNS_Moore_csv_data <- rasterize_plus(CWNS_Municipal_flow,"WWTP_CWNS_Moore_municipal")
     }
     if(Wastewater_use_DMR){
       #convert from million gallons/day to m3/s
@@ -374,11 +373,106 @@ Wastewater <- function(input_directory,
       DMR_Municipal_flow$emiss <- 1.279367*log10(DMR_Municipal_flow$Average_Daily_Flow__MGD_)+0.9257305
       #convert from log10(g/s) to mol/s
       DMR_Municipal_flow$emiss <- (10^(DMR_Municipal_flow$emiss))/(12.011+1.008*4)
-      rasterize_plus(DMR_Municipal_flow,"WWTP_DMR_Moore_municipal")
+      #convert back
+      DMR_Municipal_flow$Average_Daily_Flow__MGD_ <- DMR_Municipal_flow$Average_Daily_Flow__MGD_/3785.41178*(24*60*60)
+      DMR_Moore_csv_data <- rasterize_plus(DMR_Municipal_flow,"WWTP_DMR_Moore_municipal")
     }
   }
   
   cat("Finished calculating municipal treatment plant emissions at",format(Sys.time(),"%H:%M"),"\n")
+  ################################################################################
+  #organize and save CSV data
+  
+  #find all csv ready data and grab some info on them
+  csv_options <- ls(pattern="csv_data")
+  sources <- sapply(strsplit(csv_options,"_"),"[[",1)
+  methods <- sapply(strsplit(csv_options,"_"),"[[",2)
+  
+  #blank output
+  CWNS_csv <- data.frame()
+  DMR_csv <- data.frame()
+  
+  for(A in which(sources=="CWNS")){
+    #grab the coordinates and filter/reorganize to only needed variables
+    temp <- get(csv_options[A])
+    temp_latlong <- terra::crds(terra::project(temp,"epsg:4326"))
+    colnames(temp_latlong) <- c("longitude","latitude")
+    temp_csv <- as.data.frame(cbind(temp,temp_latlong))
+    temp_csv <- temp_csv[,c("FACILITY_NAME","EXIST_MUNICIPAL","emiss","longitude","latitude")]
+    
+    #store emissions in a properly named column and rename columns
+    if(methods[A]=="Moore"){
+      colnames(temp_csv) <- c("Facility_name","Million_gallons_per_day_flow",
+                              "Moore_Emissions_mol_per_s","longitude","latitude")
+      temp_csv$GHGI_emissions_mol_per_s <- NA
+    }else{
+      colnames(temp_csv) <- c("Facility_name","Million_gallons_per_day_flow",
+                              "GHGI_emissions_mol_per_s","longitude","latitude")
+      temp_csv$Moore_Emissions_mol_per_s <- NA
+    }
+    
+    #reorder
+    temp_csv <- temp_csv[,c("Facility_name","Million_gallons_per_day_flow",
+                            "GHGI_emissions_mol_per_s","Moore_Emissions_mol_per_s",
+                            "longitude","latitude")]
+    
+    #add source
+    temp_csv$Source <- gsub("CWNS","Clean Watershed Needs Survey",sources[A])
+    
+    #update the column if both methods are being used instead of adding new rows
+    if(nrow(CWNS_csv)>0){
+      CWNS_csv$Moore_Emissions_mol_per_s <- temp_csv$Moore_Emissions_mol_per_s
+    }else{
+      CWNS_csv <- rbind(CWNS_csv,temp_csv)
+    }
+  }
+  
+  
+  #equivalent for DMR
+  for(A in which(sources=="DMR")){
+    temp <- get(csv_options[A])
+    temp_latlong <- terra::crds(terra::project(temp,"epsg:4326"))
+    colnames(temp_latlong) <- c("longitude","latitude")
+    temp_csv <- as.data.frame(cbind(temp,temp_latlong))
+    temp_csv <- temp_csv[,c("Facility_Name","Average_Daily_Flow__MGD_","emiss","longitude","latitude")]
+    
+    if(methods[A]=="Moore"){
+      colnames(temp_csv) <- c("Facility_name","Million_gallons_per_day_flow",
+                              "Moore_Emissions_mol_per_s","longitude","latitude")
+      temp_csv$GHGI_emissions_mol_per_s <- NA
+    }else{
+      colnames(temp_csv) <- c("Facility_name","Million_gallons_per_day_flow",
+                              "GHGI_emissions_mol_per_s","longitude","latitude")
+      temp_csv$Moore_Emissions_mol_per_s <- NA
+    }
+    
+    temp_csv <- temp_csv[,c("Facility_name","Million_gallons_per_day_flow",
+                            "GHGI_emissions_mol_per_s","Moore_Emissions_mol_per_s",
+                            "longitude","latitude")]
+    
+    temp_csv$Source <- gsub("DMR","Discharge Monitoring Reports",sources[A])
+    
+    if(nrow(DMR_csv)>0){
+      DMR_csv$Moore_Emissions_mol_per_s <- temp_csv$Moore_Emissions_mol_per_s
+    }else{
+      DMR_csv <- rbind(DMR_csv,temp_csv)
+    }
+  }
+  
+  #combine the 2 and sort by name
+  out_csv <- rbind(CWNS_csv,DMR_csv)
+  out_csv <- out_csv[order(out_csv$Facility_name),]
+  
+  #Remove the column if empty
+  if(!Wastewater_Municipal_Method_Moore){
+    out_csv$Moore_Emissions_mol_per_s=NULL
+  }
+  if(!Wastewater_Municipal_Method_GHGI){
+    out_csv$GHGI_emissions_mol_per_s=NULL
+  }
+  
+  utils::write.csv(out_csv,file.path(Wastewater_output_directory,"Municipal_watewater_treatment.csv"),
+                   row.names = F)
   ################################################################################
   #Now septic systems.  First download state population data
   
@@ -388,7 +482,6 @@ Wastewater <- function(input_directory,
   #states and inventory year
   
   if(Source_State_population_data=="M3T"){
-    #UPDATE TO ZENODO
     Census_state_population <- M3T::Census_state_population_M3T
   }else{
     #first define the state population dataset filenames - new each decade as
@@ -454,7 +547,7 @@ Wastewater <- function(input_directory,
   #within the domain
   Wastewater_reported_State_info <- Wastewater_reported_State_info[(Wastewater_reported_State_info$Year %in% (inventory_year-1):(inventory_year+1)) & 
                                                                      (Wastewater_reported_State_info$State %in% State_Tigerlines$STUSPS),]
-
+  
   if(nrow(Wastewater_reported_State_info)!=0){
     #average across years if both years around the inventory year are available
     Wastewater_reported_State_info <- suppressWarnings(stats::aggregate(Wastewater_reported_State_info,by=list(Wastewater_reported_State_info$State),mean)[,-2])
@@ -463,7 +556,7 @@ Wastewater <- function(input_directory,
     Wastewater_State_info$Septic_Fraction[match(Wastewater_reported_State_info$State,Wastewater_State_info$State)] <- Wastewater_reported_State_info$Septic_Fraction
     Wastewater_State_info$Method[match(Wastewater_reported_State_info$State,Wastewater_State_info$State)] <- "reported"
   }
-
+  
   #filter the final info to the domain and incorporate the population
   Wastewater_State_info <- Wastewater_State_info[Wastewater_State_info$State %in% State_Tigerlines$STUSPS,]
   Wastewater_State_info$Population <- State_population
@@ -554,7 +647,7 @@ Wastewater <- function(input_directory,
     #prep to project to domain
     septic_flux=terra::crop(septic_flux,NLCD_domain,snap="out")
     septic_flux=terra::mask(septic_flux,NLCD_domain,touches=T,updatevalue=0)
-
+    
     #add a few pixels worth of buffer (at the domain resolution) filled with 0's
     #so the average doesn't consider these NA values to ignore in calculations
     #(drastically impacts avg).  Then finally reproject via average.
@@ -619,7 +712,7 @@ Wastewater <- function(input_directory,
       cover <- terra::extract(septic_flux2,NLCD_domain,weights=T,cells=T)
       septic_flux2[cover[,'cell']] <- septic_flux2[cover[,'cell']]*cover[,'weight']
       septic_flux2=terra::extend(septic_flux2,fill=0,
-                                terra::ext(septic_flux2)+(NLCD_res*5))
+                                 terra::ext(septic_flux2)+(NLCD_res*5))
     }
     septic_flux2=terra::project(septic_flux2,domain_template,method="average")
     
@@ -630,7 +723,7 @@ Wastewater <- function(input_directory,
     #will retain any such data.
     septic_flux2[terra::mask(septic_flux2,domain,inverse=T)==0] <- NA
   }
-
+  
   cat("Finished calculating septic emissions at",format(Sys.time(),"%H:%M"),"\n")
   ################################################################################
   #Download the relevant emissions data using the API
@@ -641,7 +734,6 @@ Wastewater <- function(input_directory,
   #(https://www.epa.gov/enviro/greenhouse-gas-model).  
   ghgrp_wastewater_file <- file.path(input_directory,"GHGRP","industrial_wastewater_II.csv")
   if(Source_GHGRP_wastewater=="M3T"){
-    #UPDATE TO ZENODO
     ghgrp_data <- M3T::GHGRP_wastewater
   }else{
     if(Source_GHGRP_wastewater=="download"){
@@ -674,6 +766,7 @@ Wastewater <- function(input_directory,
   terra::crs(ghgrp) <- "epsg:4326"
   ghgrp_crop <- terra::project(ghgrp,domain)
   ghgrp_crop <- terra::crop(ghgrp_crop,domain)
+  ghgrp_crop <- terra::mask(ghgrp_crop,domain)
   ghgrp_crop$emiss <- ghgrp_crop$ghg_quantity*1e6/(16.043*365*24*60*60) #MT CH4/yr to mol/s
   
   # Now rasterise
@@ -681,12 +774,26 @@ Wastewater <- function(input_directory,
   ghgrp_flux <- ghgrp_rast*1e9/(terra::cellSize(ghgrp_rast,unit="m"))  # Calculate flux in nmol/m2/s
   ghgrp_flux[is.na(ghgrp_flux)]<-0
   
-  #mask now - just to NA data outside non-square domains.  No need to
-  #partially weight pixels by fractional coverage, cropped as points so only
-  #those within the domain have been rasterized.
-  ghgrp_flux <- terra::mask(ghgrp_flux,domain)
-  
   cat("Finished calculating industrial treatment plant emissions at",format(Sys.time(),"%H:%M"),"\n")
+  ##############################################################################
+  #save a csv for easy understanding of the filtered input data
+  
+  ghgrp_latlong <- terra::crds(terra::project(ghgrp_crop,"epsg:4326"))
+  colnames(ghgrp_latlong) <- c("longitude","latitude")
+  csv_data <- as.data.frame(cbind(ghgrp_crop,ghgrp_latlong))
+  
+  csv_data <- csv_data[,c("facility_id","facility_name.x","state","emiss",
+                          "longitude","latitude")]
+  
+  colnames(csv_data) <- c("GHGRP_ID","facility_name",
+                          "state",
+                          "Emissions_mol_per_s",
+                          "longitude","latitude")
+  
+  csv_data <- csv_data[order(csv_data$facility_name),]
+  
+  utils::write.csv(csv_data,file.path(Wastewater_output_directory,"GHGRP_industrial_watewater_treatment.csv"),
+                   row.names = F)
   ################################################################################
   # Write the rasters
   
@@ -712,7 +819,7 @@ Wastewater <- function(input_directory,
                           overwrite=TRUE)
     }
   }
-  if(Wastewater_Municipal_Method_Moore_EF){
+  if(Wastewater_Municipal_Method_Moore){
     if(Wastewater_use_CWNS){
       writeCDF_no_newline(WWTP_CWNS_Moore_municipal,
                           file.path(Wastewater_output_directory,'Wastewater_CWNS_Moore_dom_central.nc'),
@@ -765,7 +872,7 @@ Wastewater <- function(input_directory,
                       overwrite=TRUE)
   ################################################################################
   #Create a sector total, 1 per variant
-  if(Wastewater_Municipal_Method_Moore_EF){
+  if(Wastewater_Municipal_Method_Moore){
     WWTP_method <- "Moore_municipal"
     WWTP_text <- "Moore et al. emission factor combined with"
   }else if(Wastewater_Municipal_Method_GHGI){
@@ -787,7 +894,7 @@ Wastewater <- function(input_directory,
                             missval=-9999,
                             overwrite=TRUE)
       }
-      if(Wastewater_Municipal_Method_Moore_EF){
+      if(Wastewater_Municipal_Method_Moore){
         Summed_wastewater_treatment_CWNS_Moore_state = sum(WWTP_CWNS_Moore_municipal,septic_flux2,ghgrp_flux,na.rm=T)
         writeCDF_no_newline(Summed_wastewater_treatment_CWNS_Moore_state,
                             file.path(output_directory,paste0('Wastewater_sector_total_CWNS_Moore_state.nc')),
@@ -811,7 +918,7 @@ Wastewater <- function(input_directory,
                             missval=-9999,
                             overwrite=TRUE)
       }
-      if(Wastewater_Municipal_Method_Moore_EF){
+      if(Wastewater_Municipal_Method_Moore){
         Summed_wastewater_treatment_CWNS_Moore_national = sum(WWTP_CWNS_Moore_municipal,septic_flux,ghgrp_flux,na.rm=T)
         writeCDF_no_newline(Summed_wastewater_treatment_CWNS_Moore_national,
                             file.path(output_directory,paste0('Wastewater_sector_total_CWNS_Moore_national.nc')),
@@ -837,7 +944,7 @@ Wastewater <- function(input_directory,
                             missval=-9999,
                             overwrite=TRUE)
       }
-      if(Wastewater_Municipal_Method_Moore_EF){
+      if(Wastewater_Municipal_Method_Moore){
         Summed_wastewater_treatment_DMR_Moore_state = sum(WWTP_DMR_Moore_municipal,septic_flux2,ghgrp_flux,na.rm=T)
         writeCDF_no_newline(Summed_wastewater_treatment_DMR_Moore_state,
                             file.path(output_directory,paste0('Wastewater_sector_total_DMR_Moore_state.nc')),
@@ -861,7 +968,7 @@ Wastewater <- function(input_directory,
                             missval=-9999,
                             overwrite=TRUE)
       }
-      if(Wastewater_Municipal_Method_Moore_EF){
+      if(Wastewater_Municipal_Method_Moore){
         Summed_wastewater_treatment_DMR_Moore_national = sum(WWTP_DMR_Moore_municipal,septic_flux,ghgrp_flux,na.rm=T)
         writeCDF_no_newline(Summed_wastewater_treatment_DMR_Moore_national,
                             file.path(output_directory,paste0('Wastewater_sector_total_DMR_Moore_national.nc')),
@@ -921,7 +1028,7 @@ Wastewater <- function(input_directory,
     WWTP_min=5000
     WWTP_max=0
     if(Wastewater_use_CWNS){
-      if(Wastewater_Municipal_Method_Moore_EF){
+      if(Wastewater_Municipal_Method_Moore){
         #set 0 to NA so the minimum ignores 0 (log plot, so 0 = -inf)
         temp <- WWTP_CWNS_Moore_municipal
         temp[temp==0] <- NA
@@ -940,7 +1047,7 @@ Wastewater <- function(input_directory,
       }
     }
     if(Wastewater_use_DMR){
-      if(Wastewater_Municipal_Method_Moore_EF){
+      if(Wastewater_Municipal_Method_Moore){
         temp <- WWTP_DMR_Moore_municipal
         temp[temp==0] <- NA
         if(!all(is.na(terra::values(temp)))){
@@ -964,7 +1071,7 @@ Wastewater <- function(input_directory,
     WWTP_min <- log10(WWTP_min)
     WWTP_max <- log10(WWTP_max)
     if(Wastewater_use_CWNS){
-      if(Wastewater_Municipal_Method_Moore_EF){
+      if(Wastewater_Municipal_Method_Moore){
         log_plot(WWTP_CWNS_Moore_municipal,filename="Wastewater_dom_central_CWNS_Moore",
                  "Domestic Wastewater -\n  Moore et al. emission factor combined with\nClean Watersheds Needs Survey",
                  WWTP_min,WWTP_max,plot_directory=plot_directory,
@@ -981,7 +1088,7 @@ Wastewater <- function(input_directory,
       }
     }
     if(Wastewater_use_DMR){
-      if(Wastewater_Municipal_Method_Moore_EF){
+      if(Wastewater_Municipal_Method_Moore){
         log_plot(WWTP_DMR_Moore_municipal,filename="Wastewater_dom_central_DMR_Moore",
                  "Domestic Wastewater -\n Moore et al. emission factor combined with\nDischarge Monitoring Reports",
                  WWTP_min,WWTP_max,plot_directory=plot_directory,
@@ -1011,7 +1118,7 @@ Wastewater <- function(input_directory,
     #Moore's approach, but on a log scale that's ~negligible.  So no need to
     #plot separately, it has no visible impact on spatial distribution or
     #emissions.
-    if(Wastewater_Municipal_Method_Moore_EF){
+    if(Wastewater_Municipal_Method_Moore){
       WWTP_method <- "Moore_municipal"
       WWTP_text <- "Moore et al. emission factor combined with"
     }else if(Wastewater_Municipal_Method_GHGI){
