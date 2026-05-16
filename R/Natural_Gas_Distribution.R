@@ -198,6 +198,7 @@
 #'@param NG_distribution_by_state Logical.  Pulled from
 #'  \code{\link{M3T_config}}.
 #'@param NG_distribution_by_LDC Logical.  Pulled from \code{\link{M3T_config}}.
+#'@param Source_byLDC_file Logical.  Pulled from \code{\link{M3T_config}}.
 #'@param GHGI_services Data.frame.  Pulled from \code{\link{M3T_config}}.
 #'@param GHGI_meters Data.frame.  Pulled from \code{\link{M3T_config}}.
 #'@param GHGI_maintenance Data.frame.  Pulled from \code{\link{M3T_config}}.
@@ -253,6 +254,7 @@ Natural_Gas_Distribution <- function(domain,
                             NG_distribution_by_LDC,
                             NG_distribution_by_state,
                             NG_distribution_by_domain,
+                            Source_byLDC_file,
                             natural_gas_pipeline_emission_factors,
                             natural_gas_res_post_meter_emission_factor,
                             natural_gas_com_post_meter_emission_factor,
@@ -284,7 +286,6 @@ Natural_Gas_Distribution <- function(domain,
     #load in and filter the EIA file
     
     if(Source_EIA_NG_file=="M3T"){
-      #UPDATE TO ZENODO
       EIA_csv <- M3T::EIA_NG_data
     }else{
       EIA_file <- file.path(input_directory,"EIA","User_supplied_EIA_form_176.csv")
@@ -311,7 +312,6 @@ Natural_Gas_Distribution <- function(domain,
     #download, load in and filter the PHMSA file
     
     if(Source_PHMSA_file=="M3T"){
-      #UPDATE TO ZENODO
       PHMSA_csv_NG <- M3T::PHMSA_natural_gas_distribution
       PHMSA_csv_NG <- PHMSA_csv_NG[PHMSA_csv_NG$REPORT_YEAR==GHGI_data_yr,]
     }else{
@@ -568,6 +568,7 @@ Natural_Gas_Distribution <- function(domain,
       if(B>10){
         stop()
       }
+      B=B+1
     }
     above_grade_MnR <- above_grade_MnR[state_indx,]
     below_grade_MnR <- below_grade_MnR[state_indx,]
@@ -667,8 +668,7 @@ Natural_Gas_Distribution <- function(domain,
     #load in the output of NG_distribution_by_LDC_prep.R.  Note that is a
     #script, not a function, as it requires some manual efforts.  This one is
     #calculated at the LDC scale, not state level.
-    all_merge_clean <- terra::vect(file.path(input_directory,"byLDC_merged","byLDC_merged.shp"))
-    names(all_merge_clean) <- unlist(utils::read.table(file.path(input_directory,"byLDC_merged","colnames.txt")))
+    all_merge_clean <- terra::vect(Source_byLDC_file)
   }
   ##############################################################################
   #convert a lot of the activity data to emissions data
