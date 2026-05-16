@@ -8,7 +8,8 @@
 #'@details This function will call multiple internal functions and use
 #'  \code{\link{M3T_config}} to create gridded methane inventories. Internet
 #'  access is required so that the necessary datasets can be downloaded either
-#'  directly from the source or from a companion Zenodo contiaining
+#'  directly from the source or from a
+#'  \href{https://doi.org/10.5281/zenodo.17328718}{Companion Zenodo} containing
 #'  pre-processed data unless all "Source_" variables in
 #'  \code{\link{M3T_config}} are set to filepaths that point to local copies of
 #'  the needed data.
@@ -35,8 +36,8 @@
 #'  Links to previous census urban areas are on the same page.  A list with
 #'  state fips codes is available
 #'  \href{https://www.census.gov/library/reference/code-lists/ansi.html}{here}.
-#'@param domain_res Numeric providing the resolution for the domain.  Can be
-#'  length 1 for equal x and y resolution or length 2 (x, y).
+#'@param domain_res Numeric providing the resolution for the domain.
+#'  Can be length 1 for equal x and y resolution or length 2 (x, y). 
 #'@param domain_crs Character providing the projection of the domain in
 #'  \href{https://proj.org/en/stable/operations/projections/index.html}{PROJ
 #'  string} or \href{https://epsg.io/}{EPSG codes} or
@@ -45,11 +46,17 @@
 #'  +lon_0=-97 +lat_1=33 +lat_2=45 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
 #'  for a m grid in the lambert conformal conical projection used by some CO2
 #'  inventories for the continental US. Many crs can be seen at
-#'  \href{https://spatialreference.org/}{spatialreference.org}.
+#'  \href{https://spatialreference.org/}{spatialreference.org}. Default is
+#'  lat/long.
 #'@param run_directory Character providing the full filepath to load/save input
 #'  and output data.  Subfolders will be created.
-#'@param Zenodo_folder Character.  Temporary variable to provide a filepath to
-#'  the data that will later be uploaded and automatically pulled from a zenodo.
+#'@param Zenodo_folder Optional Character.  Filepath to the data that would
+#'  otherwise be pulled from Zenodo.  Necessary if the user wants to run without
+#'  internet.
+#'@param Zenodo_record Optional Character.  Zenodo record number for the
+#'  companion Zenodo, which can be seen at the end of the URL (e.g.,
+#'  https://zenodo.org/records/17328718).  Used to choose a version of Zenodo
+#'  data.  Default will be the most recent version.
 #'@param inventory_year Numeric indicating the desired year of data to use.  The
 #'  closest available will be used if unavailable with a user update.
 #'@param verbose Logical indicating whether to save sector and subsector
@@ -79,8 +86,8 @@
 #'M3T_set_config(natural_gas_res_post_meter_emission_factor = 4e-10)
 #'
 #'#run M3T for Rhode Island and Connecticut at 1 degree resolution for 2019 in 
-#'#a temporary folder with current config settings and Zenodo_data in a folder 
-#'#with that name on the desktop.
+#'#a temporary folder with current config settings. The Zenodo_data folder 
+#'#on the desktop contains the files in the Companion Zenodo.
 #'CH4_inventory_build(run_directory=tempdir(),
 #'                    inventory_year=2019,
 #'                    domain=c("CT","RI"),
@@ -89,28 +96,26 @@
 #'                    verbose=F,
 #'                    Zenodo_folder="~/../Desktop/Zenodo_data/")
 #'
-#'#run M3T for a defined box in the northeastern US at 1 degree resolution for
-#'#2019 in a temporary folder with current config settings and Zenodo_data in 
-#'#a folder with that name on the desktop.
+#'#run M3T for a defined box in the northeastern US at 1 degree resolution for 
+#'# 2016 in a temporary folder with current config settings. Uses a specific
+#'#version of the Companion Zenodo and will include visuals for each sector.
 #'CH4_inventory_build(run_directory=tempdir(), 
-#'                    inventory_year=2019, 
+#'                    inventory_year=2016, 
 #'                    domain = as.data.frame(cbind(c(-75,-72),c(39,42))), 
 #'                    domain_res=1,
 #'                    domain_crs="epsg:4326", 
-#'                    verbose=F,
-#'                    Zenodo_folder="~/../Desktop/Zenodo_data/")
+#'                    verbose=T,
+#'                    Zenodo_record="17328718")
 #'
-#'#run M3T for the entire continental US at 1 degree resolution for
-#'#2019 in a temporary folder with current config settings and Zenodo_data in 
-#'#a folder with that name on the desktop.  Larger domains will take much longer 
-#'#to run.
+#'#run M3T for the entire continental US at 1 degree resolution for 2019 in a
+#'#temporary folder with current config settings.  Larger domains will take much
+#'#longer to run.
 #'CH4_inventory_build(run_directory=tempdir(), 
 #'                    inventory_year=2019, 
 #'                    domain = "CONUS", 
 #'                    domain_res=1,
 #'                    domain_crs="epsg:4326", 
-#'                    verbose=F,
-#'                    Zenodo_folder="~/../Desktop/Zenodo_data/")
+#'                    verbose=F)
 #'
 #'@seealso [M3T_config] Generates the config function with user-editable
 #'  settings used throughout processing.
@@ -122,12 +127,13 @@ CH4_inventory_build <- function(run_directory,
                                 domain_res=NULL,
                                 domain_crs="epsg:4326",
                                 verbose=FALSE,
-                                Zenodo_folder="G:/My Drive/Shepson Group Drive/Kris/Philly Inventory/Manuscript/All inventory data/Prepared inventory data/M3T_Zenodo_data/Processed/"){
+                                Zenodo_folder="",
+                                Zenodo_record="17328718"){
   ################################################################################
   #quick internet check given much of the package requires it if any M3T_config
-  #values are M3T or download
-  if(!curl::has_internet() & any(M3T_get_config() %in% c("M3T","download"))){
-    stop("Internet is required to access the datasets needed to do these analyses. Either connect to the internet or use M3T_set_config() to instead point to locally available files for each of the below. See '?M3T_config' for details.\n",
+  #values are M3T or download or the zenodo folder wasn't set
+  if(!curl::has_internet() & (any(M3T_get_config() %in% c("M3T","download")) | !file.exists(Zenodo_folder))){
+    stop("Internet is required to access the datasets needed to do these analyses. Either connect to the internet or use M3T_set_config() to instead point to locally available files for each of the below and set Zenodo folder to locally available data from the companion Zenodo. See '?M3T_config' for details.\n",
          paste0(names(M3T_get_config())[(M3T_get_config() %in% c("M3T","download"))],collapse="\n"))
   }
   ################################################################################
@@ -223,12 +229,12 @@ CH4_inventory_build <- function(run_directory,
   ################################################################################
   #change options for use within this function
   
-  #change the datatype to higher res and turn off progress bars
+  #change the datatype to higher res and turn off progress bars by default
   M3T_terra <- terra::terraOptions(print=F)
   terra::terraOptions(datatype=M3T_config$Terra_datatype,
                       progress=M3T_config$Terra_progress)
   
-  #increase the timeout, particularly important if using downloads
+  #increase the timeout, particularly important for certain downloads
   M3T_timeout <- options("timeout")
   options("timeout"=M3T_config$Base_timeout)
   
@@ -247,11 +253,25 @@ CH4_inventory_build <- function(run_directory,
   #Download necessary data from Zenodo
   
   if(any(M3T_get_config()=="M3T")){
-    #UPDATE TO ZENODO
+    if(Zenodo_folder==""){
+      #see https://doi.org/10.5281/zenodo.17328718
+      
+      zip_file <- tempfile(fileext = ".zip")
+      pdf_file <- tempfile(fileext = ".pdf")
 
-    invisible(file.copy(list.files(Zenodo_folder,full.names = T),
-                        input_directory,recursive=T,overwrite=T))
-    
+      data_URL <- paste0("https://zenodo.org/api/records/",Zenodo_record,"/files/M3T_Processed.zip/content")
+      Trycatch_downloader(URL=data_URL,output_location=zip_file,method="save")
+      utils::unzip(zip_file,exdir=input_directory,overwrite = T)
+      unlink(zip_file)
+      
+      data_URL <- paste0("https://zenodo.org/api/records/",Zenodo_record,"/files/M3T_Readme.pdf/content")
+      Trycatch_downloader(URL=data_URL,output_location=pdf_file,method="save")
+      invisible(file.copy(pdf_file,file.path(input_directory,"M3T_Zenodo_Readme.pdf"),overwrite=T))
+      unlink(pdf_file)
+    }else{
+      invisible(file.copy(list.files(Zenodo_folder,full.names = T),
+                          input_directory,recursive=T,overwrite=T))
+    }
   }
   ################################################################################
   #function to download vulcan v4.0 files if M3T_config$Source_Vulcan="download"
@@ -294,7 +314,6 @@ CH4_inventory_build <- function(run_directory,
     
     ACES_directory <- file.path(input_directory,"ACES V2.0")
     if(M3T_config$Source_ACES=="M3T"){
-      #UPDATE TO ZENODO
       aces_res <- terra::rast(file.path(ACES_directory,paste0('ACES_annual_Residential_',ACES_year,'.nc')))
       aces_com <- terra::rast(file.path(ACES_directory,paste0('ACES_annual_Commercial_',ACES_year,'.nc')))
       aces_ind <- terra::rast(file.path(ACES_directory,paste0('ACES_annual_Industrial_',ACES_year,'.nc')))
@@ -327,6 +346,7 @@ CH4_inventory_build <- function(run_directory,
         cat("Downloading sectoral Vulcan v4.0 CO2 emissions maps now.\n\n")
         Download_vulcan()
       }else{
+        vulcan_directory <- normalizePath(M3T_config$Source_Vulcan,mustWork = T)
         invisible(file.copy(list.files(M3T_config$Source_Vulcan,full.names = T),
                             vulcan_directory,overwrite=T,recursive=T))
       }
@@ -392,9 +412,9 @@ CH4_inventory_build <- function(run_directory,
     error_text <- paste0(error_text,"\n\nMust set M3T_config$Process_wastewater to FALSE or set M3T_config$Wastewater_use_CWNS and/or M3T_config$Wastewater_use_DMR to TRUE as these are the only options available in the package for input data")
   }
   
-  if(M3T_config$Process_wastewater & (!M3T_config$Wastewater_Municipal_Method_Moore_EF & !M3T_config$Wastewater_Municipal_Method_GHGI)){
+  if(M3T_config$Process_wastewater & (!M3T_config$Wastewater_Municipal_Method_Moore & !M3T_config$Wastewater_Municipal_Method_GHGI)){
     error_found <- TRUE
-    error_text <- paste0(error_text,"\n\nMust set M3T_config$Process_wastewater to FALSE or set M3T_config$Wastewater_Municipal_Method_Moore_EF and/or M3T_config$Wastewater_Municipal_Method_GHGI to TRUE to convert activity data to emissions")
+    error_text <- paste0(error_text,"\n\nMust set M3T_config$Process_wastewater to FALSE or set M3T_config$Wastewater_Municipal_Method_Moore and/or M3T_config$Wastewater_Municipal_Method_GHGI to TRUE to convert activity data to emissions")
   }
   
   if(M3T_config$Process_wastewater & (!M3T_config$Wastewater_national_septic & !M3T_config$Wastewater_state_septic)){
@@ -415,6 +435,11 @@ CH4_inventory_build <- function(run_directory,
   if(M3T_config$Combine_sectors & !(M3T_config$Create_summary_combinations | M3T_config$Create_individual_combinations)){
     error_found <- TRUE
     error_text <- paste0(error_text,"\n\nMust set M3T_config$Combine_sectors to FALSE or set either M3T_config$Create_summary_combinations or M3T_config$Create_individual_combinations to TRUE")
+  }
+  
+  if(!file.exists(M3T_config$Source_byLDC_file) & M3T_config$NG_distribution_by_LDC==T){
+    error_found <- TRUE
+    error_text <- paste0(error_text,"\n\nMust set M3T_config$NG_distribution_by_LDC to FALSE or set either M3T_config$Source_byLDC_file to a valid filepath")
   }
   
   if(error_found){
@@ -503,8 +528,6 @@ CH4_inventory_build <- function(run_directory,
     State_Tigerlines <- terra::vect(Census_filenames[2])
     Urban_Tigerlines <- terra::vect(Census_filenames[3])
   }else if(M3T_config$Source_Tigerlines_data=="M3T"){
-    #UPDATE TO ZENODO
-    
     State_yrs <- as.numeric(terra::vector_layers(file.path(input_directory,"combined_state_tigerlines.gpkg")))
     
     #define the closest and alert user if not = inventory year
@@ -658,8 +681,8 @@ CH4_inventory_build <- function(run_directory,
 
   #Compare resolution to ACES/Vulcan.  Give a slight buffer, but if finer than
   #aces/vulcan then change to their resolution.
-  if(any(terra::res(res_check)<950) & (M3T_config$Process_stationary_combustion | M3T_config$Process_natural_gas_distribution)){
-    terra::res(res_check)[which(terra::res(res_check)<950)] <- 1000
+  if(any(terra::res(res_check)<800) & (M3T_config$Process_stationary_combustion | M3T_config$Process_natural_gas_distribution)){
+    terra::res(res_check)[which(terra::res(res_check)<800)] <- 1000
     terra::values(res_check) <- NA
     
     #rewrite template and polygon
@@ -668,7 +691,7 @@ CH4_inventory_build <- function(run_directory,
     domain <- terra::as.polygons(terra::ext(domain_template),crs=domain_crs)
     
     #update user
-    cat("Domain resolution cannot be finer than the equivalent of 0.01 by 0.01 deg if processing stationary combustion or natural gas distributoin given this is the resolution of the proxy data.  Updating resolution to",round(terra::res(domain_template),2),"in provided crs.\n")
+    cat("Domain resolution cannot be finer than the equivalent of 0.01 by 0.01 deg if processing stationary combustion or natural gas distribution given this is the resolution of the proxy data.  Updating resolution to",round(terra::res(domain_template),2),"in provided crs.\n")
     Sys.sleep(2)
   }
   
@@ -795,8 +818,6 @@ CH4_inventory_build <- function(run_directory,
   if((M3T_config$Process_landfills | M3T_config$Process_natural_gas_distribution | M3T_config$Process_natural_gas_transmission | M3T_config$Process_wastewater)){
     
     if(M3T_config$Source_GHGI=="M3T"){
-      #UPDATE TO ZENODO
-      
       #use data for the inventory yr, based on the most recent GHGI file
       #(previous yrs are updated).  Exception if inventory yr > GHGI file (I.e.,
       #no data for inventory year).
@@ -1253,6 +1274,7 @@ CH4_inventory_build <- function(run_directory,
                              NG_distribution_by_LDC = M3T_config$NG_distribution_by_LDC,
                              NG_distribution_by_state = M3T_config$NG_distribution_by_state,
                              NG_distribution_by_domain = M3T_config$NG_distribution_by_domain,
+                             Source_byLDC_file = M3T_config$Source_byLDC_file,
                              natural_gas_pipeline_emission_factors=M3T_config$natural_gas_pipeline_emission_factors,
                              natural_gas_res_post_meter_emission_factor=M3T_config$natural_gas_res_post_meter_emission_factor,
                              natural_gas_com_post_meter_emission_factor=M3T_config$natural_gas_com_post_meter_emission_factor,
@@ -1335,7 +1357,7 @@ CH4_inventory_build <- function(run_directory,
                output_directory=output_directory,
                Wastewater_use_CWNS=M3T_config$Wastewater_use_CWNS,
                Wastewater_use_DMR=M3T_config$Wastewater_use_DMR,
-               Wastewater_Municipal_Method_Moore_EF=M3T_config$Wastewater_Municipal_Method_Moore_EF,
+               Wastewater_Municipal_Method_Moore=M3T_config$Wastewater_Municipal_Method_Moore,
                Wastewater_Municipal_Method_GHGI=M3T_config$Wastewater_Municipal_Method_GHGI,
                Wastewater_national_septic=M3T_config$Wastewater_national_septic,
                Wastewater_state_septic=M3T_config$Wastewater_state_septic,
@@ -1366,7 +1388,6 @@ CH4_inventory_build <- function(run_directory,
       #this source if is outside the function as the entire function is to process
       #wetcharts and the processed version is pulled in M3T
       
-      #UPDATE TO ZENODO
       Disaggregate_Wetcharts(input_directory=input_directory,
                              output_directory=output_directory,
                              domain=domain,
@@ -1403,6 +1424,7 @@ CH4_inventory_build <- function(run_directory,
                    County_Tigerlines=County_Tigerlines,
                    State_CB=State_CB,
                    Source_Watershed_file=M3T_config$Source_Watershed_file,
+                   Source_NWI=M3T_config$Source_NWI,
                    Use_Wetcharts=M3T_config$Use_Wetcharts,
                    Wetcharts_model_subset=M3T_config$Wetcharts_model_subset)
   }
