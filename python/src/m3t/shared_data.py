@@ -430,6 +430,24 @@ def prepare_shared_data(ctx: RunContext) -> None:
                 f"{ctx.inventory_year}. Using {nei_year} as the nearest available data."
             )
 
+    # --- wetlands companion inputs ---------------------------------------- #
+    if cfg.Process_wetlands_and_inland_waters:
+        if "state_tigerlines" not in ctx.shared:
+            raise ValueError(
+                "wetlands needs the per-state NWI rasters, selected from the state "
+                "list: pass `tigerlines=` to ch4_inventory_build"
+            )
+        if cfg.Use_Wetcharts and "wetcharts" not in ctx.shared:
+            ctx.shared["wetcharts"] = load_wetcharts(cfg.Source_wetcharts, ctx.input_directory)
+        if "nwi" not in ctx.shared:
+            ctx.shared["nwi"] = load_nwi(
+                cfg.Source_NWI, ctx.input_directory, ctx.shared["state_name_list"]
+            )
+        if cfg.Use_SOCCR2 and "watersheds" not in ctx.shared:
+            ctx.shared["watersheds"] = load_watersheds(
+                cfg.Source_Watershed_file, ctx.input_directory
+            )
+
     # --- wastewater companion inputs ------------------------------------- #
     if cfg.Process_wastewater:
         if cfg.Wastewater_use_DMR and "dmr_data" not in ctx.shared:
@@ -477,3 +495,55 @@ def prepare_shared_data(ctx: RunContext) -> None:
             yr = ctx.shared["ghgi_data_yr"]
             total = float(tbl.loc[pd.to_numeric(tbl["Year"]) == yr, "Emissions"].iloc[0])
         ctx.shared["ghgi_landfill_total"] = float(total)
+
+
+def load_wetcharts(source: str, input_directory: Path):
+    """The pre-downscaled Wetcharts ensemble raster (bands ``<year>_model_<id>``)."""
+    import rioxarray
+
+    base = (
+        Path(input_directory) / "combined_NLCD_downscaled_wetcharts.tif"
+        if source == "M3T"
+        else Path(source)
+    )
+    if not base.exists():
+        raise _zenodo_todo("Source_wetcharts", base)
+    da = rioxarray.open_rasterio(base, masked=True)
+    return da.assign_coords(band_name=("band", list(da.attrs.get("long_name", []))))
+
+
+def load_nwi(source: str, input_directory: Path, states):
+    """Per-state NWI wetland-class rasters, combined across states with ``max``.
+
+    Returns ``{class: DataArray}``. The state rasters overlap at their borders, so
+    ``max`` merges them without double-counting the seam (see combine_nwi_states).
+    """
+    import rioxarray
+
+    from .sectors.wetlands import combine_nwi_states
+
+    base = (
+        Path(input_directory) / "processed_NWI_data" if source == "M3T" else Path(source)
+    )
+    if not base.exists():
+        raise _zenodo_todo("Source_NWI", base)
+
+    per_class: dict = {}
+    for state in states:
+        path = base / f"{state}_combined_NWI_wetland_landcover.tif"
+        if not path.exists():
+            raise FileNotFoundError(f"NWI raster missing for {state}: {path}")
+        da = rioxarray.open_rasterio(path, masked=True)
+        for i, cls in enumerate(da.attrs.get("long_name", [])):
+            per_class.setdefault(cls, []).append(da.isel(band=i))
+    return {cls: combine_nwi_states(v) for cls, v in per_class.items()}
+
+
+def load_watersheds(source: str, input_directory: Path):
+    """Watershed polygons (their ``NAW1_EN`` names give the SOCCR2 ocean basin)."""
+    import geopandas as gpd
+
+    base = Path(input_directory) / "Watersheds.gpkg" if source == "M3T" else Path(source)
+    if not base.exists():
+        raise _zenodo_todo("Source_Watershed_file", base)
+    return gpd.read_file(base)

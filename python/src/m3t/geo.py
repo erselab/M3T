@@ -567,6 +567,30 @@ def coverage_fraction(template: xr.DataArray, geometries) -> xr.DataArray:
     return out
 
 
+def disagg(da: xr.DataArray, factor: int) -> xr.DataArray:
+    """Split each cell into ``factor`` x ``factor`` copies of itself.
+
+    Parity with ``terra::disagg(x, fact, method="near")``: a pure nearest-neighbour
+    upsample, so cell values are duplicated, not interpolated. The R uses this to
+    refine a coarse grid *before* reprojecting, precisely so the reprojection does
+    not interpolate across the coarse cell edges.
+    """
+    if factor == 1:
+        return da
+    xres, yres = res(da)
+    xmin, ymin, xmax, ymax = ext(da)
+    vals = np.repeat(np.repeat(da.values, factor, axis=0), factor, axis=1)
+
+    nx, ny = xres / factor, yres / factor
+    xs = xmin + (np.arange(vals.shape[1]) + 0.5) * nx
+    ys = ymax - (np.arange(vals.shape[0]) + 0.5) * ny
+
+    out = xr.DataArray(vals, coords={"y": ys, "x": xs}, dims=("y", "x"), name=da.name)
+    out.rio.write_crs(da.rio.crs, inplace=True)
+    out.rio.write_transform(from_origin(xmin, ymax, nx, ny), inplace=True)
+    return out
+
+
 def project_partial_to_grid(
     da: xr.DataArray,
     mask_geom,

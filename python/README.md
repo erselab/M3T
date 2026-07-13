@@ -18,8 +18,10 @@ methane emission inventories for U.S. urban areas. See
 > **natural gas distribution** ✅ (PHMSA/EIA/GHGRP activity → 6 subsectors ×
 > res/com × 2 levels; `by_LDC` not ported — it reads a semi-manual prep script
 > that ships outside the package).
+> **wetlands & inland waters** ✅ (Wetcharts ensemble + NWI/SOCCR1/SOCCR2 and
+> freshwater).
 > All golden-tested and running through `ch4_inventory_build` with either CO₂
-> inventory. Stubs: wetlands, remaining-GEPA.
+> inventory. Stub: remaining-GEPA.
 >
 > Stationary combustion needs a gridded CO₂ inventory: point `Source_Vulcan` at an
 > extracted `Vulcan_v4.0/` directory (or leave it `"download"` to fetch the four

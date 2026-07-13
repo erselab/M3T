@@ -9,6 +9,7 @@ from . import (
     ng_transmission,
     stationary_combustion,
     wastewater,
+    wetlands,
 )
 
 # Register real (ported) sectors over their stubs.
@@ -17,6 +18,7 @@ ng_transmission.register()
 wastewater.register()
 stationary_combustion.register()
 ng_distribution.register()
+wetlands.register()
 
 __all__ = [
     "base",
@@ -25,4 +27,5 @@ __all__ = [
     "ng_transmission",
     "stationary_combustion",
     "wastewater",
+    "wetlands",
 ]
