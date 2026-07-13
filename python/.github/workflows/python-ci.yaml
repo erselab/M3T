@@ -1,0 +1,36 @@
+name: python-ci
+
+on:
+  push:
+    paths: ["python/**"]
+  pull_request:
+    paths: ["python/**"]
+
+defaults:
+  run:
+    working-directory: python
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+        working-directory: python
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          environment-file: python/environment-py.yaml
+          activate-environment: m3t-py
+
+      - name: Install package
+        run: pip install -e . --no-deps
+
+      - name: Lint
+        run: ruff check src tests
+
+      - name: Test (non-network)
+        run: pytest -q -m "not network and not golden"

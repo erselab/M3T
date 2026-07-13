@@ -1,0 +1,27 @@
+# Conda environment for the Python port of M3T.
+# Create with:  conda env create -f environment-py.yaml
+# (named m3t-py to avoid clashing with the R env named "M3T").
+name: m3t-py
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - numpy
+  - pandas
+  - xarray
+  - rioxarray
+  - rasterio
+  - geopandas
+  - shapely
+  - pyproj
+  - rasterstats
+  - netcdf4
+  - openpyxl
+  - requests
+  - matplotlib
+  - pyarrow
+  # dev
+  - pytest
+  - pytest-cov
+  - ruff
+  - pip

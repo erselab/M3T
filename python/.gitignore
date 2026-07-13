@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Golden/oracle fixtures under tests/golden/ ARE committed, on purpose:
+# the .nc rasters in tests/golden/*/out/ are the terra-generated oracles that
+# test_landfills_golden.py and test_ng_transmission_golden.py compare against
+# cell-for-cell, and the .csv/.geojson files are their pinned inputs. They are
+# small (24 KB per raster) and regenerating them needs a working R + terra
+# install, so do not add a `*.nc` / `*.tif` ignore rule here — it would silently
+# strip the port's only correctness oracle.
+#
+# Shipped package data in src/m3t/data/ (parquet/json converted from the R
+# .rda by _data_raw/build_data.py) IS committed so the package is installable.
+
+# Downloaded archives, if a run or capture script ever caches one in-tree.
+*.zip

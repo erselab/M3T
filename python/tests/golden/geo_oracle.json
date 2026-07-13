@@ -1,0 +1,26 @@
+{
+  "make_grid_3x3": {
+    "nrow": 3,
+    "ncol": 3,
+    "ext": [-75, -72, 39, 42],
+    "res": [1, 1]
+  },
+  "make_grid_snap": {
+    "nrow": 3,
+    "ncol": 4,
+    "ext": [-75, -71, 39, 42],
+    "res": [1, 1]
+  },
+  "global": {
+    "sum": 6,
+    "max": 3,
+    "notNA": 3
+  },
+  "aggregate": {
+    "nrow": 2,
+    "ncol": 2,
+    "res": [2, 2],
+    "total": 16
+  },
+  "cell_area_m": 248658.81812308056
+}

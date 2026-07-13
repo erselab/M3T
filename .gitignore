@@ -1,0 +1,20 @@
+# macOS / Google Drive
+.DS_Store
+
+# R
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+# Run artifacts. ch4_inventory_build()/CH4_inventory_build() create in/, out/
+# and plots/ under whatever run_directory they're given; these patterns are
+# anchored to the repo root so a run launched from here doesn't commit the
+# multi-GB Zenodo/EPA/Census downloads it caches under in/.
+#
+# Anchoring matters: the golden fixtures deliberately mirror this layout
+# (python/tests/golden/*/out/, python/tests/golden/*/in/) and MUST stay tracked,
+# so do not turn these into unanchored `in/` / `out/` patterns.
+/in/
+/out/
+/plots/
