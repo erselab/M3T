@@ -23,6 +23,12 @@ dir.create(ghgi_out_dir, recursive = TRUE, showWarnings = FALSE)
 # GHGI list datasets exported in full (nested list of data frames w/ rownames).
 ghgi_lists <- c("GHGI_NG_distribution", "GHGI_NG_transmission")
 
+# Data frames whose *row names* carry data. pyreadr silently drops rownames (it
+# returns a RangeIndex), so these must be exported from R in full or the
+# information is lost: GHGI_stationary_combustion is row-labelled by year and has
+# no year column, and the R selects the year with `rownames(x) == GHGI_data_yr`.
+rowname_dfs <- c("GHGI_stationary_combustion")
+
 df_summary <- function(df) {
   num <- vapply(df, is.numeric, logical(1))
   sums <- lapply(names(df)[num], function(cn) sum(df[[cn]], na.rm = TRUE))
@@ -59,6 +65,11 @@ for (f in files) {
                dataframe = "columns", na = "null", digits = 15, auto_unbox = TRUE)
   } else if (is.data.frame(obj)) {
     ref[[nm]] <- df_summary(obj)
+    if (nm %in% rowname_dfs) {
+      df <- cbind(`.rowname` = rownames(obj), obj, stringsAsFactors = FALSE)
+      write_json(df, file.path(ghgi_out_dir, paste0(nm, ".json")),
+                 dataframe = "columns", na = "null", digits = 15, auto_unbox = TRUE)
+    }
   } else if (is.list(obj)) {
     # named list of data frames (the two GHGI datasets)
     ref[[nm]] <- list(

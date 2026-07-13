@@ -528,27 +528,82 @@ def coverage_fraction(template: xr.DataArray, geometries) -> xr.DataArray:
             geoms = geometries.to_crs(template.rio.crs).geometry
 
     nrow, ncol = template.shape
-    xmin, _, _, ymax = ext(template)
+    Xmin, Ymin, Xmax, Ymax = ext(template)
     xres, yres = res(template)
-    fine_transform = from_origin(xmin, ymax, xres / n, yres / n)
 
     weight = np.full((nrow, ncol), np.nan, dtype="float64")
     for geom in geoms:  # in order: later polygons overwrite earlier ones
+        # Only rasterize the window this geometry can touch. Sub-sampling 10x costs
+        # 100 sub-cells per cell, so doing it over a whole CONUS 1 km grid for each
+        # of many counties is hopeless; windowing makes the cost scale with the
+        # polygon, not the raster.
+        gxmin, gymin, gxmax, gymax = geom.bounds
+        c0 = max(int(np.floor((gxmin - Xmin) / xres)), 0)
+        c1 = min(int(np.ceil((gxmax - Xmin) / xres)), ncol)
+        r0 = max(int(np.floor((Ymax - gymax) / yres)), 0)
+        r1 = min(int(np.ceil((Ymax - gymin) / yres)), nrow)
+        if c0 >= c1 or r0 >= r1:
+            continue  # geometry lies entirely off the grid
+
+        wrows, wcols = r1 - r0, c1 - c0
         fine = _rio_rasterize(
             shapes=[(geom, 1)],
-            out_shape=(nrow * n, ncol * n),
-            transform=fine_transform,
+            out_shape=(wrows * n, wcols * n),
+            transform=from_origin(
+                Xmin + c0 * xres, Ymax - r0 * yres, xres / n, yres / n
+            ),
             fill=0,
             all_touched=False,  # sub-cell *centre* must be inside, as terra does
             dtype="uint8",
         )
-        frac = fine.reshape(nrow, n, ncol, n).sum(axis=(1, 3)) / float(n * n)
+        frac = fine.reshape(wrows, n, wcols, n).sum(axis=(1, 3)) / float(n * n)
         covered = frac > 0  # terra only returns cells with a non-zero weight
-        weight[covered] = frac[covered]
+        window = weight[r0:r1, c0:c1]
+        window[covered] = frac[covered]
+        weight[r0:r1, c0:c1] = window
 
     out = xr.DataArray(weight, coords=template.coords, dims=template.dims, name="weight")
     out.rio.write_crs(template.rio.crs, inplace=True)
     return out
+
+
+def project_partial_to_grid(
+    da: xr.DataArray,
+    mask_geom,
+    template: xr.DataArray,
+    *,
+    pad_cells: int = 5,
+) -> xr.DataArray:
+    """Reproject a fine raster onto a coarse ``template``, honouring partial coverage.
+
+    This exact five-step sequence appears twice in the R — the septic branch of
+    ``Wastewater.R`` and ``save_data`` in ``Stationary_combustion.R`` — so it lives
+    here once:
+
+    1. crop to the mask, snapping outward (keeps grid alignment);
+    2. mask, keeping every touched cell and zeroing the rest;
+    3. scale each cell by the fraction of it inside the mask
+       (``extract(weights=TRUE)``; cells no polygon covers are left untouched);
+    4. pad with real zeros ``pad_cells`` *target* cells wide — without this the
+       area-average would skip NaN neighbours instead of counting them as zero,
+       which badly biases the edge cells;
+    5. area-average onto the template.
+
+    ``mask_geom`` must already be in ``da``'s CRS. The pad width is derived from
+    the template's cell size expressed in ``da``'s CRS, as the R does.
+    """
+    pad_res = res(project_to_crs(template, da.rio.crs))
+    pad = (pad_res[0] * pad_cells, pad_res[1] * pad_cells)
+
+    out = da.fillna(0.0)
+    out = crop_snap_out(out, tuple(mask_geom.total_bounds))
+    out = mask_geometries(out, mask_geom, touches=True, updatevalue=0.0)
+
+    weights = coverage_fraction(out, mask_geom)
+    out = out.where(weights.isnull(), out * weights)
+
+    out = extend(out, pad, fill=0.0)
+    return project_to_grid(out, template, resampling="average")
 
 
 def _grid_cell_polygons(template: xr.DataArray):

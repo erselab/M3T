@@ -51,6 +51,14 @@ def _load_json_columns(path: Path) -> dict:
     return _strip(obj)
 
 
+# Datasets whose R rownames carry meaning and must survive as a real column.
+# GHGI_stationary_combustion is row-labelled by year and has no year column of its
+# own -- the R selects the year with `rownames(x) == GHGI_data_yr`, so dropping the
+# index (pandas' default) leaves 12 indistinguishable "US_EPA" rows. Every other
+# packaged frame's rownames are just leftover row numbers from an R subset.
+_ROWNAME_COLUMN = {"GHGI_stationary_combustion": "year"}
+
+
 def convert_dataframes() -> list[str]:
     """pyreadr-readable data.frames -> parquet. Returns the names written."""
     written = []
@@ -62,6 +70,20 @@ def convert_dataframes() -> list[str]:
         if not result:
             raise RuntimeError(f"pyreadr read nothing from {rda.name}; is it a list/matrix?")
         obj_name, df = next(iter(result.items()))
+
+        rowname_col = _ROWNAME_COLUMN.get(name)
+        if rowname_col:
+            # pyreadr drops rownames, so take the R-exported copy that keeps them
+            src = GHGI_JSON_DIR / f"{name}.json"
+            if not src.exists():
+                raise RuntimeError(
+                    f"{name} carries data in its R rownames but {src} is missing; run "
+                    "`conda run -n M3T Rscript python/_data_raw/export_rda_reference.R`"
+                )
+            cols = _load_json_columns(src)
+            df = pd.DataFrame(cols)
+            df.insert(0, rowname_col, pd.to_numeric(df.pop(".rowname")))
+
         out = OUT_DIR / f"{name}.parquet"
         df.to_parquet(out, index=False)
         written.append(name)

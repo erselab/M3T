@@ -13,7 +13,11 @@ methane emission inventories for U.S. urban areas. See
 > **wastewater** ✅ (municipal CWNS/DMR × GHGI/Moore, industrial GHGRP subpart II,
 > septic national/by-state, and all 8 sector-total variants — golden-tested against
 > R and running through `ch4_inventory_build`).
-> Stubs: NG distribution, stationary combustion, wetlands, remaining-GEPA.
+> **Stationary combustion** ✅ golden-tested (SEDS → NEI → Vulcan/ACES
+> disaggregation, 14 subsectors × 2 levels + totals) but **not yet registered**:
+> the orchestrator can't supply county Tigerlines or a gridded CO₂ inventory yet,
+> and the default `Use_Vulcan` needs a large Zenodo download.
+> Stubs: NG distribution, wetlands, remaining-GEPA.
 >
 > State-resolved sectors need the Census Tigerlines: pass `tigerlines=` to
 > `ch4_inventory_build` and the orchestrator derives `state_tigerlines` /

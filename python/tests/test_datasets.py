@@ -41,6 +41,12 @@ def _tabular_names(ref) -> list[str]:
     return [k for k, v in ref.items() if "nrow" in v and v.get("class") != "matrix/array"]
 
 
+# R data frames whose rownames carry data get one extra leading column in the
+# Python copy (pyreadr drops rownames, so build_data.py restores them from an
+# R-side export). See _ROWNAME_COLUMN in _data_raw/build_data.py.
+_ROWNAME_COLUMN = {"GHGI_stationary_combustion": "year"}
+
+
 def test_all_datasets_present(ref):
     assert set(datasets.available()) == set(ref.keys())
 
@@ -49,8 +55,19 @@ def test_tabular_shapes_and_columns(ref):
     for name in _tabular_names(ref):
         df = datasets.load(name)
         r = ref[name]
+        extra = _ROWNAME_COLUMN.get(name)
+        if extra:
+            assert df.columns[0] == extra, f"{name}: rowname column missing"
+            df = df.drop(columns=extra)
         assert df.shape == (r["nrow"], r["ncol"]), f"{name} shape"
         assert list(df.columns) == list(r["colnames"]), f"{name} columns"
+
+
+def test_rowname_columns_match_r(ref):
+    """The restored rowname column must equal R's rownames, in order."""
+    for name, col in _ROWNAME_COLUMN.items():
+        df = datasets.load(name)
+        assert [str(v) for v in df[col]] == list(ref[name]["rownames"]), name
 
 
 def test_tabular_numeric_sums_match_r(ref):

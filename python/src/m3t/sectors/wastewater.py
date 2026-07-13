@@ -17,9 +17,11 @@ Three independent emission streams, summed into per-variant sector totals:
 * **Industrial treatment plants** — GHGRP subpart II reported methane, rasterized
   as points.
 
-* **Septic systems** — computed from NLCD land cover; not yet ported. Pass the
-  rasters in via ``septic`` and they are included in the sector totals; omit it
-  and only the municipal + industrial streams are produced.
+* **Septic systems** — an emission factor per unit of "developed open space /
+  low intensity" NLCD land cover, either national (GHGI total over the national
+  area of that cover) or per state (population × septic fraction × GHGI EF).
+  Computed by :func:`compute_septic` and passed to :func:`compute_wastewater` via
+  ``septic=``, which folds it into the sector totals.
 
 The heavy lifting is in :func:`compute_wastewater`, which takes plain inputs and
 returns rasters, so it can be golden-tested without the orchestrator.
@@ -223,26 +225,14 @@ def _septic_to_domain(
     domain,
     domain_template: xr.DataArray,
     domain_crs: str,
-    nlcd_res: tuple[float, float],
 ) -> xr.DataArray:
-    """Shared tail of both septic paths: NLCD grid -> domain grid.
+    """Septic-specific tail: NLCD grid -> domain grid, then NA outside the domain.
 
-    Mirrors the R step for step. The buffer matters: reprojecting to the coarse
-    domain grid by *averaging*, NaN cells would be skipped rather than counted as
-    zero, which badly biases edge cells — so the R pads with real zeros first.
+    The reprojection itself is the shared partial-coverage sequence (identical to
+    ``save_data`` in Stationary_combustion.R); only the trailing NA step below is
+    specific to septic.
     """
-    flux = flux.fillna(0.0)
-    flux = geo.crop_snap_out(flux, tuple(nlcd_domain.total_bounds))
-    flux = geo.mask_geometries(flux, nlcd_domain, touches=True, updatevalue=0.0)
-
-    # Down-weight cells that only partially fall inside the domain. Cells no
-    # polygon covers come back NaN and are left *unmultiplied*, matching the R
-    # (which only assigns into the cells extract() returned).
-    weights = geo.coverage_fraction(flux, nlcd_domain)
-    flux = flux.where(weights.isnull(), flux * weights)
-
-    flux = geo.extend(flux, (nlcd_res[0] * 5, nlcd_res[1] * 5), fill=0.0)
-    flux = geo.project_to_grid(flux, domain_template, resampling="average")
+    flux = geo.project_partial_to_grid(flux, nlcd_domain, domain_template)
 
     # averaging leaves small non-zero values just outside a polygon domain; the R
     # NAs out only the cells that are *both* outside and exactly zero, keeping any
@@ -294,11 +284,6 @@ def compute_septic(
         )
 
     nlcd_domain = _to_crs(dom, nlcd_crs)
-    # R: res(project(domain_template, NLCD_Tigerlines)) -- the *domain* cell size
-    # expressed in NLCD metres (~9 km), NOT the NLCD raster's own 1 km. This sets
-    # the zero-buffer width below, which is what keeps average-resampling from
-    # biasing the edge cells, so getting it wrong is not cosmetic.
-    nlcd_res = geo.res(geo.project_to_crs(domain_template, nlcd_crs))
 
     out: dict[str, xr.DataArray] = {}
 
@@ -312,7 +297,6 @@ def compute_septic(
             domain=dom,
             domain_template=domain_template,
             domain_crs=domain_crs,
-            nlcd_res=nlcd_res,
         )
 
     if by_state:
@@ -355,7 +339,6 @@ def compute_septic(
             domain=dom,
             domain_template=domain_template,
             domain_crs=domain_crs,
-            nlcd_res=nlcd_res,
         )
 
     return out

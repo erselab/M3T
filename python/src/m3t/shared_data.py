@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from . import datasets
@@ -201,6 +202,63 @@ def load_septic_areas(input_directory: Path, inventory_year: int, ghgi_data_yr: 
         columns={"state": "X", col: "open_or_low_int_area"}
     )
     return total_national_area, state[state["X"].isin(list(states))]
+
+
+# The ACES NetCDFs keep their georeferencing in a `crs` variable (proj4 +
+# geotransform attributes) rather than on the data variable, and GDAL does not pick
+# it up: opened as-is they have extent 0..ncol and no CRS. These are the values from
+# the files' own attributes; tests/golden/capture_stationary_combustion_oracle.R
+# applies exactly the same ones, so R and Python agree on the grid.
+_ACES_PROJ = (
+    "+proj=lcc +lat_0=40 +lon_0=-97 +lat_1=33 +lat_2=45 +x_0=0 +y_0=0 "
+    "+ellps=WGS84 +units=m +no_defs"
+)
+_ACES_ORIGIN = (-2300000.0, 1300000.0)  # top-left x, y
+_ACES_RES = 1000.0
+_ACES_SECTORS = {
+    "res": "Residential",
+    "com": "Commercial",
+    "ind": "Industrial",
+    "elec": "Elec",
+}
+_ACES_YEARS = range(2012, 2018)
+
+
+def georeference_aces(da):
+    """Attach ACES's own CRS/extent to a raster GDAL failed to georeference."""
+    from rasterio.transform import from_origin
+
+    if "band" in da.dims:
+        da = da.squeeze("band", drop=True)
+    da = da.rio.write_crs(_ACES_PROJ)
+    da = da.rio.write_transform(
+        from_origin(_ACES_ORIGIN[0], _ACES_ORIGIN[1], _ACES_RES, _ACES_RES)
+    )
+    nrow, ncol = da.shape
+    xs = _ACES_ORIGIN[0] + (np.arange(ncol) + 0.5) * _ACES_RES
+    ys = _ACES_ORIGIN[1] - (np.arange(nrow) + 0.5) * _ACES_RES
+    return da.assign_coords({da.dims[1]: xs, da.dims[0]: ys}).rename(
+        {da.dims[0]: "y", da.dims[1]: "x"}
+    )
+
+
+def load_aces(source: str, input_directory: Path, inventory_year: int):
+    """The four ACES sectoral CO2 rasters, keyed res/com/ind/elec."""
+    import rioxarray
+
+    base = Path(source) if source != "M3T" else Path(input_directory) / "ACES V2.0"
+    if not base.exists():
+        raise _zenodo_todo("Source_ACES", base)
+
+    year = _nearest(inventory_year, _ACES_YEARS)
+    out = {}
+    for key, name in _ACES_SECTORS.items():
+        path = base / f"ACES_annual_{name}_{year}.nc"
+        if not path.exists():
+            raise FileNotFoundError(f"ACES file missing: {path}")
+        da = rioxarray.open_rasterio(f'netcdf:"{path}":flux_co2', masked=True)
+        out[key] = georeference_aces(da)
+    return out
 
 
 def load_state_population(source: str, input_directory: Path) -> pd.DataFrame:
