@@ -261,6 +261,72 @@ def load_aces(source: str, input_directory: Path, inventory_year: int):
     return out
 
 
+_VULCAN_SECTORS = {"res": "res", "com": "com", "ind": "ind", "elec": "elc"}
+_VULCAN_YEARS = range(2010, 2023)
+
+
+def load_vulcan(source: str, input_directory: Path, inventory_year: int):
+    """The four Vulcan v4.0 sectoral CO2 rasters, keyed res/com/ind/elec.
+
+    Expects the *extracted* GeoTIFFs (the Zenodo zips unpack to one per year); see
+    :func:`m3t.download.download_vulcan`. Unlike ACES these are properly
+    georeferenced, so they need no fixing up.
+    """
+    import rioxarray
+
+    base = Path(source) if source != "M3T" else Path(input_directory) / "Vulcan_v4.0"
+    if source == "download":
+        from .download import download_vulcan
+
+        base = Path(input_directory) / "Vulcan_v4.0"
+        if len(list(base.glob("*.tif"))) < 4:
+            download_vulcan(base)
+    if not base.exists():
+        raise _zenodo_todo("Source_Vulcan", base)
+
+    year = _nearest(inventory_year, _VULCAN_YEARS)
+    out = {}
+    for key, code in _VULCAN_SECTORS.items():
+        path = base / f"v4.{code}.co2.usa.1km.lcc.mn.{year}.tif"
+        if not path.exists():
+            raise FileNotFoundError(
+                f"Vulcan file missing: {path}. The zips must be extracted to .tif "
+                "(Source_Vulcan='download' does this for you)."
+            )
+        da = rioxarray.open_rasterio(path, masked=True)
+        out[key] = da.squeeze("band", drop=True) if "band" in da.dims else da
+    return out, year
+
+
+def load_county_tigerlines(
+    source: str, input_directory: Path, inventory_year: int, state_fips
+):
+    """County polygons for the run's states, from the companion year-layered gpkg.
+
+    ``state_fips`` comes from the already-derived state Tigerlines (counties carry
+    ``STATEFP`` but no ``STUSPS``, so the states table is what links them).
+    """
+    import fiona
+    import geopandas as gpd
+
+    base = Path(source) if source != "M3T" else (
+        Path(input_directory) / "combined_county_tigerlines.gpkg"
+    )
+    if not base.exists():
+        raise _zenodo_todo("Source_Tigerlines_data", base)
+
+    layers = [int(y) for y in fiona.listlayers(base)]
+    layer = str(_nearest(inventory_year, layers))
+    counties = gpd.read_file(base, layer=layer)
+    return counties[counties["STATEFP"].isin(set(state_fips))]
+
+
+def resolve_nei_year(nei: pd.DataFrame, inventory_year: int) -> int:
+    """NEI runs every 3 years; take the nearest available inventory."""
+    years = sorted(int(y) for y in nei["INVENTORY YEAR"].unique())
+    return _nearest(inventory_year, years)
+
+
 def load_state_population(source: str, input_directory: Path) -> pd.DataFrame:
     """Census state population estimates (``POPESTIMATE<year>`` columns)."""
     if source == "M3T":
@@ -318,6 +384,49 @@ def prepare_shared_data(ctx: RunContext) -> None:
 
     if "ghgi_data_yr" not in ctx.shared:
         ctx.shared["ghgi_data_yr"] = resolve_ghgi_year(ctx.inventory_year)
+
+    # --- stationary combustion -------------------------------------------- #
+    # NG distribution will need these same inputs (county Tigerlines + a gridded CO2
+    # inventory) once it is ported; while it is still a zero-filled stub it needs
+    # nothing, so don't make it demand a multi-hundred-MB download.
+    if cfg.Process_stationary_combustion:
+        if "state_tigerlines" not in ctx.shared:
+            raise ValueError(
+                "stationary combustion needs county Tigerlines, which are selected from "
+                "the state list: pass `tigerlines=` to ch4_inventory_build (or inject "
+                "ctx.shared['county_tigerlines'])"
+            )
+        if "county_tigerlines" not in ctx.shared:
+            ctx.shared["county_tigerlines"] = load_county_tigerlines(
+                cfg.Source_Tigerlines_data,
+                ctx.input_directory,
+                ctx.inventory_year,
+                ctx.shared["state_tigerlines"]["STATEFP"],
+            )
+
+        if cfg.Use_ACES and "aces_inventories" not in ctx.shared:
+            ctx.shared["aces_inventories"] = load_aces(
+                cfg.Source_ACES, ctx.input_directory, ctx.inventory_year
+            )
+        if cfg.Use_Vulcan and "vulcan_inventories" not in ctx.shared:
+            inventories, vulcan_year = load_vulcan(
+                cfg.Source_Vulcan, ctx.input_directory, ctx.inventory_year
+            )
+            ctx.shared["vulcan_inventories"] = inventories
+            if vulcan_year != ctx.inventory_year:
+                print(
+                    f"Vulcan does not include {ctx.inventory_year}, "
+                    f"using {vulcan_year} as the nearest data available"
+                )
+
+    if cfg.Process_stationary_combustion and "nei_year" not in ctx.shared:
+        nei_year = resolve_nei_year(datasets.load("NEI_all_years"), ctx.inventory_year)
+        ctx.shared["nei_year"] = nei_year
+        if nei_year != ctx.inventory_year:
+            print(
+                f"NEI is every 3 years and does not have an inventory for "
+                f"{ctx.inventory_year}. Using {nei_year} as the nearest available data."
+            )
 
     # --- wastewater companion inputs ------------------------------------- #
     if cfg.Process_wastewater:

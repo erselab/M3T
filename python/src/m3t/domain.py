@@ -256,7 +256,12 @@ def build_state_tigerlines(tigerlines, domain_geom, domain_crs: str):
             crs=domain_crs,
         ).union_all())
 
-    states = states[~states.geometry.is_empty].sort_values("STUSPS")
+    # Clipping leaves the *neighbours* behind as zero-area artifacts: a state that
+    # merely shares a border with the domain intersects it in a line, which is not
+    # empty. Dropping only empties would have let MA and NY into a CT+RI run, and
+    # with them their counties (89 instead of 13) and their SEDS/NEI rows. Require
+    # real area.
+    states = states[states.geometry.area > 0].sort_values("STUSPS")
     return states, list(states["STUSPS"])
 
 

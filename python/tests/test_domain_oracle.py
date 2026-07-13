@@ -57,3 +57,28 @@ def test_conus_constant_matches_case():
     tmpl, geom = domain.build_domain("CONUS", 1.0, "epsg:4326")
     assert geom == domain.CONUS_BOUNDS
     assert tmpl.shape == (35, 70)
+
+
+def test_state_selection_excludes_border_neighbours():
+    """Clipping states to the domain must not admit zero-area border artifacts.
+
+    A state that merely *borders* the domain intersects it in a line, which is not
+    an empty geometry — so filtering on `is_empty` alone let MA and NY into a CT+RI
+    run, dragging in their counties (89 instead of 13) and their SEDS/NEI rows.
+    """
+    import geopandas as gpd
+    from shapely.geometry import box
+
+    from m3t.domain import build_state_tigerlines
+
+    # two unit squares sharing an edge at x=1, plus a third further out
+    states = gpd.GeoDataFrame(
+        {"STUSPS": ["AA", "BB", "CC"], "STATEFP": ["01", "02", "03"]},
+        geometry=[box(0, 0, 1, 1), box(1, 0, 2, 1), box(5, 5, 6, 6)],
+        crs="epsg:4326",
+    )
+    domain = states[states["STUSPS"] == "AA"]
+
+    selected, names = build_state_tigerlines(states, domain, "epsg:4326")
+    assert names == ["AA"], f"border neighbour leaked in: {names}"
+    assert (selected.geometry.area > 0).all()

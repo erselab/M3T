@@ -47,6 +47,19 @@ _STATES = ["IA", "NE"]
 _PA_BOX = (-80.5, 39.7, -74.7, 42.3)
 
 
+@pytest.fixture
+def base_config():
+    """Default config minus stationary combustion.
+
+    That sector needs county Tigerlines and a CONUS-wide gridded CO2 inventory
+    (Vulcan/ACES, hundreds of MB) that we cannot commit as fixtures, so the
+    orchestrator tests leave it stubbed; it has its own golden test.
+    """
+    cfg = Config()
+    cfg.Process_stationary_combustion = False
+    return cfg
+
+
 @pytest.fixture(scope="module")
 def tigerlines():
     if not _TIGER.exists():
@@ -90,7 +103,7 @@ def shared_inputs():
     }
 
 
-def test_runs_end_to_end_on_states(tmp_path, shared_inputs, tigerlines):
+def test_runs_end_to_end_on_states(tmp_path, shared_inputs, tigerlines, base_config):
     ctx = ch4_inventory_build(
         run_directory=tmp_path,
         inventory_year=2019,
@@ -98,6 +111,7 @@ def test_runs_end_to_end_on_states(tmp_path, shared_inputs, tigerlines):
         domain_res=0.2,
         domain_crs="epsg:4326",
         tigerlines=tigerlines,
+        config=base_config,
         shared=shared_inputs,
     )
     # the orchestrator derived the state geometries + ordered name list
@@ -114,10 +128,11 @@ def test_runs_end_to_end_on_states(tmp_path, shared_inputs, tigerlines):
     assert float(np.nansum(xr.open_dataset(ctx.output_directory / "wastewater.nc")
                            ["methane_emissions"].values)) > 0
 
-    # every enabled sector ran (all 7 on by default)
+    # every enabled sector ran (all but stationary combustion, see base_config)
     enabled_keys = [s.key for s in base.SECTORS if ctx.config.get(s.process_flag)]
     assert ctx.shared["sectors_run"] == enabled_keys
-    assert len(enabled_keys) == 7
+    assert len(enabled_keys) == 6
+    assert "stationary_combustion" not in enabled_keys
 
     # each sector wrote a NetCDF; the total exists
     for key in enabled_keys:
@@ -130,19 +145,20 @@ def test_runs_end_to_end_on_states(tmp_path, shared_inputs, tigerlines):
     assert (ctx.input_directory / "GHGRP").is_dir()
 
 
-def test_total_is_sum_of_sectors(tmp_path, shared_inputs, tigerlines):
+def test_total_is_sum_of_sectors(tmp_path, shared_inputs, tigerlines, base_config):
     ctx = ch4_inventory_build(
         run_directory=tmp_path,
         inventory_year=2019,
         domain=_STATES,
         domain_res=0.5,
         tigerlines=tigerlines,
+        config=base_config,
         shared=shared_inputs,
     )
     ds = xr.open_dataset(ctx.output_directory / "M3T_total.nc")
     total = ds[next(iter(ds.data_vars))]
     assert total.shape == ctx.domain_template.shape
-    assert total.attrs.get("m3t_n_sectors_combined") == 7
+    assert total.attrs.get("m3t_n_sectors_combined") == 6
 
     # the total equals the cell-wise sum of the per-sector rasters
     manual = np.zeros(total.shape)
@@ -152,8 +168,8 @@ def test_total_is_sum_of_sectors(tmp_path, shared_inputs, tigerlines):
     assert np.allclose(np.nan_to_num(total.values), manual, rtol=1e-6)
 
 
-def test_disabled_sector_is_skipped(tmp_path, shared_inputs):
-    cfg = Config()
+def test_disabled_sector_is_skipped(tmp_path, shared_inputs, base_config):
+    cfg = base_config
     cfg.Process_wastewater = False
     ctx = ch4_inventory_build(
         run_directory=tmp_path,
@@ -184,8 +200,8 @@ def test_invalid_config_raises_before_running(tmp_path):
     assert not (tmp_path / "out" / "landfills.nc").exists()
 
 
-def test_does_not_mutate_passed_config(tmp_path, shared_inputs, tigerlines):
-    cfg = Config()
+def test_does_not_mutate_passed_config(tmp_path, shared_inputs, tigerlines, base_config):
+    cfg = base_config
     ctx = ch4_inventory_build(
         run_directory=tmp_path,
         inventory_year=2019,
