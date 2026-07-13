@@ -49,14 +49,16 @@ _PA_BOX = (-80.5, 39.7, -74.7, 42.3)
 
 @pytest.fixture
 def base_config():
-    """Default config minus stationary combustion.
+    """Default config minus the two CO2-disaggregated sectors.
 
-    That sector needs county Tigerlines and a CONUS-wide gridded CO2 inventory
-    (Vulcan/ACES, hundreds of MB) that we cannot commit as fixtures, so the
-    orchestrator tests leave it stubbed; it has its own golden test.
+    Stationary combustion and NG distribution both need a CONUS-wide gridded CO2
+    inventory (Vulcan/ACES, hundreds of MB), and stationary combustion also needs
+    the county Tigerlines. Neither can be committed as a fixture, so the
+    orchestrator tests leave them stubbed; each has its own golden test.
     """
     cfg = Config()
     cfg.Process_stationary_combustion = False
+    cfg.Process_natural_gas_distribution = False
     return cfg
 
 
@@ -128,11 +130,12 @@ def test_runs_end_to_end_on_states(tmp_path, shared_inputs, tigerlines, base_con
     assert float(np.nansum(xr.open_dataset(ctx.output_directory / "wastewater.nc")
                            ["methane_emissions"].values)) > 0
 
-    # every enabled sector ran (all but stationary combustion, see base_config)
+    # every enabled sector ran (all but the CO2-disaggregated two, see base_config)
     enabled_keys = [s.key for s in base.SECTORS if ctx.config.get(s.process_flag)]
     assert ctx.shared["sectors_run"] == enabled_keys
-    assert len(enabled_keys) == 6
+    assert len(enabled_keys) == 5
     assert "stationary_combustion" not in enabled_keys
+    assert "natural_gas_distribution" not in enabled_keys
 
     # each sector wrote a NetCDF; the total exists
     for key in enabled_keys:
@@ -158,7 +161,7 @@ def test_total_is_sum_of_sectors(tmp_path, shared_inputs, tigerlines, base_confi
     ds = xr.open_dataset(ctx.output_directory / "M3T_total.nc")
     total = ds[next(iter(ds.data_vars))]
     assert total.shape == ctx.domain_template.shape
-    assert total.attrs.get("m3t_n_sectors_combined") == 6
+    assert total.attrs.get("m3t_n_sectors_combined") == 5
 
     # the total equals the cell-wise sum of the per-sector rasters
     manual = np.zeros(total.shape)

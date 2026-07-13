@@ -14,9 +14,12 @@ methane emission inventories for U.S. urban areas. See
 > septic national/by-state, and all 8 sector-total variants — golden-tested against
 > R and running through `ch4_inventory_build`).
 > **stationary combustion** ✅ (SEDS → NEI → Vulcan/ACES disaggregation, 14
-> subsectors × 2 levels + totals — golden-tested and running through
-> `ch4_inventory_build` with either CO₂ inventory).
-> Stubs: NG distribution, wetlands, remaining-GEPA.
+> subsectors × 2 levels + totals),
+> **natural gas distribution** ✅ (PHMSA/EIA/GHGRP activity → 6 subsectors ×
+> res/com × 2 levels; `by_LDC` not ported — it reads a semi-manual prep script
+> that ships outside the package).
+> All golden-tested and running through `ch4_inventory_build` with either CO₂
+> inventory. Stubs: wetlands, remaining-GEPA.
 >
 > Stationary combustion needs a gridded CO₂ inventory: point `Source_Vulcan` at an
 > extracted `Vulcan_v4.0/` directory (or leave it `"download"` to fetch the four

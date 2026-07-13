@@ -385,24 +385,26 @@ def prepare_shared_data(ctx: RunContext) -> None:
     if "ghgi_data_yr" not in ctx.shared:
         ctx.shared["ghgi_data_yr"] = resolve_ghgi_year(ctx.inventory_year)
 
-    # --- stationary combustion -------------------------------------------- #
-    # NG distribution will need these same inputs (county Tigerlines + a gridded CO2
-    # inventory) once it is ported; while it is still a zero-filled stub it needs
-    # nothing, so don't make it demand a multi-hundred-MB download.
-    if cfg.Process_stationary_combustion:
+    # --- gridded CO2 inventory: stationary combustion + NG distribution ---- #
+    needs_inventory = cfg.Process_stationary_combustion or cfg.Process_natural_gas_distribution
+    if needs_inventory:
         if "state_tigerlines" not in ctx.shared:
             raise ValueError(
-                "stationary combustion needs county Tigerlines, which are selected from "
-                "the state list: pass `tigerlines=` to ch4_inventory_build (or inject "
-                "ctx.shared['county_tigerlines'])"
+                "stationary combustion / NG distribution disaggregate by state: pass "
+                "`tigerlines=` to ch4_inventory_build (or inject "
+                "ctx.shared['state_tigerlines'])"
             )
-        if "county_tigerlines" not in ctx.shared:
-            ctx.shared["county_tigerlines"] = load_county_tigerlines(
-                cfg.Source_Tigerlines_data,
-                ctx.input_directory,
-                ctx.inventory_year,
-                ctx.shared["state_tigerlines"]["STATEFP"],
-            )
+
+    # only stationary combustion resolves emissions down to counties
+    if cfg.Process_stationary_combustion and "county_tigerlines" not in ctx.shared:
+        ctx.shared["county_tigerlines"] = load_county_tigerlines(
+            cfg.Source_Tigerlines_data,
+            ctx.input_directory,
+            ctx.inventory_year,
+            ctx.shared["state_tigerlines"]["STATEFP"],
+        )
+
+    if needs_inventory:
 
         if cfg.Use_ACES and "aces_inventories" not in ctx.shared:
             ctx.shared["aces_inventories"] = load_aces(
