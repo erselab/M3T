@@ -123,6 +123,97 @@ def _download_eia_pipes(*, timeout: float = 60 * 20):
     return gpd.GeoDataFrame.from_features(json.loads(json.dumps(feats)), crs="epsg:4326")
 
 
+_DMR_YEARS = range(2010, 2025)
+
+
+def _nearest(target: int, options) -> int:
+    return min(options, key=lambda y: abs(target - y))
+
+
+def load_dmr(source: str, input_directory: Path, inventory_year: int) -> pd.DataFrame:
+    """Discharge Monitoring Report municipal flow, for the year nearest the run year.
+
+    ``"M3T"`` reads ``<input>/DMR_data.csv`` from the Zenodo companion (a
+    multi-year table filtered here); a path reads a user-exported ECHO CSV, whose
+    header sits below a "Data Source" preamble and whose column names use dots.
+    """
+    if source == "M3T":
+        path = Path(input_directory) / "DMR_data.csv"
+        if not path.exists():
+            raise _zenodo_todo("Source_DMR", path)
+        dmr = pd.read_csv(path, low_memory=False)
+        return dmr[dmr["year"] == _nearest(inventory_year, _DMR_YEARS)]
+
+    with open(source) as fh:
+        head = [next(fh) for _ in range(10)]
+    skip = next((i for i, line in enumerate(head) if "Data Source" in line), 0)
+    dmr = pd.read_csv(source, skiprows=skip, low_memory=False)
+    dmr.columns = [c.replace(".", "_") for c in dmr.columns]
+    return dmr[dmr["Facility_Latitude"].notna() & dmr["Facility_Longitude"].notna()]
+
+
+def load_wastewater_nlcd(source: str, input_directory: Path, inventory_year: int):
+    """NLCD 'developed open space + low intensity' fractional cover, nearest year.
+
+    Returns ``(suburbia, nlcd_year)``. ``"M3T"`` reads the companion
+    ``combined_wastewater_NLCD.tif``, whose bands are years; we select the band
+    nearest the run year (the R prints a note when it has to substitute).
+    """
+    import rioxarray
+
+    if source != "M3T":
+        raise NotImplementedError(
+            "Source_wastewater_NLCD: only the packaged 'M3T' companion raster is "
+            "ported; the per-state NLCD_fractions_by_state path is not"
+        )
+    path = Path(input_directory) / "combined_wastewater_NLCD.tif"
+    if not path.exists():
+        raise _zenodo_todo("Source_wastewater_NLCD", path)
+
+    da = rioxarray.open_rasterio(path, masked=True)
+    years = [int(y) for y in (da.attrs.get("long_name") or ())]
+    if years:
+        year = _nearest(inventory_year, years)
+        da = da.isel(band=years.index(year))
+    else:  # single-band raster (e.g. the clipped test fixture)
+        year = int(da.attrs.get("year", inventory_year))
+        da = da.squeeze("band", drop=True) if "band" in da.dims else da
+    return da, year
+
+
+def load_septic_areas(input_directory: Path, inventory_year: int, ghgi_data_yr: int, states):
+    """National and per-state area (km²) of the septic-bearing NLCD classes."""
+    in_dir = Path(input_directory)
+    nat_path = in_dir / "Total_national_septic_area.csv"
+    state_path = in_dir / "wastewater_state_septic_area.csv"
+    for p in (nat_path, state_path):
+        if not p.exists():
+            raise _zenodo_todo("Total_national_open_or_low_int_area", p)
+
+    national = pd.read_csv(nat_path)
+    row = national.iloc[(national["year"] - inventory_year).abs().idxmin()]
+    total_national_area = float(row["Total_national_open_or_low_int_area"])
+
+    state = pd.read_csv(state_path)
+    year_cols = [c for c in state.columns if c != "state"]
+    col = str(_nearest(ghgi_data_yr, [int(c) for c in year_cols]))
+    state = state[["state", col]].rename(
+        columns={"state": "X", col: "open_or_low_int_area"}
+    )
+    return total_national_area, state[state["X"].isin(list(states))]
+
+
+def load_state_population(source: str, input_directory: Path) -> pd.DataFrame:
+    """Census state population estimates (``POPESTIMATE<year>`` columns)."""
+    if source == "M3T":
+        return datasets.load("Census_state_population_M3T")
+    if source == "download":
+        raise NotImplementedError(
+            "Source_State_population_data='download' is not ported; use 'M3T' or a CSV path"
+        )
+    return pd.read_csv(source)
+
+
 def _needs_ghgrp_facility(cfg) -> bool:
     return bool(
         cfg.Process_landfills
@@ -169,6 +260,45 @@ def prepare_shared_data(ctx: RunContext) -> None:
 
     if "ghgi_data_yr" not in ctx.shared:
         ctx.shared["ghgi_data_yr"] = resolve_ghgi_year(ctx.inventory_year)
+
+    # --- wastewater companion inputs ------------------------------------- #
+    if cfg.Process_wastewater:
+        if cfg.Wastewater_use_DMR and "dmr_data" not in ctx.shared:
+            ctx.shared["dmr_data"] = load_dmr(
+                cfg.Source_DMR, ctx.input_directory, ctx.inventory_year
+            )
+
+        needs_septic = cfg.Wastewater_national_septic or cfg.Wastewater_state_septic
+        if needs_septic and "nlcd_suburbia" not in ctx.shared:
+            if "state_tigerlines" not in ctx.shared:
+                raise ValueError(
+                    "septic emissions need the state Tigerlines: pass `tigerlines=` to "
+                    "ch4_inventory_build (or inject ctx.shared['state_tigerlines'])"
+                )
+            suburbia, nlcd_year = load_wastewater_nlcd(
+                cfg.Source_wastewater_NLCD, ctx.input_directory, ctx.inventory_year
+            )
+            ctx.shared["nlcd_suburbia"] = suburbia
+            ctx.shared["nlcd_year"] = nlcd_year
+            if nlcd_year != ctx.inventory_year:
+                print(
+                    f"National Land Cover Data used for septic does not include "
+                    f"{ctx.inventory_year}, using {nlcd_year} as the nearest available"
+                )
+
+            total_area, state_areas = load_septic_areas(
+                ctx.input_directory,
+                ctx.inventory_year,
+                ctx.shared["ghgi_data_yr"],
+                ctx.shared["state_name_list"],
+            )
+            ctx.shared["septic_total_national_area"] = total_area
+            ctx.shared["septic_state_areas"] = state_areas
+
+        if "state_population" not in ctx.shared:
+            ctx.shared["state_population"] = load_state_population(
+                cfg.Source_State_population_data, ctx.input_directory
+            )
 
     # Landfill national total (resolve the "GHGI" keyword to a number).
     if cfg.Process_landfills and "ghgi_landfill_total" not in ctx.shared:

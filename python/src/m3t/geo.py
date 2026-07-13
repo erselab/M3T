@@ -214,6 +214,9 @@ def global_(da: xr.DataArray, fun: str | Callable = "sum", *, na_rm: bool = True
 # --------------------------------------------------------------------------- #
 # Warping (parity with terra::project / crop / mask / extend / aggregate)
 # --------------------------------------------------------------------------- #
+_AVERAGE_SUPERSAMPLE = 5
+
+
 def project_to_grid(
     da: xr.DataArray,
     template: xr.DataArray,
@@ -226,7 +229,25 @@ def project_to_grid(
     ``resampling`` is required-by-convention to be chosen deliberately: use
     ``"sum"`` when conserving a mass total across a resolution change, ``"average"``
     for densities/fluxes, ``"bilinear"`` for smooth continuous fields.
+
+    ``"average"`` does **not** map to GDAL's ``average``. GDAL takes an unweighted
+    mean of the source pixels whose *centres* fall in the target cell, whereas
+    ``terra``'s average is effectively area-weighted. Coarsening 1 km -> ~8.5 km
+    that difference is large: a median per-cell error of 1.3e-3 and 60% of cells
+    past our 1e-4 tolerance (the totals still agree, so it hides in mass-balance
+    checks). Supersampling the source first makes each source pixel contribute in
+    proportion to its overlap, which recovers the area weighting: at 5x the result
+    matches terra to 1.5e-8, and 5x vs 10x are identical, so it is converged
+    rather than tuned. Costs one extra in-memory resample of the source.
     """
+    if resampling == "average":
+        k = _AVERAGE_SUPERSAMPLE
+        xres, yres = res(da)
+        da = da.rio.reproject(
+            da.rio.crs,
+            resolution=(xres / k, yres / k),
+            resampling=Resampling.nearest,
+        )
     return da.rio.reproject_match(template, resampling=_RESAMPLING[resampling])
 
 
@@ -374,6 +395,162 @@ def rasterize_points_sum(
     return out
 
 
+def crop_snap_out(da: xr.DataArray, bounds: BBox) -> xr.DataArray:
+    """Crop to ``bounds``, expanding outward to whole cells.
+
+    Parity with ``terra::crop(x, y, snap="out")``: any cell the bounds touch even
+    partially is kept, so the result's extent is >= ``bounds`` and stays aligned
+    to the source grid. (Plain :func:`crop` / ``rio.clip_box`` snaps differently,
+    which shifts the grid — the septic path depends on staying aligned, because a
+    finer sub-grid is later built from this extent and aggregated back.)
+    """
+    xmin, ymin, xmax, ymax = bounds
+    Xmin, Ymin, Xmax, Ymax = ext(da)
+    xres, yres = res(da)
+    nrow, ncol = da.shape
+
+    c0 = int(np.floor((xmin - Xmin) / xres))
+    c1 = int(np.ceil((xmax - Xmin) / xres))
+    r0 = int(np.floor((Ymax - ymax) / yres))
+    r1 = int(np.ceil((Ymax - ymin) / yres))
+
+    c0, c1 = max(c0, 0), min(c1, ncol)
+    r0, r1 = max(r0, 0), min(r1, nrow)
+    if c0 >= c1 or r0 >= r1:
+        raise ValueError("crop bounds do not overlap the raster")
+
+    out = da.isel(y=slice(r0, r1), x=slice(c0, c1))
+    out.rio.write_crs(da.rio.crs, inplace=True)
+    out.rio.write_transform(
+        from_origin(Xmin + c0 * xres, Ymax - r0 * yres, xres, yres), inplace=True
+    )
+    return out
+
+
+def mask_geometries(
+    da: xr.DataArray,
+    geometries,
+    *,
+    touches: bool = False,
+    updatevalue: float = np.nan,
+) -> xr.DataArray:
+    """Set cells outside ``geometries`` to ``updatevalue``.
+
+    Parity with ``terra::mask(x, y, touches=, updatevalue=)``. ``touches=True``
+    keeps every cell the polygon touches (rasterio ``all_touched``); the default
+    keeps cells whose centre falls inside.
+    """
+    from rasterio.features import geometry_mask
+
+    geoms = getattr(geometries, "geometry", geometries)
+    inside = geometry_mask(
+        list(geoms),
+        out_shape=da.shape,
+        transform=da.rio.transform(),
+        all_touched=touches,
+        invert=True,  # True == inside the polygons
+    )
+    out = da.where(xr.DataArray(inside, coords=da.coords, dims=da.dims), updatevalue)
+    out.rio.write_crs(da.rio.crs, inplace=True)
+    return out
+
+
+def extend(da: xr.DataArray, pad: tuple[float, float], *, fill: float = np.nan) -> xr.DataArray:
+    """Grow the extent by ``pad`` (x, y map units) on every side, filling with ``fill``.
+
+    Parity with ``terra::extend(x, ext(x) + pad, fill=)``. The requested extent
+    rarely lands on a cell boundary, and terra snaps it to the *nearest* whole
+    cell rather than rounding outward — verified against terra, which pads 42
+    cells (not 43) for a 42.29-cell request. Rounding out instead shifts the grid
+    by one cell and silently corrupts everything downstream of the reprojection.
+    """
+    xres, yres = res(da)
+    xmin, ymin, xmax, ymax = ext(da)
+    nx = int(round(pad[0] / xres))
+    ny = int(round(pad[1] / yres))
+    if nx <= 0 and ny <= 0:
+        return da
+
+    vals = np.pad(
+        da.values.astype("float64"),
+        ((ny, ny), (nx, nx)),
+        mode="constant",
+        constant_values=fill,
+    )
+    new_xmin, new_ymax = xmin - nx * xres, ymax + ny * yres
+    xs = new_xmin + (np.arange(vals.shape[1]) + 0.5) * xres
+    ys = new_ymax - (np.arange(vals.shape[0]) + 0.5) * yres
+
+    out = xr.DataArray(vals, coords={"y": ys, "x": xs}, dims=("y", "x"), name=da.name)
+    out.rio.write_crs(da.rio.crs, inplace=True)
+    out.rio.write_transform(from_origin(new_xmin, new_ymax, xres, yres), inplace=True)
+    return out
+
+
+_COVERAGE_SUBCELLS = 10
+
+
+def coverage_fraction(template: xr.DataArray, geometries) -> xr.DataArray:
+    """Fraction of each cell covered by ``geometries`` (0..1).
+
+    Parity with the weights from ``terra::extract(x, y, weights=TRUE)``, which the
+    R uses to down-weight cells straddling the domain boundary before
+    area-averaging onto a coarser grid.
+
+    Two terra behaviours are reproduced here, both verified against terra directly:
+
+    1. ``terra`` distinguishes ``weights=TRUE`` (approximate) from ``exact=TRUE``
+       (exact area). ``weights`` splits each cell into a 10x10 grid of sub-cells
+       and counts how many sub-cell *centres* fall inside the polygon, so its
+       output is quantised to hundredths (terra returns exactly 100 distinct
+       values). We sub-sample the same way rather than computing the exact
+       intersection area: the exact area is a *better* number, but it is not the
+       number the R pipeline uses, and parity beats accuracy here.
+
+    2. **Weights are per polygon, and the last one wins.** ``extract`` returns one
+       row per (polygon, cell), so a cell straddling two polygons comes back twice
+       with partial weights that sum to ~1. The R then does
+       ``x[cover$cell] <- x[cover$cell] * cover$weight`` — with duplicate indices,
+       R's assignment keeps only the *last* write, so a cell on an interior state
+       border is scaled by just one state's partial weight (e.g. 0.18x) instead of
+       1x. That loses emissions on interior borders and is arguably an R bug, but
+       reproducing it is the whole point of a golden port. Do not "fix" it here.
+
+    Cells no polygon covers come back as NaN (not 0), because the R leaves such
+    cells *unmultiplied* rather than zeroing them; callers must preserve that.
+    """
+    from rasterio.features import rasterize as _rio_rasterize
+
+    n = _COVERAGE_SUBCELLS
+    geoms = getattr(geometries, "geometry", geometries)
+    if getattr(geometries, "crs", None) is not None and template.rio.crs is not None:
+        if geometries.crs != template.rio.crs:
+            geoms = geometries.to_crs(template.rio.crs).geometry
+
+    nrow, ncol = template.shape
+    xmin, _, _, ymax = ext(template)
+    xres, yres = res(template)
+    fine_transform = from_origin(xmin, ymax, xres / n, yres / n)
+
+    weight = np.full((nrow, ncol), np.nan, dtype="float64")
+    for geom in geoms:  # in order: later polygons overwrite earlier ones
+        fine = _rio_rasterize(
+            shapes=[(geom, 1)],
+            out_shape=(nrow * n, ncol * n),
+            transform=fine_transform,
+            fill=0,
+            all_touched=False,  # sub-cell *centre* must be inside, as terra does
+            dtype="uint8",
+        )
+        frac = fine.reshape(nrow, n, ncol, n).sum(axis=(1, 3)) / float(n * n)
+        covered = frac > 0  # terra only returns cells with a non-zero weight
+        weight[covered] = frac[covered]
+
+    out = xr.DataArray(weight, coords=template.coords, dims=template.dims, name="weight")
+    out.rio.write_crs(template.rio.crs, inplace=True)
+    return out
+
+
 def _grid_cell_polygons(template: xr.DataArray):
     """GeoDataFrame of one box polygon per grid cell, with ``row``/``col`` labels."""
     import geopandas as gpd
@@ -439,10 +616,19 @@ def rasterize_line_length(
     return out
 
 
-def rasterize(gdf, template: xr.DataArray, *, field: str | None = None, background: float = np.nan):
+def rasterize(
+    gdf,
+    template: xr.DataArray,
+    *,
+    field: str | None = None,
+    background: float = np.nan,
+    touches: bool = False,
+):
     """Burn vector geometries onto ``template``'s grid. Parity with ``terra::rasterize``.
 
     ``field`` selects the attribute to burn (``None`` -> 1 where covered).
+    ``touches`` maps to ``terra::rasterize(touches=)`` / rasterio ``all_touched``:
+    burn every cell the geometry touches, not just those whose centre it covers.
     """
     from rasterio.features import rasterize as _rio_rasterize
 
@@ -457,6 +643,7 @@ def rasterize(gdf, template: xr.DataArray, *, field: str | None = None, backgrou
         out_shape=template.shape,
         transform=template.rio.transform(),
         fill=background,
+        all_touched=touches,
         dtype="float64",
     )
     out = xr.DataArray(arr, coords=template.coords, dims=template.dims, name=field or "layer")

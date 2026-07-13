@@ -137,6 +137,13 @@ def ch4_inventory_build(
         shared=dict(shared) if shared else {},
     )
 
+    # The state geometries + ordered state list every state-resolved sector needs
+    # (septic, and later stationary combustion / NG distribution).
+    if tigerlines is not None and "state_tigerlines" not in ctx.shared:
+        states, names = _domain.build_state_tigerlines(tigerlines, domain_geom, domain_crs)
+        ctx.shared["state_tigerlines"] = states
+        ctx.shared["state_name_list"] = names
+
     # Load cross-sector inputs the enabled sectors need (respects injected shared).
     prepare_shared_data(ctx)
 

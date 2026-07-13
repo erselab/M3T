@@ -9,9 +9,24 @@ methane emission inventories for U.S. urban areas. See
 > Sectors run through `ch4_inventory_build` end-to-end, each golden-tested
 > cell-for-cell against the corresponding R function.
 >
-> Ported sectors: **landfills** ✅, **natural gas transmission** ✅.
-> Stubs: NG distribution, stationary combustion, wastewater, wetlands,
-> remaining-GEPA.
+> Ported sectors: **landfills** ✅, **natural gas transmission** ✅,
+> **wastewater** ✅ (municipal CWNS/DMR × GHGI/Moore, industrial GHGRP subpart II,
+> septic national/by-state, and all 8 sector-total variants — golden-tested against
+> R and running through `ch4_inventory_build`).
+> Stubs: NG distribution, stationary combustion, wetlands, remaining-GEPA.
+>
+> State-resolved sectors need the Census Tigerlines: pass `tigerlines=` to
+> `ch4_inventory_build` and the orchestrator derives `state_tigerlines` /
+> `state_name_list` (territories dropped, clipped to the domain, sorted by STUSPS)
+> onto the `RunContext`. Septic requires this.
+
+## Companion data
+
+The large inputs (NLCD land cover, DMR, Tigerlines, Vulcan, ...) are **not** shipped
+with the code — download the M3T companion archive from Zenodo separately and point
+the `Source_*` config options at it. Tests use small clipped fixtures committed
+under `tests/golden/`, so the suite runs without it; the R oracle-capture scripts
+do need it (`M3T_DATA=/path/to/M3T_Processed`).
 
 ## Install
 

@@ -222,6 +222,44 @@ def _build_from_vector(gdf, res, domain_crs: str):
     return geo.make_grid(bounds, res, domain_crs), gdf
 
 
+# Territories the R drops before any sector sees the state list.
+_EXCLUDED_STATES = ("AK", "AS", "PR", "HI", "MP", "GU", "VI")
+
+
+def build_state_tigerlines(tigerlines, domain_geom, domain_crs: str):
+    """Return ``(state_tigerlines, state_name_list)`` for a run.
+
+    Port of the block in ``CH4_inventory_build.R`` that finalises
+    ``State_Tigerlines``: drop the non-CONUS territories, clip the states to the
+    domain when the domain does not already contain them (a bbox domain cuts
+    states in half; a state-selector domain is already exact, so the clip is a
+    no-op), then sort by ``STUSPS`` — the order every downstream sector assumes
+    when it lines a state table up against the geometries.
+    """
+    import geopandas as gpd
+
+    states = tigerlines
+    if "STUSPS" in states.columns:
+        states = states[~states["STUSPS"].isin(_EXCLUDED_STATES)]
+    if states.crs is not None and str(states.crs) != domain_crs:
+        states = states.to_crs(domain_crs)
+
+    if _is_geodataframe(domain_geom):
+        dom = domain_geom if str(domain_geom.crs) == domain_crs else domain_geom.to_crs(domain_crs)
+        within = states.geometry.within(dom.geometry.union_all())
+        if not bool(within.all()):
+            states = gpd.clip(states, dom)
+    else:  # bbox tuple
+        xmin, ymin, xmax, ymax = domain_geom
+        states = gpd.clip(states, gpd.GeoSeries.from_wkt(
+            [f"POLYGON(({xmin} {ymin},{xmax} {ymin},{xmax} {ymax},{xmin} {ymax},{xmin} {ymin}))"],
+            crs=domain_crs,
+        ).union_all())
+
+    states = states[~states.geometry.is_empty].sort_values("STUSPS")
+    return states, list(states["STUSPS"])
+
+
 def _build_from_tigerlines(selectors, res, domain_crs, tigerlines):
     if tigerlines is None:
         raise ValueError(
