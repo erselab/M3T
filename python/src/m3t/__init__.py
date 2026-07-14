@@ -1,17 +1,22 @@
 """M3T — Modular Methane Mapping Tool (Python port).
 
 Gridded, sectoral methane emission inventories for U.S. urban areas.
-Python port of the M3T R package; see ``PYTHON_PORT_PLAN.md`` at the repo root.
+Python port of the M3T R package; see ``PYTHON_PORT_PLAN.md`` at the repo root
+for status, terra-parity notes, and remaining work.
 
-Public surface (Phase 0):
+Public surface:
 
-* :class:`m3t.config.Config` and the ``M3T_get_config`` / ``M3T_set_config``
-  helpers.
+* :func:`m3t.ch4_inventory_build` — the orchestrator. Builds the target grid,
+  runs the enabled sectors, and combines them.
+* :class:`m3t.config.Config` — all 79 options (copied per run, never global
+  state); ``M3T_get_config`` / ``M3T_set_config`` are R-parity helpers.
+* :class:`m3t.context.RunContext` — the run state threaded to every sector.
 * :mod:`m3t.geo` — the terra-parity geospatial layer used by every sector.
+* :mod:`m3t.datasets` — the 19 packaged reference datasets.
 * :mod:`m3t.download` — retrying downloader + Zenodo/Vulcan fetchers.
 
-``ch4_inventory_build`` (the orchestrator) and the sector modules land in
-Phases 2–3.
+All seven sectors are ported (:mod:`m3t.sectors`), each golden-tested against
+the corresponding R function.
 """
 
 from __future__ import annotations

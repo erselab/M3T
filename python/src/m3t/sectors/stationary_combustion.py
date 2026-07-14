@@ -30,7 +30,11 @@ import xarray as xr
 
 from .. import geo
 from ..context import RunContext
-from ..disaggregation import county_cover_weights, inventory_based_disaggregation
+from ..disaggregation import (
+    INVENTORY_LABEL,
+    county_cover_weights,
+    inventory_based_disaggregation,
+)
 
 _SEC_PER_YR = 365 * 24 * 60 * 60
 _CH4 = 16.043
@@ -84,6 +88,19 @@ _NEI_SECTOR_MAP = {
     "Fuel Comb - Residential - Wood": "res_wood_ER",
 }
 REQUIRED_NEI_SECTORS = list(_NEI_SECTOR_MAP)
+
+
+def sector_total_name(label: str, inventory_name: str, level: str) -> str:
+    """Top-level sector-total filename stem, exactly as R spells it.
+
+    `combine` discovers this sector's variations by filename, so this must stay
+    byte-identical to R (note ``Vulcan``, not ``VULCAN``). Locked by
+    ``tests/test_sector_output_contract.py``.
+    """
+    return (
+        f"Stationary_combustion_sector_{label}_total_"
+        f"{INVENTORY_LABEL[inventory_name]}_by{level}"
+    )
 
 
 def prepare_seds(
@@ -343,9 +360,7 @@ def compute_stationary_combustion(
                 continue
             total = sum(p.fillna(0.0) for p in parts)
             total.name = "methane_emissions"
-            out[
-                f"Stationary_combustion_sector_{label}_total_{inventory_name.upper()}_by{level}"
-            ] = total
+            out[sector_total_name(label, inventory_name, level)] = total
 
     return out
 

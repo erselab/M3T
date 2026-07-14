@@ -6,12 +6,19 @@ surfaced as disagreements between the two, or as R failing outright.
 
 Nothing here has been changed in the R. The Python port reproduces the R's
 behaviour wherever it is merely *different* (so parity stays testable), and departs
-from it only where noted — currently one place: mass conservation (**B5**), behind
-`Config.Mass_conserving_regrid`, default on.
+from it only where noted — currently two places: mass conservation (**B5**), behind
+`Config.Mass_conserving_regrid`, default on; and `Combine_across_sectors`
+(**B8**–**B10**), which is corrected outright because its output is not merely
+different but corrupt. Both departures are pinned by tests that hold R's numbers
+next to ours, so the divergence stays visible.
 
-**Four of these are silent**: the run completes, the output looks plausible, and
-the numbers are wrong (**B2** stationary combustion, **B3**, **B4**, **B5**). Those
-are the ones worth acting on first. **B1** and **B6** fail loudly.
+**Six of these are silent**: the run completes, the output looks plausible, and
+the numbers are wrong (**B2** stationary combustion, **B3**, **B4**, **B5**,
+**B8**, **B9**). Those are the ones worth acting on first. **B1**, **B6** and
+**B10** fail loudly.
+
+**B8 is the most serious.** Every individual combined inventory is wrong, and the
+key CSV that documents them points at the wrong rasters.
 
 Environment used: R 4.x + terra, in the `M3T` conda env on macOS (arm64). **B1** and
 **B2** depend on how terra/GDAL was built and may not reproduce everywhere — but
@@ -235,6 +242,161 @@ correctly — so no numbers change. Worth fixing before it misleads someone.
 
 ---
 
+## B8 — `Combine_across_sectors` drops half of stationary combustion, and the key CSV describes the wrong rasters
+
+**Severity: critical (silent — every combined inventory is wrong).**
+`R/Combine_across_sectors.R:196`, then `:221-222` and `:262-277`
+
+Stationary combustion is the only sector whose **variation spans two files** —
+fossil fuel *and* wood. Line 196 means to join them into one entry before building
+combinations:
+
+```r
+if (isa(stat_comb_options_filenames[1], "matrix")) {                       # :196
+  stat_comb_options_filenames <- apply(stat_comb_options_filenames, 2,
+                                       function(x) paste0(x, collapse = ","))
+}
+```
+
+`stat_comb_options_filenames` **is** a matrix (2 files × N variations), but
+`stat_comb_options_filenames[1]` selects its first **element** — a character
+string. `isa("…", "matrix")` is therefore always `FALSE`, **the join never runs**,
+and the raw matrix flows into `expand.grid`, which flattens it column-major into
+single files.
+
+Two consequences:
+
+* `Possible_combination_filenames` (`:222`) ends up with **twice as many rows** as
+  `Possible_combinations` (`:221`) — 64 vs 32 in the fixture below. The loop at
+  `:262` iterates over `nrow(Possible_combinations)`, so it uses only the **first
+  half** of the filename grid.
+* Every combination therefore contains **only one of stationary combustion's two
+  files** (fossil *or* wood, never both), and **`Combined_inventory_key.csv` does
+  not describe the raster it names**.
+
+Check — drive the function with synthetic constant-valued rasters (one distinct
+value per sector file), so every output decodes to exact arithmetic:
+
+```
+combination 01  key says: Stationary_Combustion = ACES_bystate
+                          (fossil 300,000 + wood 400,000 = 700,000)
+                raster contains: 300,000        <- fossil only
+combination 17  key says: Vulcan_bystate
+                raster actually holds: wood_ACES
+```
+
+A model of the bug reproduces **all 32** of R's combinations exactly, so this is
+not a rounding artefact. `python/tests/golden/capture_combine_oracle.R` sets it up.
+
+Suggested fix: `isa(stat_comb_options_filenames, "matrix")` — drop the `[1]`. Then
+assert `nrow(Possible_combination_filenames) == nrow(Possible_combinations)`; if
+that invariant had been checked, the bug could not have survived.
+
+---
+
+## B9 — The combined **summary** halves stationary combustion
+
+**Severity: high (silent).**
+`R/Combine_across_sectors.R:240-242`
+
+The summary is meant to be, per sector, the cell-wise min / mean / max **across
+that sector's variations**, summed over sectors (valid because sectors are
+additive and independent). But `sub_rast` (`:237`) is the sector's *files*, and for
+stationary combustion that is fossil and wood as **separate layers** — so the
+statistics are taken across individual files rather than across variation
+**totals**:
+
+```r
+summary_combinations_rast$mean <- sum(c(summary_combinations_rast$mean,
+                                        terra::mean(sub_rast, na.rm = T)), na.rm = T)   # :240
+```
+
+On the synthetic fixture R's mean contribution from stationary combustion is
+`mean(100k, 200k, 300k, 400k) = 250,000`; the correct value is
+`mean(300k, 700k) = 500,000` — exactly **double**. `min`/`max` are likewise taken
+over individual files, so the reported envelope is too narrow at both ends.
+
+Note this is a *different* mistake from **B8**, in a different code path, but with
+the same root cause: fossil and wood are never recombined into one variation.
+
+Suggested fix: sum each variation's files first, then take min/mean/max across
+variations.
+
+---
+
+## B10 — `Separate_thermo` + summary cannot run at all
+
+**Severity: high (loud — the run stops; that output is unobtainable).**
+`R/Combine_across_sectors.R:307`
+
+The thermogenic-summary accumulator is seeded from the **domain template**:
+
+```r
+thermo_summary_combinations_rast <- terra::rast(domain_template, nlyrs = 3)   # :307
+```
+
+`domain_template` carries the real extent and CRS. The sector layers it is then
+combined with (`:317` onwards) were read back off disk and — by **B2** — carry a
+*default* extent (`0..ncol`) and no CRS. terra refuses:
+
+```
+Error: [rast] extents do not match
+```
+
+So with `Separate_thermo = TRUE` **and** `Create_summary_combinations = TRUE`, the
+run halts and the thermogenic / non-thermogenic summary rasters are never
+produced. (The *main* summary path at `:228` survives only by accident: it seeds
+from `set_rast`, which was also read back off disk and is therefore wrong in the
+same way, so the extents happen to agree with each other.)
+
+This is another face of **B2**, but worth its own entry because it is the one
+combination of config flags that cannot produce output at all.
+
+Check:
+
+```r
+M3T:::Combine_across_sectors(Separate_thermo = TRUE,
+                             Create_summary_combinations = TRUE, ...)
+# Error: [rast] extents do not match
+```
+
+Suggested fix: fixing **B2** (keep rasters in memory instead of round-tripping
+through `writeCDF`) fixes this too.
+
+---
+
+## B11 — `not_log_plot` log-scales the data but labels the colour bar linear
+
+**Severity: low (cosmetic, but actively misleading when it fires).**
+`R/Plotting_individual_sectors.R:259` (vs the colour-bar label at `:266`)
+
+The whole purpose of `not_log_plot` is the *linear* scale. But in its
+"raster has exactly one distinct value" branch it runs the data through
+`prep_plot_data` — which takes the **log10** — while still labelling the colour
+bar `nmol/m2/s`:
+
+```r
+} else if (length(unique(terra::values(input))) == 1) {
+  plot_type <- "classes"
+  input <- prep_plot_data(input)                      # :259  <- log10!
+  ...
+  plg = list(cex = 2, title = "nmol/m2/s", ...)       # :266  <- linear label
+```
+
+So a reader sees log-scaled numbers presented as linear ones. (`log_plot`'s
+equivalent branch does the same transform but correctly labels it
+`log10(nmol/m2/s)`, which is what gives the game away.)
+
+Only the single-valued case is affected, so no realistic map changes — but that
+case is reachable (a sector with one facility, or a uniform fill).
+
+Suggested fix: drop the `prep_plot_data` call from `not_log_plot`.
+
+**Python.** Not reproduced: `not_log_plot` stays linear throughout. It is the only
+place the plotting port knowingly departs from R.
+
+---
+
 ## Latent / worth knowing (not bugs today)
 
 **Sector-total regex is a character class, not an alternation.**
@@ -249,6 +411,20 @@ alternatives. It happens to work — `wood` contains `w`/`d`, which are not in t
 class, so it is excluded, and coal/gas/petr all match. But any future fuel spelled
 only from those letters (e.g. `peat`) would be silently swept into the fossil-fuel
 total. Use `_(coal|gas|petr)_`.
+
+**The "Saturated colorscale" title fix-up is a no-op.**
+`R/Plotting_individual_sectors.R:157` and `:294`:
+
+```r
+if (zlim_min > zlim_max) {
+  zlim_min <- unlist(terra::global(input, min, na.rm = T))
+  gsub("\nSaturated colorscale low end", "", title)     # result discarded
+}
+```
+
+`gsub` returns a new string; nothing is assigned. So when the requested floor is
+discarded (the scale is no longer saturated), the title still *claims* it is.
+Harmless, but the caption lies. Needs `title <- gsub(...)`.
 
 **`GHGI_stationary_combustion` carries its year in `rownames`.**
 Not an R bug — it works fine in R — but the year exists *only* as a row label, and

@@ -162,4 +162,11 @@ def ch4_inventory_build(
         ctx.shared["combined_total"] = total_path
         print(f"Combined total written to {total_path}")
 
+    if verbose:
+        from .plotting import render_run_plots
+
+        plots = render_run_plots(ctx)
+        ctx.shared["plots"] = plots
+        print(f"Wrote {len(plots)} plots to {ctx.plot_directory}")
+
     return ctx

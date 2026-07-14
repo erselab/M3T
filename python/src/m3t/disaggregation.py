@@ -28,6 +28,12 @@ import xarray as xr
 
 from . import geo
 
+# How each CO2 proxy inventory is spelled in *output filenames*. Note this is NOT
+# `name.upper()`: R writes "Vulcan", not "VULCAN", and `combine` discovers sector
+# variations by filename — so getting this wrong makes a sector silently invisible
+# to the combine step.
+INVENTORY_LABEL = {"aces": "ACES", "vulcan": "Vulcan"}
+
 
 def county_cover_weights(inventory: xr.DataArray, counties) -> list[xr.DataArray]:
     """Per-county pixel coverage fractions on the inventory grid.

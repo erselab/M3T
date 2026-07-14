@@ -46,7 +46,11 @@ import xarray as xr
 
 from .. import geo
 from ..context import RunContext
-from ..disaggregation import county_cover_weights, inventory_based_disaggregation
+from ..disaggregation import (
+    INVENTORY_LABEL,
+    county_cover_weights,
+    inventory_based_disaggregation,
+)
 
 # The 49 states M3T covers (CONUS + DC), used to fill M&R gaps from neighbours.
 FULL_STATE_LIST = [
@@ -60,6 +64,16 @@ FULL_STATE_LIST = [
 SUBSECTORS = ["mains", "serv", "MnR", "meter", "upset", "post_meter"]
 RES_TOTALS = [f"{s}_ER_total_res" for s in SUBSECTORS]
 COM_TOTALS = [f"{s}_ER_total_com" for s in SUBSECTORS]
+
+
+def sector_total_name(inventory_name: str, level: str) -> str:
+    """Top-level sector-total filename stem, exactly as R spells it.
+
+    `combine` discovers this sector's variations by filename, so this must stay
+    byte-identical to R (note ``Vulcan``, not ``VULCAN``). Locked by
+    ``tests/test_sector_output_contract.py``.
+    """
+    return f"NG_distribution_sector_total_{INVENTORY_LABEL[inventory_name]}_by{level}"
 
 # M&R station types: above-grade ones are everything that isn't a vault.
 _MNR_ABOVE = ["M&R >300", "M&R 100-300", "M&R <100", "Reg >300", "Reg 100-300",
@@ -474,11 +488,27 @@ class NGDistributionSector:
         for name, da in results.items():
             ctx.write_output(da, f"{name}.nc", subdir="NG_distribution")
 
+        # One sector total per variation (inventory x level), summing that
+        # variation's subsectors -- the files `combine` selects between, and the
+        # same names R writes (NG_distribution_sector_total_<INV>_by<level>.nc).
+        totals: dict[str, xr.DataArray] = {}
+        for inv_name in ("aces", "vulcan"):
+            for level in ("state", "domain", "LDC"):
+                suffix = f"_by{level}_{inv_name}"
+                parts = [da for n, da in results.items() if n.endswith(suffix)]
+                if not parts:
+                    continue
+                total = sum(p.fillna(0.0) for p in parts)
+                total.name = "methane_emissions"
+                name = sector_total_name(inv_name, level)
+                totals[name] = total
+                ctx.write_output(total, f"{name}.nc")
+
         combined = sum(da.fillna(0.0) for da in results.values())
         combined.name = "methane_emissions"
         ctx.write_output(combined, f"{self.key}.nc")
 
-        ctx.shared.setdefault("sector_results", {})[self.key] = results
+        ctx.shared.setdefault("sector_results", {})[self.key] = results | totals
 
 
 def register() -> None:
