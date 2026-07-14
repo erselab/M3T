@@ -121,7 +121,7 @@ def compute_wetcharts(
     sel = wetcharts.isel(band=keep)
     models = [int(names[i].split("_")[-1]) for i in keep]
 
-    dom = domain if str(getattr(domain, "crs", "")) == domain_crs else domain.to_crs(domain_crs)
+    dom = geo.as_polygons(domain, domain_crs)
     if not isinstance(dom, gpd.GeoDataFrame):
         raise TypeError("wetlands needs a polygon domain")
 
@@ -156,7 +156,11 @@ def compute_wetcharts(
         if not members:
             raise ValueError(f"Wetcharts subset {n} matched no models in {year}")
         mean = sum(m.fillna(0.0) for m in members) / len(members)
-        mean = geo.mask_geometries(mean, dom, updatevalue=np.nan)
+        # touches=True: a boundary cell only *partly* inside the domain must be kept
+        # and scaled by its coverage fraction, not discarded. Dropping it (the
+        # centre-in rule) silently loses that cell's emissions -- see the mass
+        # conservation note in geo.project_partial_to_grid.
+        mean = geo.mask_geometries(mean, dom, touches=True, updatevalue=np.nan)
         mean = mean.where(weights.isnull(), mean * weights)
         mean.name = "methane_emissions"
         out[f"Wetcharts_NLCD_Downscaled_subset_{n}"] = mean
@@ -193,7 +197,7 @@ def compute_soccr(
     ``nwi`` maps a class name to its (already state-combined) fractional-cover
     raster. Returns ``Freshwater`` always, plus ``SOCCR1`` / ``SOCCR2`` if enabled.
     """
-    dom = domain if str(getattr(domain, "crs", "")) == domain_crs else domain.to_crs(domain_crs)
+    dom = geo.as_polygons(domain, domain_crs)
 
     wetland_efs = wetland_efs * _G_PER_YR_TO_NMOL_PER_S  # g/m2/yr -> nmol/m2/s
     soccr1_efs = wetland_efs.loc["SOCCR1"]
@@ -245,7 +249,10 @@ def compute_soccr(
     # reprojection above deliberately carries no weighting).
     weights = geo.coverage_fraction(domain_template, dom)
     for key, da in out.items():
-        masked = geo.mask_geometries(da, dom, updatevalue=np.nan)
+        # touches=True keeps the partially-covered boundary cells; the weight below
+        # then scales each to the emissions actually inside the domain. Masking on
+        # cell centres instead would throw those cells away whole.
+        masked = geo.mask_geometries(da, dom, touches=True, updatevalue=np.nan)
         masked = masked.where(weights.isnull(), masked * weights)
         masked.name = "methane_emissions"
         out[key] = masked

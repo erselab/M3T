@@ -22,3 +22,9 @@ htmlcov/
 
 # Downloaded archives, if a run or capture script ever caches one in-tree.
 *.zip
+
+# Notebook scratch: run outputs and the cached GEPA download. The executed
+# notebook itself (with figures) IS committed -- it is the deliverable.
+notebooks/nb_runs/
+notebooks/nb_cache/
+.ipynb_checkpoints/

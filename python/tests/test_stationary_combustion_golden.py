@@ -102,6 +102,12 @@ def results(oracle, tables):
         inventory_name="aces",
         by_state=True,
         by_domain=True,
+        # R parity: the R's gridding is not mass-conserving (it treats a 1 km
+        # conformal-projection pixel as 1 km2 and area-averages the flux, inflating
+        # the total ~1.4%). The shipped default fixes that; this fixture pins the
+        # R-compatible path so parity stays reproducible. Mass conservation is
+        # checked separately, in test_mass_conservation.py.
+        mass_conserving=False,
     )
 
 

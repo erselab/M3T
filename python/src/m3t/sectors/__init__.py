@@ -7,6 +7,7 @@ from . import (
     landfills,
     ng_distribution,
     ng_transmission,
+    remaining_gepa,
     stationary_combustion,
     wastewater,
     wetlands,
@@ -19,12 +20,14 @@ wastewater.register()
 stationary_combustion.register()
 ng_distribution.register()
 wetlands.register()
+remaining_gepa.register()
 
 __all__ = [
     "base",
     "landfills",
     "ng_distribution",
     "ng_transmission",
+    "remaining_gepa",
     "stationary_combustion",
     "wastewater",
     "wetlands",

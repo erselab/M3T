@@ -253,6 +253,7 @@ def compute_stationary_combustion(
     inventory_name: str,
     by_state: bool = True,
     by_domain: bool = False,
+    mass_conserving: bool = True,
     verbose: bool = False,
 ) -> dict[str, xr.DataArray]:
     """Disaggregate county CH4 onto the domain grid using a CO2 inventory.
@@ -272,7 +273,7 @@ def compute_stationary_combustion(
         how="inner",
     ).sort_values(["STATEFP", "COUNTYFP"])
 
-    dom = domain if str(getattr(domain, "crs", "")) == domain_crs else domain.to_crs(domain_crs)
+    dom = geo.as_polygons(domain, domain_crs)
     # keep only counties at least partly inside the domain, then move to the CO2 grid
     counties = gpd.clip(counties, dom)
     counties = counties[~counties.geometry.is_empty].to_crs(inv_crs)
@@ -321,8 +322,7 @@ def compute_stationary_combustion(
                 progress=f"{inventory_name} {sector} by{level}" if verbose else None,
             )
             for total, da in ch4.items():
-                flux = geo.project_partial_to_grid(da, box, domain_template)
-                flux = flux * 1000.0  # mol/km2/s -> nmol/m2/s
+                flux = _to_flux(da, box, domain_template, mass_conserving=mass_conserving)
                 flux.name = "methane_emissions"
                 fuel = total.replace("_ER", "")
                 out[f"stat_comb_{fuel}_by{level}_{inventory_name}"] = flux
@@ -348,6 +348,34 @@ def compute_stationary_combustion(
             ] = total
 
     return out
+
+
+def _to_flux(
+    ch4: xr.DataArray, box, domain_template: xr.DataArray, *, mass_conserving: bool
+) -> xr.DataArray:
+    """Disaggregated CH4 (mol/s per inventory pixel) -> flux on the domain grid.
+
+    ``mass_conserving=True`` (the default) redistributes the mass conservatively and
+    then divides by each target cell's true geodesic area, so the raster's total
+    mass equals the county totals that went in.
+
+    ``mass_conserving=False`` reproduces the R exactly, and is kept so the golden
+    tests can still check parity. Two things make the R's version lose the books:
+
+    * it treats each 1 km Vulcan/ACES pixel as exactly 1 km² (``* 1000`` to go from
+      "mol/s per pixel" to nmol/m²/s). Those grids are Lambert Conformal Conic —
+      *conformal*, not equal-area — so a "1 km" pixel is really ~1.009 km² at
+      CT/RI's latitude, overstating the flux by ~0.9%;
+    * it then area-*averages* the result onto the domain grid and weights cells by
+      their coverage of the domain's bounding box, neither of which conserves mass.
+
+    Together those inflate the gridded total by ~1.4% relative to the county totals.
+    """
+    if not mass_conserving:
+        return geo.project_partial_to_grid(ch4, box, domain_template) * 1000.0
+
+    mass = geo.project_mass_to_grid(ch4, domain_template)  # mol/s per target cell
+    return mass * 1e9 / geo.cell_area(domain_template, unit="m")
 
 
 def _bbox_wkt(bounds) -> str:
@@ -398,6 +426,7 @@ class StationaryCombustionSector:
                 inventory_name=inv_name,
                 by_state=cfg.stationary_combustion_by_state,
                 by_domain=cfg.stationary_combustion_by_domain,
+                mass_conserving=cfg.Mass_conserving_regrid,
                 verbose=ctx.verbose,
             )
 

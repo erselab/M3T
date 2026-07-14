@@ -16,7 +16,9 @@ them, which `test_sector_totals_are_sums` checks structurally.
 Accuracy. Wetcharts matches R to a median 3.5e-8. The NWI/SOCCR rasters match to a
 median ~5e-6. The stragglers are domain-boundary cells (terra and GDAL disagree
 about which cells a polygon edge covers) -- and CT/RI is nearly all coastline, so
-those are ~25% of a 286-cell grid, which is also why the totals sit ~2% low.
+those are ~25% of a 286-cell grid. The *totals* agree to <0.1%: boundary cells are
+kept and scaled by their coverage fraction, so no emissions are lost (mass
+conservation is a hard requirement of this code -- see tests/test_geo.py).
 """
 
 from __future__ import annotations
@@ -137,12 +139,20 @@ def test_raster_matches_r(oracle, results, key):
     comparable = np.isfinite(py) & np.isfinite(ref) & (np.abs(ref) > 0)
     rel = np.abs(py[comparable] - ref[comparable]) / np.abs(ref[comparable])
 
-    # the interior is exact; the stragglers are coastal domain-boundary cells
+    # The interior is exact; the stragglers are coastal domain-boundary cells, whose
+    # coverage weight is terra's 10x10 approximation and ours only to within a
+    # sub-cell. Note this fraction went *down* when the mass leak was fixed -- we now
+    # correctly keep the partially-covered cells, and those are exactly the ones with
+    # approximate weights. Keeping them (right totals) beats dropping them (tidy
+    # per-cell stats, 2% of the emissions missing).
     assert np.median(rel) <= 1e-4, f"{key}: median rel {np.median(rel):.2e}"
-    assert (rel <= 1e-4).mean() >= 0.70, f"{key}: {(rel <= 1e-4).mean():.1%} within 1e-4"
+    assert (rel <= 1e-4).mean() >= 0.65, f"{key}: {(rel <= 1e-4).mean():.1%} within 1e-4"
     assert (rel <= 5e-2).mean() >= 0.95, f"{key}: {(rel <= 5e-2).mean():.1%} within 5e-2"
     assert rel.max() <= 0.15, f"{key}: worst cell off by {rel.max():.2%}"
-    assert float(np.nansum(py)) == pytest.approx(r["sum"], rel=3e-2), f"{key} total"
+    # Totals must track R closely: this is the mass-conservation check. Masking on
+    # cell centres instead of "touches" drops the partially-covered coastal cells
+    # and lands ~2% low here -- see tests/test_geo.py::test_..._conserves_mass.
+    assert float(np.nansum(py)) == pytest.approx(r["sum"], rel=5e-3), f"{key} total"
 
 
 def test_sector_totals_are_sums(results):

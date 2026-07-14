@@ -35,6 +35,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "jupytext>=1.16",       # notebooks/nyc_demo.py <-> .ipynb
+    "nbconvert>=7",
+    "ipykernel>=6",
+    "matplotlib>=3.8",
     "pytest>=7.4",
     "pytest-cov>=4.1",
     "ruff>=0.5",

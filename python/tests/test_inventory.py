@@ -55,12 +55,14 @@ def base_config():
     inventory (Vulcan/ACES, hundreds of MB), stationary combustion also needs the
     county Tigerlines, and wetlands needs the NWI/Wetcharts companion rasters. None
     can be committed as fixtures, so the orchestrator tests leave them stubbed; each
-    has its own golden test.
+    has its own golden test. Remaining-GEPA is off for a different reason: its only
+    data source is a Zenodo download, and tests must not hit the network.
     """
     cfg = Config()
     cfg.Process_stationary_combustion = False
     cfg.Process_natural_gas_distribution = False
     cfg.Process_wetlands_and_inland_waters = False
+    cfg.Process_remaining_sectors_from_gridded_EPA = False
     return cfg
 
 
@@ -135,8 +137,9 @@ def test_runs_end_to_end_on_states(tmp_path, shared_inputs, tigerlines, base_con
     # every enabled sector ran (all but the CO2-disaggregated two, see base_config)
     enabled_keys = [s.key for s in base.SECTORS if ctx.config.get(s.process_flag)]
     assert ctx.shared["sectors_run"] == enabled_keys
-    assert len(enabled_keys) == 4
-    for stubbed in ("stationary_combustion", "natural_gas_distribution", "wetlands"):
+    assert len(enabled_keys) == 3
+    for stubbed in ("stationary_combustion", "natural_gas_distribution", "wetlands",
+                    "remaining_gepa"):
         assert stubbed not in enabled_keys
 
     # each sector wrote a NetCDF; the total exists
@@ -163,7 +166,7 @@ def test_total_is_sum_of_sectors(tmp_path, shared_inputs, tigerlines, base_confi
     ds = xr.open_dataset(ctx.output_directory / "M3T_total.nc")
     total = ds[next(iter(ds.data_vars))]
     assert total.shape == ctx.domain_template.shape
-    assert total.attrs.get("m3t_n_sectors_combined") == 4
+    assert total.attrs.get("m3t_n_sectors_combined") == 3
 
     # the total equals the cell-wise sum of the per-sector rasters
     manual = np.zeros(total.shape)

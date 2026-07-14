@@ -490,8 +490,13 @@ def extend(da: xr.DataArray, pad: tuple[float, float], *, fill: float = np.nan) 
 _COVERAGE_SUBCELLS = 10
 
 
-def coverage_fraction(template: xr.DataArray, geometries) -> xr.DataArray:
+def coverage_fraction(template: xr.DataArray, geometries, *, exact: bool = False) -> xr.DataArray:
     """Fraction of each cell covered by ``geometries`` (0..1).
+
+    ``exact=True`` selects terra's ``extract(weights=TRUE, exact=TRUE)`` — the true
+    intersection area rather than the sub-sampled approximation below. The R asks
+    for it in exactly one place (``Prepare_GEPA.R``); everywhere else it takes the
+    approximation, so this is opt-in rather than the default.
 
     Parity with the weights from ``terra::extract(x, y, weights=TRUE)``, which the
     R uses to down-weight cells straddling the domain boundary before
@@ -531,6 +536,9 @@ def coverage_fraction(template: xr.DataArray, geometries) -> xr.DataArray:
     Xmin, Ymin, Xmax, Ymax = ext(template)
     xres, yres = res(template)
 
+    if exact:
+        return _coverage_fraction_exact(template, geoms)
+
     weight = np.full((nrow, ncol), np.nan, dtype="float64")
     for geom in geoms:  # in order: later polygons overwrite earlier ones
         # Only rasterize the window this geometry can touch. Sub-sampling 10x costs
@@ -565,6 +573,25 @@ def coverage_fraction(template: xr.DataArray, geometries) -> xr.DataArray:
     out = xr.DataArray(weight, coords=template.coords, dims=template.dims, name="weight")
     out.rio.write_crs(template.rio.crs, inplace=True)
     return out
+
+
+def as_polygons(domain, domain_crs: str):
+    """The domain as a GeoDataFrame in ``domain_crs``.
+
+    ``build_domain`` hands sectors either a GeoDataFrame (state/urban/file domains)
+    or a plain ``(xmin, ymin, xmax, ymax)`` tuple (a bounding box). Both are
+    documented domain types, so every sector that needs to mask or clip against the
+    domain must accept either — hence one helper rather than a `.to_crs` on the raw
+    argument in each sector, which blows up on the bbox case.
+    """
+    import geopandas as gpd
+    from shapely.geometry import box
+
+    if isinstance(domain, (tuple, list)) and len(domain) == 4:
+        return gpd.GeoDataFrame(geometry=[box(*domain)], crs=domain_crs)
+    if str(getattr(domain, "crs", domain_crs)) != domain_crs:
+        return domain.to_crs(domain_crs)
+    return domain
 
 
 def disagg(da: xr.DataArray, factor: int) -> xr.DataArray:
@@ -615,6 +642,15 @@ def project_partial_to_grid(
 
     ``mask_geom`` must already be in ``da``'s CRS. The pad width is derived from
     the template's cell size expressed in ``da``'s CRS, as the R does.
+
+    **Mass conservation.** These rasters are fluxes (nmol/m²/s), so a cell's mass is
+    ``flux * cell_area``. Steps 2 and 3 are what make the coarsening conserve it: a
+    boundary cell only partly inside the mask is *kept* and scaled by its coverage
+    fraction, so the mass it reports over its full area equals the emissions
+    actually inside. Masking on cell centres instead would discard such cells whole
+    and silently lose their emissions — up to 15% of the total on a coastal domain.
+    This is a scientific requirement of M3T, not a rounding detail; it is pinned by
+    ``tests/test_geo.py::test_project_partial_to_grid_conserves_mass``.
     """
     pad_res = res(project_to_crs(template, da.rio.crs))
     pad = (pad_res[0] * pad_cells, pad_res[1] * pad_cells)
@@ -628,6 +664,75 @@ def project_partial_to_grid(
 
     out = extend(out, pad, fill=0.0)
     return project_to_grid(out, template, resampling="average")
+
+
+def _coverage_fraction_exact(template: xr.DataArray, geoms) -> xr.DataArray:
+    """True intersection-area coverage, per polygon, last-write-wins (see above).
+
+    Only boundary cells pay for an intersection: cells the polygon contains get
+    exactly 1.0, cells it misses stay NaN.
+    """
+    import shapely
+    from shapely import STRtree
+
+    nrow, ncol = template.shape
+    cells = _grid_cell_polygons(template)
+    polys = cells.geometry.to_numpy()
+    tree = STRtree(polys)
+
+    weight = np.full(len(polys), np.nan, dtype="float64")
+    for geom in geoms:
+        touched = tree.query(geom, predicate="intersects")
+        if not len(touched):
+            continue
+        inter = shapely.area(shapely.intersection(polys[touched], geom))
+        areas = shapely.area(polys[touched])
+        frac = np.divide(inter, areas, out=np.zeros(len(touched)), where=areas > 0)
+        covered = frac > 0
+        idx = touched[covered]
+        weight[idx] = np.clip(frac[covered], 0.0, 1.0)
+        # contained cells lose nothing to floating point
+        inside = tree.query(geom, predicate="contains")
+        if len(inside):
+            weight[inside] = 1.0
+
+    out = xr.DataArray(
+        weight.reshape(nrow, ncol), coords=template.coords, dims=template.dims, name="weight"
+    )
+    out.rio.write_crs(template.rio.crs, inplace=True)
+    return out
+
+
+_MASS_SUPERSAMPLE = 5
+
+
+def project_mass_to_grid(
+    mass: xr.DataArray, template: xr.DataArray, *, supersample: int = _MASS_SUPERSAMPLE
+) -> xr.DataArray:
+    """Conservatively regrid an *absolute* quantity (not a flux) onto ``template``.
+
+    Use this when the source cells hold a total — e.g. mol/s of methane assigned to
+    a pixel — rather than a density. The total is preserved: ``sum(out) == sum(in)``.
+
+    How: each source cell is split into ``supersample**2`` sub-cells carrying an
+    equal share of its mass, and the sub-cells are then *summed* into whichever
+    target cell they fall in. Every unit of mass lands in exactly one target cell,
+    so nothing is created or destroyed; the sub-sampling only controls how finely
+    mass is apportioned between target cells along their shared edges.
+
+    This is the mass-conserving alternative to area-*averaging* a flux
+    (:func:`project_partial_to_grid`), which conserves mass only up to the accuracy
+    of the flux/area bookkeeping. Do not apply domain coverage weights to the result
+    — if the mass was already placed inside the region (as the county/state
+    disaggregation does), weighting it again by that region's coverage would
+    discount it twice.
+    """
+    k = supersample
+    fine = disagg(mass.fillna(0.0), k) / float(k * k)
+    out = fine.rio.reproject_match(template, resampling=Resampling.sum)
+    out = out.where(np.isfinite(out), 0.0)
+    out.rio.write_crs(template.rio.crs, inplace=True)
+    return out
 
 
 def _grid_cell_polygons(template: xr.DataArray):

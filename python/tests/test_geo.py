@@ -100,3 +100,64 @@ def test_rasterize_counts_geometry():
     burned = geo.rasterize(poly, template, field=None, background=0.0)
     assert geo.global_(burned, "sum") > 0
     assert burned.rio.crs == template.rio.crs
+
+
+# --------------------------------------------------------------------------- #
+# Mass conservation
+#
+# The rasters are fluxes (nmol/m2/s), so the mass in a cell is flux * cell_area.
+# When a fine grid is coarsened onto the run grid, the emissions from fine cells
+# that only *partly* fall inside a coarse cell -- or inside the domain at all --
+# must still be carried: total mass in == total mass out. That is the whole point
+# of the coverage weighting, and it is a scientific requirement of this code, not a
+# nicety. These tests exist so a change to the masking or weighting cannot quietly
+# start dropping boundary emissions.
+# --------------------------------------------------------------------------- #
+def _mass(da) -> float:
+    """Total mass on a flux raster: sum(flux * cell_area)."""
+    return float(np.nansum(da.values * geo.cell_area(da, unit="m").values))
+
+
+def test_project_partial_to_grid_conserves_mass():
+    """Coarsening a fine flux grid onto the domain must preserve total mass."""
+    import geopandas as gpd
+    from shapely.geometry import box
+
+    # a fine 100 m grid in an equal-area CRS, uniform flux
+    crs = "epsg:5070"
+    fine = geo.make_grid((0, 0, 10_000, 10_000), 100.0, crs, fill=1.0)
+
+    # domain deliberately misaligned with the coarse grid, so its edge cuts cells
+    domain = gpd.GeoDataFrame(geometry=[box(1_050, 1_050, 8_950, 8_950)], crs=crs)
+    coarse = geo.make_grid((0, 0, 10_000, 10_000), 1_000.0, crs)
+
+    out = geo.project_partial_to_grid(fine, domain, coarse)
+
+    # the mass that should survive is the flux (1.0) over the domain's area
+    expected = 1.0 * domain.geometry.area.sum()
+    assert _mass(out) == pytest.approx(expected, rel=1e-2)
+
+
+def test_partial_boundary_cells_are_kept_not_dropped():
+    """A cell straddling the domain edge keeps a *fraction* of its flux, not zero.
+
+    The failure this guards against is masking on cell centres: a boundary cell
+    whose centre lies just outside the domain gets discarded whole, taking its
+    emissions with it. On a coastal domain that silently lost ~15% of the total.
+    """
+    import geopandas as gpd
+    from shapely.geometry import box
+
+    crs = "epsg:5070"
+    fine = geo.make_grid((0, 0, 4_000, 4_000), 100.0, crs, fill=1.0)
+    coarse = geo.make_grid((0, 0, 4_000, 4_000), 1_000.0, crs)
+
+    # domain edge at x=2_400 cuts the third column of coarse cells (2000-3000),
+    # leaving their centres (2_500) *outside* the domain
+    domain = gpd.GeoDataFrame(geometry=[box(0, 0, 2_400, 4_000)], crs=crs)
+    out = geo.project_partial_to_grid(fine, domain, coarse)
+
+    col = out.values[:, 2]  # the straddling column
+    assert np.all(np.isfinite(col)), "boundary cells were dropped instead of weighted"
+    # 400 m of the 1000 m cell is inside -> ~0.4 of the flux
+    assert col.mean() == pytest.approx(0.4, abs=0.05)

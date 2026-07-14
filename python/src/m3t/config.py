@@ -199,6 +199,14 @@ class Config:
     GHGI_Pipeline: float | str = "GHGI"
     GHGI_transmission_compressors: float | str = "GHGI"
 
+    # --- gridding ---------------------------------------------------------- #
+    # Conservatively regrid the Vulcan/ACES-disaggregated sectors so the gridded
+    # total equals the county totals that fed it. The R instead treats each 1 km
+    # inventory pixel as exactly 1 km^2 (those grids are conformal, not equal-area)
+    # and area-averages the flux, which inflates the total by ~1.4%. Set False to
+    # reproduce the R's numbers exactly.
+    Mass_conserving_regrid: bool = True
+
     # --- stationary combustion ------------------------------------------- #
     Process_stationary_combustion: bool = True
     stationary_combustion_by_state: bool = True

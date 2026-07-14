@@ -329,6 +329,7 @@ def compute_ng_distribution(
     inventory_name: str,
     by_state: bool = True,
     by_domain: bool = False,
+    mass_conserving: bool = True,
     verbose: bool = False,
 ) -> dict[str, xr.DataArray]:
     """Disaggregate state (or domain) CH4 totals onto the domain grid.
@@ -392,7 +393,13 @@ def compute_ng_distribution(
                 progress=f"{inventory_name} {sector} by{level}" if verbose else None,
             )
             for total, da in ch4.items():
-                flux = geo.project_partial_to_grid(da, box, domain_template) * 1000.0
+                # same mass-conservation story as stationary combustion -- see
+                # stationary_combustion._to_flux for why the R version drifts
+                if mass_conserving:
+                    mass = geo.project_mass_to_grid(da, domain_template)
+                    flux = mass * 1e9 / geo.cell_area(domain_template, unit="m")
+                else:
+                    flux = geo.project_partial_to_grid(da, box, domain_template) * 1000.0
                 flux.name = "methane_emissions"
                 name = total.replace("_ER_total", "")
                 out[f"NG_dist_{name}_by{level}_{inventory_name}"] = flux
@@ -460,6 +467,7 @@ class NGDistributionSector:
                 inventory_name=inv_name,
                 by_state=cfg.NG_distribution_by_state,
                 by_domain=cfg.NG_distribution_by_domain,
+                mass_conserving=cfg.Mass_conserving_regrid,
                 verbose=ctx.verbose,
             )
 

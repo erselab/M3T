@@ -52,35 +52,21 @@ writeVector(County_Tigerlines[, c("STATEFP", "COUNTYFP", "NAME")],
             file.path(gold_dir, "counties_ctri.geojson"),
             filetype = "GeoJSON", overwrite = TRUE)
 
-# --- ACES: one raster per sector, cropped to the domain ----------------------
-# The ACES NetCDFs put their georeferencing in a `crs` variable (proj4 +
-# geotransform attributes) that this GDAL/terra build does not pick up -- a plain
-# rast() yields extent 0..ncol and no CRS. Apply the file's own values explicitly;
-# python/src/m3t/shared_data.py:load_aces does exactly the same.
-ACES_PROJ <- "+proj=lcc +lat_0=40 +lon_0=-97 +lat_1=33 +lat_2=45 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
-ACES_ORIGIN <- c(-2300000, 1300000)  # top-left x, y; 1000 m cells
-aces_dir <- file.path(data_dir, "ACES V2.0")
-load_aces <- function(sector) {
-  r <- rast(file.path(aces_dir, paste0("ACES_annual_", sector, "_", inventory_year, ".nc")),
-            subds = "flux_co2")
-  ext(r) <- ext(ACES_ORIGIN[1], ACES_ORIGIN[1] + ncol(r) * 1000,
-                ACES_ORIGIN[2] - nrow(r) * 1000, ACES_ORIGIN[2])
-  crs(r) <- ACES_PROJ
-  r
-}
-aces_res  <- load_aces("Residential")
-aces_com  <- load_aces("Commercial")
-aces_ind  <- load_aces("Industrial")
-aces_elec <- load_aces("Elec")
-
-# committed fixtures: clip to the domain (+ generous margin for the zero-buffer)
-dom_aces <- project(domain, crs(aces_res))
-clip_ext <- ext(dom_aces) + 60000
+# --- ACES: read the committed GeoTIFF fixtures, NOT the NetCDFs ---------------
+# terra reads the ACES .nc files as ALL ZEROS in this environment (right shape,
+# every value 0). That silently disables the CO2 proxy: the disaggregation sees a
+# county with no CO2 and falls back to spreading its methane evenly, so the oracle
+# would agree with Python while neither had used ACES at all. The fixtures are built
+# from the NetCDFs by tests/golden/make_aces_fixtures.py (Python/xarray reads them
+# correctly) and are what both sides read.
+load_aces <- function(sector) rast(file.path(gold_dir, paste0("aces_", sector, "_ctri.tif")))
+aces_res  <- load_aces("res")
+aces_com  <- load_aces("com")
+aces_ind  <- load_aces("ind")
+aces_elec <- load_aces("elec")
 for (nm in c("res", "com", "ind", "elec")) {
   r <- get(paste0("aces_", nm))
-  writeRaster(crop(r, clip_ext, snap = "out"),
-              file.path(gold_dir, paste0("aces_", nm, "_ctri.tif")),
-              overwrite = TRUE, datatype = "FLT8S")
+  stopifnot(as.numeric(global(r, "sum", na.rm = TRUE)[1, 1]) > 0)
 }
 
 M3T:::Stationary_combustion(

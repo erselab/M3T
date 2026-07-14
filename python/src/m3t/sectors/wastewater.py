@@ -157,7 +157,8 @@ def _municipal_csv(points: pd.DataFrame, source: str, methods: list[str]) -> pd.
 
 
 def _to_crs(gdf, dst):
-    return gdf if str(gdf.crs) == str(dst) else gdf.to_crs(dst)
+    """Domain (GeoDataFrame or bbox tuple) as polygons in ``dst``."""
+    return geo.as_polygons(gdf, dst)
 
 
 def septic_state_info(

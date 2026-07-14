@@ -17,7 +17,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import datasets
+from . import datasets, geo
 from .context import RunContext
 from .download import trycatch_downloader
 
@@ -72,12 +72,14 @@ def load_ghgrp_facility_data(source: str, input_directory: Path, *, timeout: flo
 
 def load_ghgrp_subpartW(source: str, input_directory: Path, *, timeout: float = 60 * 20):
     """Load GHGRP subpart W (oil & gas) emissions per its ``Source_GHGRP_NG`` setting."""
+    dest = Path(input_directory) / "GHGRP" / "Oil_and_gas_W.csv"
     if source == "download":
-        dest = Path(input_directory) / "GHGRP" / "Oil_and_gas_W.csv"
         trycatch_downloader(_SUBPARTW_URL, output_location=dest, method="save", timeout=timeout)
         return pd.read_csv(dest, low_memory=False)
     if source == "M3T":
-        raise _zenodo_todo("Source_GHGRP_NG", Path(input_directory) / "GHGRP" / "Oil_and_gas_W.csv")
+        if not dest.exists():
+            raise _zenodo_todo("Source_GHGRP_NG", dest)
+        return pd.read_csv(dest, low_memory=False)
     return pd.read_csv(source, low_memory=False)
 
 
@@ -92,10 +94,10 @@ def load_eia_transmission_pipes(source: str, input_directory: Path, *, timeout: 
     if source == "download":
         return _download_eia_pipes(timeout=timeout)
     if source == "M3T":
-        raise _zenodo_todo(
-            "Source_EIA_transmission_file",
-            Path(input_directory) / "EIA" / "EIA_transmission_pipeline_map.geojson",
-        )
+        companion = Path(input_directory) / "EIA" / "EIA_transmission_pipeline_map.geojson"
+        if not companion.exists():
+            raise _zenodo_todo("Source_EIA_transmission_file", companion)
+        return gpd.read_file(companion)
     return gpd.read_file(source)
 
 
@@ -243,8 +245,14 @@ def georeference_aces(da):
 
 
 def load_aces(source: str, input_directory: Path, inventory_year: int):
-    """The four ACES sectoral CO2 rasters, keyed res/com/ind/elec."""
-    import rioxarray
+    """The four ACES sectoral CO2 rasters, keyed res/com/ind/elec.
+
+    Read with xarray, not ``rioxarray.open_rasterio("netcdf:...")``: the latter goes
+    through GDAL's netCDF driver, which is an optional plugin and is missing from
+    plenty of conda GDAL builds (including the one this package pins). xarray reads
+    the file directly, and we attach the georeferencing ourselves anyway.
+    """
+    import xarray as xr
 
     base = Path(source) if source != "M3T" else Path(input_directory) / "ACES V2.0"
     if not base.exists():
@@ -256,7 +264,12 @@ def load_aces(source: str, input_directory: Path, inventory_year: int):
         path = base / f"ACES_annual_{name}_{year}.nc"
         if not path.exists():
             raise FileNotFoundError(f"ACES file missing: {path}")
-        da = rioxarray.open_rasterio(f'netcdf:"{path}":flux_co2', masked=True)
+        da = xr.open_dataset(path)["flux_co2"]
+        # the year is a length-1 leading dim named after the year itself
+        for dim in list(da.dims):
+            if dim not in ("easting", "northing") and da.sizes[dim] == 1:
+                da = da.isel({dim: 0}, drop=True)
+        da = da.rename({"northing": "y", "easting": "x"})
         out[key] = georeference_aces(da)
     return out
 
@@ -430,6 +443,12 @@ def prepare_shared_data(ctx: RunContext) -> None:
                 f"{ctx.inventory_year}. Using {nei_year} as the nearest available data."
             )
 
+    # --- remaining sectors (gridded EPA) ---------------------------------- #
+    if cfg.Process_remaining_sectors_from_gridded_EPA and "gepa" not in ctx.shared:
+        ctx.shared["gepa"] = load_gepa(
+            cfg.Source_GEPA, ctx.input_directory, ctx.inventory_year, timeout=cfg.Base_timeout
+        )
+
     # --- wetlands companion inputs ---------------------------------------- #
     if cfg.Process_wetlands_and_inland_waters:
         if "state_tigerlines" not in ctx.shared:
@@ -441,7 +460,11 @@ def prepare_shared_data(ctx: RunContext) -> None:
             ctx.shared["wetcharts"] = load_wetcharts(cfg.Source_wetcharts, ctx.input_directory)
         if "nwi" not in ctx.shared:
             ctx.shared["nwi"] = load_nwi(
-                cfg.Source_NWI, ctx.input_directory, ctx.shared["state_name_list"]
+                cfg.Source_NWI,
+                ctx.input_directory,
+                ctx.shared["state_name_list"],
+                bounds=geo.ext(ctx.domain_template),
+                crs=ctx.domain_crs,
             )
         if cfg.Use_SOCCR2 and "watersheds" not in ctx.shared:
             ctx.shared["watersheds"] = load_watersheds(
@@ -512,12 +535,18 @@ def load_wetcharts(source: str, input_directory: Path):
     return da.assign_coords(band_name=("band", list(da.attrs.get("long_name", []))))
 
 
-def load_nwi(source: str, input_directory: Path, states):
+def load_nwi(source: str, input_directory: Path, states, *, bounds=None, crs=None):
     """Per-state NWI wetland-class rasters, combined across states with ``max``.
 
     Returns ``{class: DataArray}``. The state rasters overlap at their borders, so
     ``max`` merges them without double-counting the seam (see combine_nwi_states).
+
+    ``bounds``/``crs`` give the run's domain, and each state raster is cropped to it
+    before anything else. Without that we would stack whole states at 1 km (33M
+    cells each) and hold several hundred MB to compute a max over a window the size
+    of a city. The crop is generous enough that the sector's own crop is unaffected.
     """
+    import geopandas as gpd
     import rioxarray
 
     from .sectors.wetlands import combine_nwi_states
@@ -528,14 +557,48 @@ def load_nwi(source: str, input_directory: Path, states):
     if not base.exists():
         raise _zenodo_todo("Source_NWI", base)
 
+    from . import geo
+
     per_class: dict = {}
     for state in states:
         path = base / f"{state}_combined_NWI_wetland_landcover.tif"
         if not path.exists():
             raise FileNotFoundError(f"NWI raster missing for {state}: {path}")
         da = rioxarray.open_rasterio(path, masked=True)
+
+        window = None
+        if bounds is not None:
+            # the domain (+ a 50 km margin, comfortably more than the sector's own
+            # crop and zero-buffer need), in this raster's CRS
+            box = gpd.GeoSeries.from_wkt(
+                [
+                    "POLYGON(({0} {1},{2} {1},{2} {3},{0} {3},{0} {1}))".format(
+                        bounds[0], bounds[1], bounds[2], bounds[3]
+                    )
+                ],
+                crs=crs,
+            ).to_crs(da.rio.crs)
+            m = 50_000.0
+            xmin, ymin, xmax, ymax = box.total_bounds
+            window = (xmin - m, ymin - m, xmax + m, ymax + m)
+
+            # skip a state whose raster does not reach the domain at all
+            rxmin, rymin, rxmax, rymax = geo.ext(da.isel(band=0))
+            if (window[0] >= rxmax or window[2] <= rxmin
+                    or window[1] >= rymax or window[3] <= rymin):
+                continue
+
         for i, cls in enumerate(da.attrs.get("long_name", [])):
-            per_class.setdefault(cls, []).append(da.isel(band=i))
+            layer = da.isel(band=i)  # crop 2-D layers: crop_snap_out is y/x only
+            if window is not None:
+                layer = geo.crop_snap_out(layer, window)
+            per_class.setdefault(cls, []).append(layer)
+
+    if not per_class:
+        raise ValueError(
+            f"no NWI raster overlaps the domain (states: {list(states)}). "
+            "Check the domain and Source_NWI."
+        )
     return {cls: combine_nwi_states(v) for cls, v in per_class.items()}
 
 
@@ -547,3 +610,47 @@ def load_watersheds(source: str, input_directory: Path):
     if not base.exists():
         raise _zenodo_todo("Source_Watershed_file", base)
     return gpd.read_file(base)
+
+
+_GEPA_ZENODO_RECORD = "8367082"
+
+
+def load_gepa(source: str, input_directory: Path, inventory_year: int, *, timeout: float = 60 * 20):
+    """The gridded EPA inventory (GEPA v2) for the year nearest the run year.
+
+    ``"download"`` fetches from Zenodo record 8367082 (~3 MB); a path reads a local
+    NetCDF. The record holds one file per year, plus monthly scale factors we skip.
+    """
+    import xarray as xr
+
+    if source != "download":
+        path = Path(source)
+        if not path.exists():
+            raise _zenodo_todo("Source_GEPA", path)
+    else:
+        import json
+        import urllib.request
+
+        with urllib.request.urlopen(
+            f"https://zenodo.org/api/records/{_GEPA_ZENODO_RECORD}", timeout=timeout
+        ) as fh:
+            files = [f["key"] for f in json.load(fh)["files"]]
+        files = [f for f in files if "Scale_Factors" not in f and f.endswith(".nc")]
+        years = {int(f.rsplit("_", 1)[-1][:-3]): f for f in files}
+        year = _nearest(inventory_year, sorted(years))
+        if year != inventory_year:
+            print(
+                f"GEPA does not include {inventory_year}, using {year} "
+                "for GEPA as the nearest data available"
+            )
+        path = Path(input_directory) / years[year]
+        if not path.exists():
+            trycatch_downloader(
+                f"https://zenodo.org/api/records/{_GEPA_ZENODO_RECORD}/files/"
+                f"{years[year]}/content",
+                output_location=path,
+                method="save",
+                timeout=timeout,
+            )
+
+    return xr.open_dataset(path).rio.write_crs("epsg:4326")
